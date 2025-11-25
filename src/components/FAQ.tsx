@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -5,7 +6,11 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const FAQ = () => {
+interface FAQProps {
+  onNavigate: (section: string) => void;
+}
+
+const FAQ = ({ onNavigate }: FAQProps) => {
   const faqs = [
     {
       question: "What is a crypto onramp?",
@@ -36,6 +41,13 @@ const FAQ = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
+      <button
+        onClick={() => onNavigate("home")}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        <span className="text-sm">Back to Onramp</span>
+      </button>
       <h1 className="text-4xl font-semibold mb-8">Frequently Asked Questions</h1>
       <Accordion type="single" collapsible className="w-full">
         {faqs.map((faq, index) => (

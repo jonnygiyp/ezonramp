@@ -1,11 +1,16 @@
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
-const Contact = () => {
+interface ContactProps {
+  onNavigate: (section: string) => void;
+}
+
+const Contact = ({ onNavigate }: ContactProps) => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: "",
@@ -61,6 +66,13 @@ const Contact = () => {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
+      <button
+        onClick={() => onNavigate("home")}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        <span className="text-sm">Back to Onramp</span>
+      </button>
       <h1 className="text-4xl font-semibold mb-8">Contact Us</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
