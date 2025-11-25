@@ -1,60 +1,57 @@
+import * as jose from "https://deno.land/x/jose@v5.9.6/index.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to generate JWT for Coinbase API
 async function generateCoinbaseJWT(apiKey: string, apiSecret: string, requestMethod: string, requestPath: string): Promise<string> {
-  const algorithm = { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" };
-  
-  // Parse the PEM-formatted private key
-  const pemHeader = "-----BEGIN EC PRIVATE KEY-----";
-  const pemFooter = "-----END EC PRIVATE KEY-----";
-  const pemContents = apiSecret
-    .replace(pemHeader, "")
-    .replace(pemFooter, "")
-    .replace(/\\n/g, "")
-    .replace(/\s/g, "");
-  
-  const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-  
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    binaryDer,
-    algorithm,
-    false,
-    ["sign"]
-  );
-  
-  const header = {
-    alg: "ES256",
-    kid: apiKey,
-    nonce: crypto.randomUUID(),
-  };
-  
-  const payload = {
-    sub: apiKey,
-    iss: "coinbase-cloud",
-    nbf: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 120, // 2 minutes expiry
-    aud: ["cdp_service"],
-    uri: `${requestMethod} ${requestPath}`,
-  };
-  
-  const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, "");
-  const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, "");
-  const message = `${encodedHeader}.${encodedPayload}`;
-  
-  const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-  const signature = await crypto.subtle.sign(algorithm, key, data);
-  
-  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
-  
-  return `${message}.${encodedSignature}`;
+  try {
+    // Process the private key to ensure it has proper newlines
+    let processedKey = apiSecret;
+    if (apiSecret.includes('\\n')) {
+      processedKey = apiSecret.replace(/\\n/g, '\n');
+    }
+
+    // Import the private key - try PKCS#8 format first
+    let privateKey;
+    try {
+      // Check if it's already in PKCS#8 format (BEGIN PRIVATE KEY)
+      if (processedKey.includes('BEGIN PRIVATE KEY')) {
+        privateKey = await jose.importPKCS8(processedKey, 'ES256');
+      } else {
+        // It's in SEC1 format (BEGIN EC PRIVATE KEY)
+        // jose doesn't support SEC1 directly, so we need to tell the user
+        throw new Error('Please provide the API secret in PKCS#8 format (BEGIN PRIVATE KEY). You can convert it using: openssl pkcs8 -topk8 -nocrypt -in ec-key.pem -out pkcs8-key.pem');
+      }
+    } catch (error) {
+      console.error('Key import error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown key import error';
+      throw new Error(`Failed to import private key: ${errorMsg}`);
+    }
+
+    const payload = {
+      sub: apiKey,
+      iss: "coinbase-cloud",
+      nbf: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 120, // 2 minutes expiry
+      aud: ["cdp_service"],
+      uri: `${requestMethod} api.developer.coinbase.com${requestPath}`,
+    };
+
+    const jwt = await new jose.SignJWT(payload)
+      .setProtectedHeader({
+        alg: 'ES256',
+        kid: apiKey,
+        nonce: crypto.randomUUID(),
+      })
+      .sign(privateKey);
+
+    return jwt;
+  } catch (error) {
+    console.error('JWT generation error:', error);
+    throw error;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -85,8 +82,12 @@ Deno.serve(async (req) => {
     const requestMethod = "POST";
     const requestPath = "/onramp/v1/token";
     
+    console.log('Generating JWT...');
+    
     // Generate JWT token for authentication
     const jwt = await generateCoinbaseJWT(apiKey, apiSecret, requestMethod, requestPath);
+    
+    console.log('JWT generated successfully');
     
     // Call Coinbase API to create session token
     const response = await fetch('https://api.developer.coinbase.com/onramp/v1/token', {
