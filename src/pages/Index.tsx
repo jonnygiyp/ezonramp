@@ -16,7 +16,7 @@ const Index = () => {
     {
       id: "coinbase",
       name: "Coinbase Onramp",
-      appId: "YOUR_COINBASE_APP_ID", // Replace with your actual Coinbase App ID from https://portal.cdp.coinbase.com/
+      appId: "95ad3c47-1682-4b32-894f-46acf29c3778",
     },
   ];
 
