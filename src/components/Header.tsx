@@ -11,16 +11,16 @@ const Header = ({ activeSection, onNavigate }: HeaderProps) => {
   return (
     <header className="border-b border-border">
       <div className="container mx-auto px-6 py-6">
-        <div className="flex items-center justify-between">
+        <div className="grid grid-cols-3 items-center">
           <button
             onClick={() => onNavigate("home")}
-            className="flex items-center gap-3 transition-opacity hover:opacity-70"
+            className="flex items-center gap-3 transition-opacity hover:opacity-70 justify-self-start"
           >
             <img src={logo} alt="EZ Logo" className="h-12 w-auto" />
             <span className="text-2xl font-semibold">EZOnRamp</span>
           </button>
           
-          <nav className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-8">
+          <nav className="flex gap-8 justify-self-center">
             {navItems.map((item) => (
               <button
                 key={item}
@@ -35,6 +35,8 @@ const Header = ({ activeSection, onNavigate }: HeaderProps) => {
               </button>
             ))}
           </nav>
+          
+          <div className="justify-self-end"></div>
         </div>
       </div>
     </header>
