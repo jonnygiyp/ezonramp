@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { initOnRamp, CBPayInstanceType } from "@coinbase/cbpay-js";
-import { Button } from "./ui/button";
 
 interface ApiConfig {
   id: string;
@@ -14,12 +13,14 @@ interface ApiIntegrationProps {
 
 const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const [onrampInstance, setOnrampInstance] = useState<CBPayInstanceType | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Initialize Coinbase Onramp SDK
-    if (apis.length > 0 && apis[0].appId) {
+    if (apis.length > 0 && apis[0].appId && containerRef.current) {
       initOnRamp({
         appId: apis[0].appId,
+        target: '#coinbase-onramp-container',
         widgetParameters: {
           addresses: { 
             '0x0000000000000000000000000000000000000000': ['ethereum', 'base', 'polygon'] 
@@ -35,12 +36,11 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
         onEvent: (event) => {
           console.log('Onramp event:', event);
         },
-        experienceLoggedIn: 'popup',
-        experienceLoggedOut: 'popup',
-        closeOnExit: true,
-        closeOnSuccess: true,
+        experienceLoggedIn: 'embedded',
+        experienceLoggedOut: 'embedded',
       }, (_, instance) => {
         setOnrampInstance(instance);
+        instance?.open();
       });
     }
 
@@ -48,10 +48,6 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       onrampInstance?.destroy();
     };
   }, [apis]);
-
-  const handleOpenOnramp = () => {
-    onrampInstance?.open();
-  };
 
   if (apis.length === 0) {
     return (
@@ -67,30 +63,27 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   }
 
   return (
-    <div className="w-full min-h-[600px] flex items-center justify-center px-6">
-      <div className="text-center space-y-8 max-w-2xl mx-auto">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with {apis[0].name}</h1>
-          <p className="text-xl text-muted-foreground">
+    <div className="w-full px-6 py-8">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Buy Crypto with {apis[0].name}</h1>
+          <p className="text-muted-foreground">
             Purchase cryptocurrency quickly and securely using your preferred payment method
           </p>
         </div>
         
-        <div className="space-y-4">
-          <Button 
-            onClick={handleOpenOnramp}
-            size="lg"
-            className="text-lg px-8 py-6 hover-scale"
-            disabled={!onrampInstance}
-          >
-            {onrampInstance ? 'Open Coinbase Onramp' : 'Loading...'}
-          </Button>
-          
-          <div className="text-sm text-muted-foreground space-y-2">
-            <p>✓ Support for multiple blockchains</p>
-            <p>✓ Secure payment processing</p>
-            <p>✓ Fast transactions</p>
-          </div>
+        <div 
+          id="coinbase-onramp-container"
+          ref={containerRef}
+          className="w-full min-h-[600px] bg-card border border-border rounded-lg overflow-hidden shadow-sm"
+        >
+          {!onrampInstance && (
+            <div className="flex items-center justify-center h-[600px]">
+              <div className="text-center space-y-4">
+                <div className="animate-pulse text-muted-foreground">Loading Coinbase Onramp...</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
