@@ -30,7 +30,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
     <div className="w-full">
       {/* Navigation dots - only show if multiple APIs */}
       {apis.length > 1 && (
-        <div className="flex justify-center gap-2 py-6">
+        <div className="flex justify-center gap-2 py-8 pt-12">
           {apis.map((_, index) => (
             <button
               key={index}
@@ -47,7 +47,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       )}
 
       {/* API Integration Container */}
-      <div className="w-full px-6 pb-16">
+      <div className="w-full px-6 pb-16 pt-12">
         <div className="max-w-4xl mx-auto">
           <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
             <iframe
