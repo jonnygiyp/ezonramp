@@ -54,9 +54,7 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Header onNavigate={handleNavigate} />
-      {activeSection === "home" && (
-        <Navigation activeSection={activeSection} onNavigate={handleNavigate} />
-      )}
+      <Navigation activeSection={activeSection} onNavigate={handleNavigate} />
       
       <main className="flex-1">
         <div
