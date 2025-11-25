@@ -16,14 +16,8 @@ const Index = () => {
     {
       id: "coinbase",
       name: "Coinbase Onramp",
-      embedUrl: "https://pay.coinbase.com/buy/select-asset", // Replace with actual Coinbase onramp URL
+      appId: "YOUR_COINBASE_APP_ID", // Replace with your actual Coinbase App ID from https://portal.cdp.coinbase.com/
     },
-    // Add more APIs as needed:
-    // {
-    //   id: "another-provider",
-    //   name: "Another Provider",
-    //   embedUrl: "https://example.com/onramp",
-    // },
   ];
 
   const handleNavigate = (section: string) => {
