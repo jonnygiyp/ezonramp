@@ -14,12 +14,13 @@ const Header = ({ activeSection, onNavigate }: HeaderProps) => {
         <div className="flex items-center justify-between">
           <button
             onClick={() => onNavigate("home")}
-            className="flex items-center transition-opacity hover:opacity-70"
+            className="flex items-center gap-3 transition-opacity hover:opacity-70"
           >
             <img src={logo} alt="EZ Logo" className="h-12 w-auto" />
+            <span className="text-2xl font-semibold">EZOnRamp</span>
           </button>
           
-          <nav className="flex gap-8">
+          <nav className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-8">
             {navItems.map((item) => (
               <button
                 key={item}
