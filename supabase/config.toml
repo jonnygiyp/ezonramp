@@ -1,1 +1,4 @@
 project_id = "aryusbuyyoxkeigzsnko"
+
+[functions.generate-coinbase-token]
+verify_jwt = false
