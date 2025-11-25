@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { initOnRamp, CBPayInstanceType } from "@coinbase/cbpay-js";
+import { Button } from "./ui/button";
 
 interface ApiConfig {
   id: string;
   name: string;
-  embedUrl: string;
+  appId: string;
 }
 
 interface ApiIntegrationProps {
@@ -11,7 +13,42 @@ interface ApiIntegrationProps {
 }
 
 const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [onrampInstance, setOnrampInstance] = useState<CBPayInstanceType | null>(null);
+
+  useEffect(() => {
+    if (apis.length > 0 && apis[0].appId) {
+      initOnRamp({
+        appId: apis[0].appId,
+        widgetParameters: {
+          addresses: { 
+            '0x0000000000000000000000000000000000000000': ['ethereum', 'base', 'polygon'] 
+          },
+          assets: ['ETH', 'USDC', 'BTC'],
+        },
+        onSuccess: () => {
+          console.log('Onramp purchase successful');
+        },
+        onExit: () => {
+          console.log('Onramp closed');
+        },
+        onEvent: (event) => {
+          console.log('Onramp event:', event);
+        },
+        experienceLoggedIn: 'embedded',
+        experienceLoggedOut: 'embedded',
+      }, (_, instance) => {
+        setOnrampInstance(instance);
+      });
+    }
+
+    return () => {
+      onrampInstance?.destroy();
+    };
+  }, [apis]);
+
+  const handleOpenOnramp = () => {
+    onrampInstance?.open();
+  };
 
   if (apis.length === 0) {
     return (
@@ -27,35 +64,44 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   }
 
   return (
-    <div className="w-full">
-      {/* Navigation dots - only show if multiple APIs */}
-      {apis.length > 1 && (
-        <div className="flex justify-center gap-2 py-8 pt-12">
-          {apis.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`h-2 rounded-full transition-all ${
-                index === currentIndex
-                  ? "w-8 bg-foreground"
-                  : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
-              }`}
-              aria-label={`View ${apis[index].name}`}
-            />
-          ))}
+    <div className="w-full min-h-[600px] flex items-center justify-center px-6 py-12">
+      <div className="text-center space-y-8 max-w-2xl mx-auto">
+        <div className="space-y-4">
+          <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with {apis[0].name}</h1>
+          <p className="text-xl text-muted-foreground">
+            Purchase cryptocurrency quickly and securely using your preferred payment method
+          </p>
         </div>
-      )}
-
-      {/* API Integration Container */}
-      <div className="w-full px-6 pb-16 pt-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-            <iframe
-              src={apis[currentIndex].embedUrl}
-              title={apis[currentIndex].name}
-              className="w-full h-[600px]"
-              allow="payment"
-            />
+        
+        <div className="space-y-6">
+          <Button 
+            onClick={handleOpenOnramp}
+            size="lg"
+            className="text-lg px-8 py-6 hover-scale"
+            disabled={!onrampInstance}
+          >
+            {onrampInstance ? 'Buy Crypto Now' : 'Loading...'}
+          </Button>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-2xl">⚡</span>
+              </div>
+              <p className="font-medium">Fast Transactions</p>
+            </div>
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-2xl">🔒</span>
+              </div>
+              <p className="font-medium">Secure Processing</p>
+            </div>
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-2xl">🌐</span>
+              </div>
+              <p className="font-medium">Multiple Blockchains</p>
+            </div>
           </div>
         </div>
       </div>
