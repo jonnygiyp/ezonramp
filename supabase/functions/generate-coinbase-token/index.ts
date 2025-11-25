@@ -5,6 +5,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Convert EC PRIVATE KEY (SEC1) to PKCS#8 format for P-256 curve
+function convertSEC1toPKCS8(sec1Pem: string): string {
+  // Remove PEM headers and decode base64
+  const sec1Content = sec1Pem
+    .replace('-----BEGIN EC PRIVATE KEY-----', '')
+    .replace('-----END EC PRIVATE KEY-----', '')
+    .replace(/\s/g, '');
+  
+  const sec1Der = Uint8Array.from(atob(sec1Content), c => c.charCodeAt(0));
+  
+  // PKCS#8 wrapper for P-256 EC private key
+  // This is the ASN.1 structure for wrapping an EC private key
+  const oid = new Uint8Array([
+    0x30, 0x13, // SEQUENCE
+    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID for EC public key
+    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07 // OID for P-256 curve
+  ]);
+  
+  // Build PKCS#8 structure
+  const version = new Uint8Array([0x02, 0x01, 0x00]); // INTEGER 0
+  const privateKeyOctetString = new Uint8Array([0x04, sec1Der.length, ...sec1Der]);
+  
+  // Calculate total length
+  const contentLength = version.length + oid.length + privateKeyOctetString.length;
+  const pkcs8Der = new Uint8Array(2 + (contentLength > 127 ? 2 : 1) + contentLength);
+  
+  let offset = 0;
+  pkcs8Der[offset++] = 0x30; // SEQUENCE
+  
+  if (contentLength > 127) {
+    pkcs8Der[offset++] = 0x82; // Long form length
+    pkcs8Der[offset++] = (contentLength >> 8) & 0xff;
+    pkcs8Der[offset++] = contentLength & 0xff;
+  } else {
+    pkcs8Der[offset++] = contentLength;
+  }
+  
+  pkcs8Der.set(version, offset);
+  offset += version.length;
+  pkcs8Der.set(oid, offset);
+  offset += oid.length;
+  pkcs8Der.set(privateKeyOctetString, offset);
+  
+  // Convert to base64 and add PEM headers
+  const pkcs8Base64 = btoa(String.fromCharCode(...pkcs8Der));
+  const pkcs8Pem = `-----BEGIN PRIVATE KEY-----\n${pkcs8Base64.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`;
+  
+  return pkcs8Pem;
+}
+
 async function generateCoinbaseJWT(apiKey: string, apiSecret: string, requestMethod: string, requestPath: string): Promise<string> {
   try {
     // Process the private key to ensure it has proper newlines
@@ -13,16 +63,20 @@ async function generateCoinbaseJWT(apiKey: string, apiSecret: string, requestMet
       processedKey = apiSecret.replace(/\\n/g, '\n');
     }
 
-    // Import the private key - try PKCS#8 format first
+    // Import the private key
     let privateKey;
     try {
-      // Check if it's already in PKCS#8 format (BEGIN PRIVATE KEY)
+      // Check if it's in PKCS#8 format (BEGIN PRIVATE KEY) or SEC1 format (BEGIN EC PRIVATE KEY)
       if (processedKey.includes('BEGIN PRIVATE KEY')) {
         privateKey = await jose.importPKCS8(processedKey, 'ES256');
+      } else if (processedKey.includes('BEGIN EC PRIVATE KEY')) {
+        // Convert SEC1 to PKCS#8
+        console.log('Converting EC PRIVATE KEY to PKCS#8 format...');
+        const pkcs8Key = convertSEC1toPKCS8(processedKey);
+        privateKey = await jose.importPKCS8(pkcs8Key, 'ES256');
+        console.log('Conversion successful');
       } else {
-        // It's in SEC1 format (BEGIN EC PRIVATE KEY)
-        // jose doesn't support SEC1 directly, so we need to tell the user
-        throw new Error('Please provide the API secret in PKCS#8 format (BEGIN PRIVATE KEY). You can convert it using: openssl pkcs8 -topk8 -nocrypt -in ec-key.pem -out pkcs8-key.pem');
+        throw new Error('Invalid key format. Expected BEGIN PRIVATE KEY or BEGIN EC PRIVATE KEY');
       }
     } catch (error) {
       console.error('Key import error:', error);
