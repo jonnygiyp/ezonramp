@@ -1,6 +1,19 @@
-const About = () => {
+import { ArrowLeft } from "lucide-react";
+
+interface AboutProps {
+  onNavigate: (section: string) => void;
+}
+
+const About = ({ onNavigate }: AboutProps) => {
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
+      <button
+        onClick={() => onNavigate("home")}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        <span className="text-sm">Back to Onramp</span>
+      </button>
       <h1 className="text-4xl font-semibold mb-8">About Us</h1>
       <div className="space-y-4 text-muted-foreground leading-relaxed">
         <p>

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Header from "@/components/Header";
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 import About from "@/components/About";
 import FAQ from "@/components/FAQ";
 import Contact from "@/components/Contact";
@@ -39,11 +41,11 @@ const Index = () => {
   const renderContent = () => {
     switch (activeSection) {
       case "about":
-        return <About />;
+        return <About onNavigate={handleNavigate} />;
       case "faq":
-        return <FAQ />;
+        return <FAQ onNavigate={handleNavigate} />;
       case "contact":
-        return <Contact />;
+        return <Contact onNavigate={handleNavigate} />;
       default:
         return <ApiIntegration apis={apiConfigs} />;
     }
@@ -51,7 +53,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header activeSection={activeSection} onNavigate={handleNavigate} />
+      <Header onNavigate={handleNavigate} />
+      {activeSection === "home" && (
+        <Navigation activeSection={activeSection} onNavigate={handleNavigate} />
+      )}
       
       <main className="flex-1">
         <div
@@ -61,6 +66,8 @@ const Index = () => {
           {renderContent()}
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 };
