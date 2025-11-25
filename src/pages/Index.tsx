@@ -16,7 +16,8 @@ const Index = () => {
     {
       id: "coinbase",
       name: "Coinbase Onramp",
-      appId: "95ad3c47-1682-4b32-894f-46acf29c3778",
+      embedUrl:
+        "https://pay.coinbase.com/buy/select-asset?appId=95ad3c47-1682-4b32-894f-46acf29c3778",
     },
   ];
 
