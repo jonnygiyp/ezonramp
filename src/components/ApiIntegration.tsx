@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { initOnRamp, CBPayInstanceType } from "@coinbase/cbpay-js";
 import { Button } from "./ui/button";
 
 interface ApiConfig {
@@ -13,41 +12,68 @@ interface ApiIntegrationProps {
 }
 
 const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
-  const [onrampInstance, setOnrampInstance] = useState<CBPayInstanceType | null>(null);
+  const [onrampUrl, setOnrampUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (apis.length > 0 && apis[0].appId) {
-      initOnRamp({
-        appId: apis[0].appId,
-        widgetParameters: {
-          addresses: { 
-            '0x0000000000000000000000000000000000000000': ['ethereum', 'base', 'polygon'] 
-          },
-          assets: ['ETH', 'USDC', 'BTC'],
-        },
-        onSuccess: () => {
-          console.log('Onramp purchase successful');
-        },
-        onExit: () => {
-          console.log('Onramp closed');
-        },
-        onEvent: (event) => {
-          console.log('Onramp event:', event);
-        },
-        experienceLoggedIn: 'embedded',
-        experienceLoggedOut: 'embedded',
-      }, (_, instance) => {
-        setOnrampInstance(instance);
-      });
-    }
+    const initializeOnramp = async () => {
+      if (apis.length === 0 || !apis[0].appId) {
+        setIsLoading(false);
+        return;
+      }
 
-    return () => {
-      onrampInstance?.destroy();
+      try {
+        // Generate session token from backend
+        const response = await fetch(
+          'https://aryusbuyyoxkeigzsnko.supabase.co/functions/v1/generate-coinbase-token',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              addresses: [
+                {
+                  address: '0x0000000000000000000000000000000000000000',
+                  blockchains: ['ethereum', 'base', 'polygon']
+                }
+              ],
+              assets: ['ETH', 'USDC', 'BTC'],
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to generate session token');
+        }
+
+        const { token } = await response.json();
+        console.log('Session token received');
+
+        // Build the onramp URL with session token
+        const url = new URL('https://pay.coinbase.com/buy/select-asset');
+        url.searchParams.set('appId', apis[0].appId);
+        url.searchParams.set('sessionToken', token);
+        url.searchParams.set('addresses', JSON.stringify({
+          '0x0000000000000000000000000000000000000000': ['ethereum', 'base', 'polygon']
+        }));
+        url.searchParams.set('assets', JSON.stringify(['ETH', 'USDC', 'BTC']));
+
+        setOnrampUrl(url.toString());
+      } catch (error) {
+        console.error('Error initializing onramp:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
+    initializeOnramp();
   }, [apis]);
 
   const handleOpenOnramp = () => {
-    onrampInstance?.open();
+    if (onrampUrl) {
+      window.open(onrampUrl, 'coinbase-onramp', 'width=500,height=700');
+    }
   };
 
   if (apis.length === 0) {
@@ -78,9 +104,9 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
             onClick={handleOpenOnramp}
             size="lg"
             className="text-lg px-8 py-6 hover-scale"
-            disabled={!onrampInstance}
+            disabled={isLoading || !onrampUrl}
           >
-            {onrampInstance ? 'Buy Crypto Now' : 'Loading...'}
+            {isLoading ? 'Loading...' : 'Buy Crypto Now'}
           </Button>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
