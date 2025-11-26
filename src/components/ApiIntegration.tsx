@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { initOnRamp, CBPayInstanceType } from "@coinbase/cbpay-js";
-import { Button } from "./ui/button";
+import { Card } from "./ui/card";
 
 interface ApiConfig {
   id: string;
@@ -21,6 +21,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
     initOnRamp(
       {
         appId: apis[0].appId,
+        target: '#coinbase-onramp-embedded',
         widgetParameters: {
           addresses: { 
             '0x0000000000000000000000000000000000000000': ['ethereum', 'base', 'polygon'] 
@@ -36,10 +37,8 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
         onEvent: (event) => {
           console.log('Onramp event:', event);
         },
-        experienceLoggedIn: 'popup',
-        experienceLoggedOut: 'popup',
-        closeOnExit: true,
-        closeOnSuccess: true,
+        experienceLoggedIn: 'embedded',
+        experienceLoggedOut: 'embedded',
       },
       (_, instance) => {
         setOnrampInstance(instance);
@@ -50,10 +49,6 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       onrampInstance?.destroy();
     };
   }, [apis]);
-
-  const handleOpenOnramp = () => {
-    onrampInstance?.open();
-  };
 
   if (apis.length === 0) {
     return (
@@ -69,46 +64,18 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   }
 
   return (
-    <div className="w-full min-h-[600px] flex items-center justify-center px-6 py-12">
-      <div className="text-center space-y-8 max-w-2xl mx-auto">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with {apis[0].name}</h1>
-          <p className="text-xl text-muted-foreground">
-            Purchase cryptocurrency quickly and securely using your preferred payment method
-          </p>
-        </div>
+    <div className="w-full px-6 py-8">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <p className="text-center text-lg text-muted-foreground">
+          Ready to buy? Try this simple on ramp below.
+        </p>
         
-        <div className="space-y-6">
-          <Button 
-            onClick={handleOpenOnramp}
-            size="lg"
-            className="text-lg px-8 py-6 hover-scale"
-            disabled={!onrampInstance}
-          >
-            {onrampInstance ? 'Buy Crypto Now' : 'Loading...'}
-          </Button>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-2xl">⚡</span>
-              </div>
-              <p className="font-medium">Fast Transactions</p>
-            </div>
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-2xl">🔒</span>
-              </div>
-              <p className="font-medium">Secure Processing</p>
-            </div>
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-2xl">🌐</span>
-              </div>
-              <p className="font-medium">Multiple Blockchains</p>
-            </div>
-          </div>
-        </div>
+        <Card className="overflow-hidden">
+          <div 
+            id="coinbase-onramp-embedded" 
+            className="min-h-[600px] w-full"
+          />
+        </Card>
       </div>
     </div>
   );
