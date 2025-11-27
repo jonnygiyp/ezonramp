@@ -10,7 +10,7 @@ import React from 'react';
 const config = createConfig({
   projectId: 'e7041872-c6f2-4de1-826a-8c20f4d26e7f',
   clientKey: 'cQYG1BDRMOjRHHfoifZ10kiAXuHGbe5ypVetw2LV',
-  appId: 'e7041872-c6f2-4de1-826a-8c20f4d26e7f',
+  appId: 's4H3NQGeGgDN28AzjOKbFO55zm1VmeNmRdO5n9Lk',
 
   appearance: {
     recommendedWallets: [
