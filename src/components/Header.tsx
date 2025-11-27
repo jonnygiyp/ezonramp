@@ -1,5 +1,5 @@
 import logo from "@/assets/logo.png";
-import { ConnectButton } from '@particle-network/connectkit';
+import CustomConnectButton from './CustomConnectButton';
 
 interface HeaderProps {
   onNavigate: (section: string) => void;
@@ -18,7 +18,7 @@ const Header = ({ onNavigate }: HeaderProps) => {
             <span className="text-2xl font-semibold">EZOnRamp</span>
           </button>
           
-          <ConnectButton />
+          <CustomConnectButton />
         </div>
       </div>
     </header>
