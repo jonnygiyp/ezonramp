@@ -1,17 +1,16 @@
-import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 
 interface ContactProps {
   onNavigate: (section: string) => void;
 }
 
 const Contact = ({ onNavigate }: ContactProps) => {
-  const { toast } = useToast();
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -19,50 +18,51 @@ const Contact = ({ onNavigate }: ContactProps) => {
     message: "",
   });
 
+  useEffect(() => {
+    if (isSubmitted) {
+      const timer = setTimeout(() => {
+        onNavigate("home");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSubmitted, onNavigate]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic validation
     if (!formData.name || !formData.email || !formData.message) {
-      toast({
-        title: "Missing Required Fields",
-        description: "Please fill in Name, Email, and Message fields.",
-        variant: "destructive",
-      });
       return;
     }
 
     if (formData.message.length > 500) {
-      toast({
-        title: "Message Too Long",
-        description: "Please limit your message to 500 characters.",
-        variant: "destructive",
-      });
       return;
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
       return;
     }
 
     // TODO: Implement actual email sending via API
     console.log("Form submitted:", formData);
     
-    toast({
-      title: "Message Sent",
-      description: "Thank you for contacting us. We'll get back to you soon!",
-    });
-
-    // Reset form
+    setIsSubmitted(true);
     setFormData({ name: "", email: "", phone: "", message: "" });
   };
+
+  if (isSubmitted) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-16">
+        <div className="flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
+          <CheckCircle className="h-20 w-20 text-green-500 mb-6 animate-scale-in" />
+          <h2 className="text-3xl font-semibold text-foreground mb-2">Message sent!</h2>
+          <p className="text-muted-foreground text-lg">We'll be in touch soon.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
