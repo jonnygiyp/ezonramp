@@ -6,6 +6,8 @@ import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import fs from "fs";
 
+// Note: vite-plugin-static-copy is installed but not needed since we use custom middleware
+
 // Custom plugin to serve WASM files from node_modules
 function serveParticleWasm(): Plugin {
   return {
