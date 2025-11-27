@@ -3,8 +3,9 @@
 import { ConnectKitProvider, createConfig } from '@particle-network/connectkit';
 import { authWalletConnectors } from '@particle-network/connectkit/auth';
 import { evmWalletConnectors } from '@particle-network/connectkit/evm';
+import { solanaWalletConnectors } from '@particle-network/connectkit/solana';
 import { EntryPosition, wallet } from '@particle-network/connectkit/wallet';
-import { mainnet, polygon, base, arbitrum } from '@particle-network/connectkit/chains';
+import { mainnet, polygon, base, arbitrum, solana } from '@particle-network/connectkit/chains';
 import React from 'react';
 
 const config = createConfig({
@@ -12,9 +13,15 @@ const config = createConfig({
   clientKey: 'cQYG1BDRMOjRHHfoifZ10kiAXuHGbe5ypVetw2LV',
   appId: '38f0e5f3-50dd-459c-9016-783a347c30aa',
 
+  // Default to Solana mainnet (101) when user logs in
+  initialChainId: {
+    solana: 101, // Solana mainnet
+  },
+
   appearance: {
     recommendedWallets: [
-      { walletId: 'metaMask', label: 'Recommended' },
+      { walletId: 'phantom', label: 'Recommended' },
+      { walletId: 'metaMask', label: 'Popular' },
       { walletId: 'coinbaseWallet', label: 'Popular' },
     ],
     language: 'en-US',
@@ -22,6 +29,9 @@ const config = createConfig({
   },
 
   walletConnectors: [
+    // Solana wallet connectors (listed first for priority)
+    solanaWalletConnectors(),
+    // EVM wallet connectors
     evmWalletConnectors({
       metadata: {
         name: 'EZOnRamp',
@@ -30,6 +40,7 @@ const config = createConfig({
         url: typeof window !== 'undefined' ? window.location.origin : '',
       },
     }),
+    // Social/email login connectors
     authWalletConnectors({}),
   ],
 
@@ -40,7 +51,8 @@ const config = createConfig({
     }),
   ],
 
-  chains: [mainnet, polygon, base, arbitrum],
+  // Include both Solana and EVM chains
+  chains: [solana, mainnet, polygon, base, arbitrum],
 });
 
 export const ParticleConnectkit = ({ children }: React.PropsWithChildren) => {
