@@ -12,7 +12,13 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     fs: {
       // Allow serving files from node_modules
-      allow: ['..'],
+      allow: ['..', 'node_modules'],
+      strict: false,
+    },
+    // Add headers for WASM support
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
   plugins: [
@@ -27,8 +33,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    // Don't pre-bundle WASM modules
-    exclude: ['@aspect-build/thresh-sig-wasm'],
+    // Include thresh-sig in optimization to handle WASM properly
+    include: ['@particle-network/thresh-sig'],
+    exclude: [],
     esbuildOptions: {
       target: 'esnext',
     },
