@@ -10,6 +10,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    fs: {
+      // Allow serving files from node_modules
+      allow: ['..'],
+    },
   },
   plugins: [
     wasm(),
@@ -23,6 +27,15 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    exclude: ["@aspect-build/thresh-sig-wasm"],
+    // Don't pre-bundle WASM modules
+    exclude: ['@aspect-build/thresh-sig-wasm'],
+    esbuildOptions: {
+      target: 'esnext',
+    },
   },
+  build: {
+    target: 'esnext',
+  },
+  // Handle WASM files properly
+  assetsInclude: ['**/*.wasm'],
 }));
