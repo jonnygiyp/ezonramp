@@ -30,9 +30,7 @@ const config = createConfig({
         url: typeof window !== 'undefined' ? window.location.origin : '',
       },
     }),
-    authWalletConnectors({
-      authTypes: ['email', 'google', 'twitter', 'discord', 'github', 'apple'],
-    }),
+    authWalletConnectors({}), // Simplified - let Particle handle auth types
   ],
 
   plugins: [
