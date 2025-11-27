@@ -17,9 +17,15 @@ const About = ({ onNavigate }: AboutProps) => {
       <h1 className="text-4xl font-semibold mb-8">About Us</h1>
       <div className="space-y-4 text-muted-foreground leading-relaxed">
         <p>
-          Welcome to our platform. We provide a simple and secure way to access
-          cryptocurrency onramp services, making it easy for anyone to get started
-          with digital assets.
+          <a 
+            href="https://EZOnRamp.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            EZOnRamp.com
+          </a>{" "}
+          was created for people who want to buy crypto or stablecoins for the first time, but have no clue where to get started.
         </p>
         <p>
           Our mission is to bridge the gap between traditional finance and the
