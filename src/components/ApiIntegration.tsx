@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { initOnRamp, CBPayInstanceType } from "@coinbase/cbpay-js";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { ChevronLeft, ChevronRight, CreditCard, Wallet } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ApiConfig {
   id: string;
@@ -12,8 +17,28 @@ interface ApiIntegrationProps {
   apis: ApiConfig[];
 }
 
+const CARD2CRYPTO_PROVIDERS = [
+  { id: 'moonpay', name: 'MoonPay', minAmount: 20 },
+  { id: 'coinbase', name: 'Coinbase', minAmount: 2 },
+  { id: 'transak', name: 'Transak', minAmount: 15 },
+  { id: 'banxa', name: 'Banxa', minAmount: 20 },
+  { id: 'rampnetwork', name: 'Ramp Network', minAmount: 4 },
+  { id: 'stripe', name: 'Stripe (USA)', minAmount: 2 },
+  { id: 'mercuryo', name: 'Mercuryo', minAmount: 30 },
+  { id: 'simplex', name: 'Simplex', minAmount: 50 },
+  { id: 'revolut', name: 'Revolut', minAmount: 15 },
+];
+
 const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'coinbase' | 'card2crypto'>('coinbase');
   const [onrampInstance, setOnrampInstance] = useState<CBPayInstanceType | null>(null);
+  
+  // Card2Crypto state
+  const [amount, setAmount] = useState('');
+  const [email, setEmail] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState('moonpay');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (apis.length === 0 || !apis[0].appId) return;
@@ -55,6 +80,65 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
     onrampInstance?.open();
   };
 
+  const handleCard2CryptoPayment = async () => {
+    if (!amount || !email) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter amount and email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const provider = CARD2CRYPTO_PROVIDERS.find(p => p.id === selectedProvider);
+    if (provider && parseFloat(amount) < provider.minAmount) {
+      toast({
+        title: "Amount Too Low",
+        description: `Minimum amount for ${provider.name} is $${provider.minAmount}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('card2crypto', {
+        body: {
+          amount: parseFloat(amount),
+          provider: selectedProvider,
+          email,
+          currency: 'USD',
+          orderId: `order_${Date.now()}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.paymentUrl) {
+        // Redirect to payment page
+        window.location.href = data.paymentUrl;
+      }
+    } catch (error: any) {
+      console.error('Card2Crypto error:', error);
+      toast({
+        title: "Payment Error",
+        description: error.message || "Failed to create payment link. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const swipeLeft = () => {
+    setActiveTab('coinbase');
+  };
+
+  const swipeRight = () => {
+    setActiveTab('card2crypto');
+  };
+
   if (apis.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[500px] px-6">
@@ -69,46 +153,193 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   }
 
   return (
-    <div className="w-full min-h-[600px] flex items-center justify-center px-6 py-12">
-      <div className="text-center space-y-8 max-w-2xl mx-auto">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with {apis[0].name}</h1>
-          <p className="text-xl text-muted-foreground">
-            Purchase cryptocurrency quickly and securely using your preferred payment method
-          </p>
-        </div>
+    <div className="w-full min-h-[600px] flex flex-col items-center justify-center px-6 py-12">
+      {/* Tab Switcher */}
+      <div className="flex items-center justify-center gap-4 mb-8">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={swipeLeft}
+          className={activeTab === 'coinbase' ? 'opacity-30' : 'hover-scale'}
+          disabled={activeTab === 'coinbase'}
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
         
-        <div className="space-y-6">
-          <Button 
-            onClick={handleOpenOnramp}
-            size="lg"
-            className="text-lg px-8 py-6 hover-scale"
-            disabled={!onrampInstance}
+        <div className="flex gap-2 bg-muted rounded-full p-1">
+          <button
+            onClick={() => setActiveTab('coinbase')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+              activeTab === 'coinbase' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'hover:bg-muted-foreground/10'
+            }`}
           >
-            {onrampInstance ? 'Buy Crypto Now' : 'Loading...'}
-          </Button>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-2xl">⚡</span>
-              </div>
-              <p className="font-medium">Fast Transactions</p>
+            <Wallet className="h-4 w-4" />
+            <span className="font-medium">Coinbase</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('card2crypto')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+              activeTab === 'card2crypto' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'hover:bg-muted-foreground/10'
+            }`}
+          >
+            <CreditCard className="h-4 w-4" />
+            <span className="font-medium">Card2Crypto</span>
+          </button>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={swipeRight}
+          className={activeTab === 'card2crypto' ? 'opacity-30' : 'hover-scale'}
+          disabled={activeTab === 'card2crypto'}
+        >
+          <ChevronRight className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* Dot Indicators */}
+      <div className="flex gap-2 mb-8">
+        <div className={`w-2 h-2 rounded-full transition-all ${activeTab === 'coinbase' ? 'bg-primary w-4' : 'bg-muted-foreground/30'}`} />
+        <div className={`w-2 h-2 rounded-full transition-all ${activeTab === 'card2crypto' ? 'bg-primary w-4' : 'bg-muted-foreground/30'}`} />
+      </div>
+
+      {/* Content Area */}
+      <div className="w-full max-w-2xl mx-auto">
+        {activeTab === 'coinbase' ? (
+          <div className="text-center space-y-8 animate-fade-in">
+            <div className="space-y-4">
+              <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with {apis[0].name}</h1>
+              <p className="text-xl text-muted-foreground">
+                Purchase cryptocurrency quickly and securely using your preferred payment method
+              </p>
             </div>
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-2xl">🔒</span>
+            
+            <div className="space-y-6">
+              <Button 
+                onClick={handleOpenOnramp}
+                size="lg"
+                className="text-lg px-8 py-6 hover-scale"
+                disabled={!onrampInstance}
+              >
+                {onrampInstance ? 'Buy Crypto Now' : 'Loading...'}
+              </Button>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-2xl">⚡</span>
+                  </div>
+                  <p className="font-medium">Fast Transactions</p>
+                </div>
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-2xl">🔒</span>
+                  </div>
+                  <p className="font-medium">Secure Processing</p>
+                </div>
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-2xl">🌐</span>
+                  </div>
+                  <p className="font-medium">Multiple Blockchains</p>
+                </div>
               </div>
-              <p className="font-medium">Secure Processing</p>
-            </div>
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-2xl">🌐</span>
-              </div>
-              <p className="font-medium">Multiple Blockchains</p>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-8 animate-fade-in">
+            <div className="text-center space-y-4">
+              <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with Card2Crypto</h1>
+              <p className="text-xl text-muted-foreground">
+                Accept credit/debit cards, Apple Pay, Google Pay & bank transfers
+              </p>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount (USD)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="Enter amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    min="2"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Payment Provider</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {CARD2CRYPTO_PROVIDERS.map((provider) => (
+                      <button
+                        key={provider.id}
+                        onClick={() => setSelectedProvider(provider.id)}
+                        className={`p-3 rounded-lg border text-sm font-medium transition-all ${
+                          selectedProvider === provider.id
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {provider.name}
+                        <span className="block text-xs text-muted-foreground">
+                          Min: ${provider.minAmount}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleCard2CryptoPayment}
+                size="lg"
+                className="w-full text-lg py-6 hover-scale"
+                disabled={isProcessing || !amount || !email}
+              >
+                {isProcessing ? 'Processing...' : 'Pay with Card'}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-2xl">💳</span>
+                </div>
+                <p className="font-medium">All Major Cards</p>
+              </div>
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-2xl">🛡️</span>
+                </div>
+                <p className="font-medium">No Chargebacks</p>
+              </div>
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-2xl">⚡</span>
+                </div>
+                <p className="font-medium">Instant Settlement</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
