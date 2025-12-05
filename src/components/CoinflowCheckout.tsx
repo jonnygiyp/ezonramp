@@ -1,91 +1,87 @@
-import { FC, useState, useMemo, useCallback } from 'react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { FC, useState, useMemo } from 'react';
 import { CoinflowPurchase, Currency } from '@coinflowlabs/react';
-import { Transaction, VersionedTransaction, PublicKey, SystemProgram } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, VersionedTransaction, clusterApiUrl } from '@solana/web3.js';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
 
 const MERCHANT_ID = 'lovable-test'; // Sandbox merchant ID
 
+// Solana address validation schema
+const solanaAddressSchema = z.string()
+  .trim()
+  .min(32, "Invalid Solana address")
+  .max(44, "Invalid Solana address")
+  .refine((val) => {
+    try {
+      new PublicKey(val);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Invalid Solana wallet address");
+
 export const CoinflowCheckout: FC = () => {
   const { toast } = useToast();
-  const { publicKey, sendTransaction, connected } = useWallet();
-  const { connection } = useConnection();
+  const [walletAddress, setWalletAddress] = useState('');
   const [amount, setAmount] = useState<number>(10);
   const [email, setEmail] = useState('');
   const [showCheckout, setShowCheckout] = useState(false);
 
-  // Create a simple transaction for Coinflow
-  const transaction = useMemo(() => {
-    if (!publicKey) return undefined;
-    
-    const tx = new Transaction();
-    // Add a simple instruction - this is a placeholder
-    // In production, this would be your actual purchase transaction
-    tx.add(
-      SystemProgram.transfer({
-        fromPubkey: publicKey,
-        toPubkey: publicKey, // Self-transfer for demo
-        lamports: 0,
-      })
-    );
-    return tx;
-  }, [publicKey]);
+  // Create connection to Solana devnet
+  const connection = useMemo(() => new Connection(clusterApiUrl('devnet')), []);
 
-  // Coinflow wallet interface
+  // Parse the wallet address
+  const publicKey = useMemo(() => {
+    try {
+      const result = solanaAddressSchema.safeParse(walletAddress);
+      if (result.success) {
+        return new PublicKey(walletAddress);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [walletAddress]);
+
+  // Coinflow wallet interface (read-only for receiving funds)
   const coinflowWallet = useMemo(() => {
-    if (!publicKey || !sendTransaction) return undefined;
+    if (!publicKey) return undefined;
     
     return {
       publicKey,
-      sendTransaction: async <T extends Transaction | VersionedTransaction>(tx: T): Promise<string> => {
-        const signature = await sendTransaction(tx, connection);
-        await connection.confirmTransaction(signature);
-        return signature;
+      // For receive-only mode, we provide a minimal sendTransaction that won't be called
+      sendTransaction: async <T extends Transaction | VersionedTransaction>(_tx: T): Promise<string> => {
+        throw new Error('This is a receive-only wallet');
       },
     };
-  }, [publicKey, sendTransaction, connection]);
-
-  const handleConnectWallet = useCallback(async () => {
-    // Check if Phantom is installed
-    const phantom = (window as any).phantom?.solana;
-    
-    if (!phantom) {
-      toast({
-        title: "Phantom Wallet Required",
-        description: "Please install Phantom wallet extension to use Coinflow.",
-        variant: "destructive",
-      });
-      window.open('https://phantom.app/', '_blank');
-      return;
-    }
-
-    try {
-      await phantom.connect();
-      toast({
-        title: "Wallet Connected",
-        description: "Your Phantom wallet is now connected.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Connection Failed",
-        description: error.message || "Failed to connect wallet.",
-        variant: "destructive",
-      });
-    }
-  }, [toast]);
+  }, [publicKey]);
 
   const handleStartCheckout = () => {
-    if (!email) {
+    // Validate wallet address
+    const addressResult = solanaAddressSchema.safeParse(walletAddress);
+    if (!addressResult.success) {
       toast({
-        title: "Email Required",
-        description: "Please enter your email address.",
+        title: "Invalid Wallet Address",
+        description: "Please enter a valid Solana wallet address.",
         variant: "destructive",
       });
       return;
     }
+
+    // Validate email
+    const emailSchema = z.string().email();
+    if (!emailSchema.safeParse(email).success) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (amount < 1) {
       toast({
         title: "Invalid Amount",
@@ -94,63 +90,11 @@ export const CoinflowCheckout: FC = () => {
       });
       return;
     }
+    
     setShowCheckout(true);
   };
 
-  if (!connected) {
-    return (
-      <div className="space-y-8 animate-fade-in">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with Coinflow</h1>
-          <p className="text-xl text-muted-foreground">
-            Credit card payments powered by Solana
-          </p>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-8 text-center space-y-6">
-          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-3xl">👻</span>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-xl font-semibold">Connect Phantom Wallet</h3>
-            <p className="text-muted-foreground">
-              Connect your Solana wallet to start purchasing crypto with Coinflow
-            </p>
-          </div>
-          <Button 
-            onClick={handleConnectWallet}
-            size="lg"
-            className="px-8 hover-scale"
-          >
-            Connect Phantom
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
-          <div className="flex flex-col items-center space-y-2">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-2xl">💳</span>
-            </div>
-            <p className="font-medium">Credit Card Support</p>
-          </div>
-          <div className="flex flex-col items-center space-y-2">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-2xl">🔗</span>
-            </div>
-            <p className="font-medium">Solana Network</p>
-          </div>
-          <div className="flex flex-col items-center space-y-2">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-2xl">⚡</span>
-            </div>
-            <p className="font-medium">Instant Settlement</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (showCheckout && coinflowWallet && transaction) {
+  if (showCheckout && coinflowWallet) {
     return (
       <div className="space-y-4 animate-fade-in">
         <div className="flex items-center justify-between">
@@ -165,7 +109,6 @@ export const CoinflowCheckout: FC = () => {
             merchantId={MERCHANT_ID}
             env="sandbox"
             connection={connection}
-            transaction={transaction}
             subtotal={{ cents: amount * 100, currency: Currency.USD }}
             blockchain="solana"
             email={email}
@@ -187,22 +130,30 @@ export const CoinflowCheckout: FC = () => {
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with Coinflow</h1>
         <p className="text-xl text-muted-foreground">
-          Credit card payments powered by Solana
+          Credit card payments to any Solana wallet
         </p>
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-        <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-lg">
-          <span className="text-2xl">✓</span>
-          <div>
-            <p className="font-medium">Wallet Connected</p>
-            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-              {publicKey?.toBase58()}
-            </p>
-          </div>
-        </div>
-
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="coinflow-wallet">Solana Wallet Address</Label>
+            <Input
+              id="coinflow-wallet"
+              type="text"
+              placeholder="Enter your Solana wallet address"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              className={publicKey ? "border-green-500" : walletAddress ? "border-destructive" : ""}
+            />
+            {walletAddress && !publicKey && (
+              <p className="text-sm text-destructive">Please enter a valid Solana address</p>
+            )}
+            {publicKey && (
+              <p className="text-sm text-green-600">Valid Solana address ✓</p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="coinflow-amount">Amount (USD)</Label>
             <Input
@@ -231,7 +182,7 @@ export const CoinflowCheckout: FC = () => {
           onClick={handleStartCheckout}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
-          disabled={!amount || !email}
+          disabled={!publicKey || !amount || !email}
         >
           Continue to Payment
         </Button>
@@ -248,7 +199,7 @@ export const CoinflowCheckout: FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
             <span className="text-2xl">🔗</span>
           </div>
-          <p className="font-medium">Solana Network</p>
+          <p className="font-medium">No Wallet Extension</p>
         </div>
         <div className="flex flex-col items-center space-y-2">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
