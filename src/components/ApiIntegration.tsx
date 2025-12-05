@@ -3,9 +3,10 @@ import { initOnRamp, CBPayInstanceType } from "@coinbase/cbpay-js";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { ChevronLeft, ChevronRight, CreditCard, Wallet } from "lucide-react";
+import { ChevronLeft, ChevronRight, CreditCard, Wallet, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { CoinflowCheckout } from "./CoinflowCheckout";
 
 interface ApiConfig {
   id: string;
@@ -29,9 +30,11 @@ const CARD2CRYPTO_PROVIDERS = [
   { id: 'revolut', name: 'Revolut', minAmount: 15 },
 ];
 
+type TabType = 'coinbase' | 'card2crypto' | 'coinflow';
+
 const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'coinbase' | 'card2crypto'>('coinbase');
+  const [activeTab, setActiveTab] = useState<TabType>('coinbase');
   const [onrampInstance, setOnrampInstance] = useState<CBPayInstanceType | null>(null);
   
   // Card2Crypto state
@@ -39,6 +42,9 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const [email, setEmail] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('moonpay');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const tabs: TabType[] = ['coinbase', 'card2crypto', 'coinflow'];
+  const currentIndex = tabs.indexOf(activeTab);
 
   useEffect(() => {
     if (apis.length === 0 || !apis[0].appId) return;
@@ -132,11 +138,15 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   };
 
   const swipeLeft = () => {
-    setActiveTab('coinbase');
+    if (currentIndex > 0) {
+      setActiveTab(tabs[currentIndex - 1]);
+    }
   };
 
   const swipeRight = () => {
-    setActiveTab('card2crypto');
+    if (currentIndex < tabs.length - 1) {
+      setActiveTab(tabs[currentIndex + 1]);
+    }
   };
 
   if (apis.length === 0) {
@@ -160,8 +170,8 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
           variant="ghost"
           size="icon"
           onClick={swipeLeft}
-          className={activeTab === 'coinbase' ? 'opacity-30' : 'hover-scale'}
-          disabled={activeTab === 'coinbase'}
+          className={currentIndex === 0 ? 'opacity-30' : 'hover-scale'}
+          disabled={currentIndex === 0}
         >
           <ChevronLeft className="h-6 w-6" />
         </Button>
@@ -189,14 +199,25 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
             <CreditCard className="h-4 w-4" />
             <span className="font-medium">Card2Crypto</span>
           </button>
+          <button
+            onClick={() => setActiveTab('coinflow')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+              activeTab === 'coinflow' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'hover:bg-muted-foreground/10'
+            }`}
+          >
+            <Zap className="h-4 w-4" />
+            <span className="font-medium">Coinflow</span>
+          </button>
         </div>
 
         <Button
           variant="ghost"
           size="icon"
           onClick={swipeRight}
-          className={activeTab === 'card2crypto' ? 'opacity-30' : 'hover-scale'}
-          disabled={activeTab === 'card2crypto'}
+          className={currentIndex === tabs.length - 1 ? 'opacity-30' : 'hover-scale'}
+          disabled={currentIndex === tabs.length - 1}
         >
           <ChevronRight className="h-6 w-6" />
         </Button>
@@ -204,13 +225,19 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
 
       {/* Dot Indicators */}
       <div className="flex gap-2 mb-8">
-        <div className={`w-2 h-2 rounded-full transition-all ${activeTab === 'coinbase' ? 'bg-primary w-4' : 'bg-muted-foreground/30'}`} />
-        <div className={`w-2 h-2 rounded-full transition-all ${activeTab === 'card2crypto' ? 'bg-primary w-4' : 'bg-muted-foreground/30'}`} />
+        {tabs.map((tab, index) => (
+          <div
+            key={tab}
+            className={`w-2 h-2 rounded-full transition-all ${
+              activeTab === tab ? 'bg-primary w-4' : 'bg-muted-foreground/30'
+            }`}
+          />
+        ))}
       </div>
 
       {/* Content Area */}
       <div className="w-full max-w-2xl mx-auto">
-        {activeTab === 'coinbase' ? (
+        {activeTab === 'coinbase' && (
           <div className="text-center space-y-8 animate-fade-in">
             <div className="space-y-4">
               <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with {apis[0].name}</h1>
@@ -251,7 +278,9 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
               </div>
             </div>
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'card2crypto' && (
           <div className="space-y-8 animate-fade-in">
             <div className="text-center space-y-4">
               <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with Card2Crypto</h1>
@@ -339,6 +368,10 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'coinflow' && (
+          <CoinflowCheckout />
         )}
       </div>
     </div>
