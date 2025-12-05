@@ -1,1 +1,4 @@
 project_id = "aryusbuyyoxkeigzsnko"
+
+[functions.card2crypto]
+verify_jwt = false
