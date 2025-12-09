@@ -1,6 +1,7 @@
-import { FC, useState, useMemo } from 'react';
+import { FC, useState, useMemo, useEffect } from 'react';
 import { CoinflowPurchase, Currency } from '@coinflowlabs/react';
 import { Connection, PublicKey, Transaction, VersionedTransaction, clusterApiUrl } from '@solana/web3.js';
+import { useWallets } from '@particle-network/connectkit';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
 const MERCHANT_ID = 'lovable-test'; // Sandbox merchant ID
+const SOLANA_MAINNET_CHAIN_ID = 101;
 
 // Solana address validation schema
 const solanaAddressSchema = z.string()
@@ -25,10 +27,19 @@ const solanaAddressSchema = z.string()
 
 export const CoinflowCheckout: FC = () => {
   const { toast } = useToast();
+  const wallets = useWallets();
   const [walletAddress, setWalletAddress] = useState('');
   const [amount, setAmount] = useState<number>(10);
   const [email, setEmail] = useState('');
   const [showCheckout, setShowCheckout] = useState(false);
+
+  // Auto-populate Solana wallet address from Particle if connected
+  useEffect(() => {
+    const solanaWallet = wallets.find(w => w.chainId === SOLANA_MAINNET_CHAIN_ID);
+    if (solanaWallet && solanaWallet.accounts[0] && !walletAddress) {
+      setWalletAddress(solanaWallet.accounts[0]);
+    }
+  }, [wallets, walletAddress]);
 
   // Create connection to Solana devnet
   const connection = useMemo(() => new Connection(clusterApiUrl('devnet')), []);
