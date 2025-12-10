@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      transaction_audit_log: {
+        Row: {
+          amount: number
+          callback_data: Json | null
+          client_ip_hash: string | null
+          created_at: string
+          crypto_currency: string
+          currency: string
+          email_hash: string | null
+          error_message: string | null
+          id: string
+          payment_url: string | null
+          provider: string
+          request_id: string | null
+          status: Database["public"]["Enums"]["transaction_status"]
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          amount: number
+          callback_data?: Json | null
+          client_ip_hash?: string | null
+          created_at?: string
+          crypto_currency?: string
+          currency?: string
+          email_hash?: string | null
+          error_message?: string | null
+          id?: string
+          payment_url?: string | null
+          provider: string
+          request_id?: string | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          amount?: number
+          callback_data?: Json | null
+          client_ip_hash?: string | null
+          created_at?: string
+          crypto_currency?: string
+          currency?: string
+          email_hash?: string | null
+          error_message?: string | null
+          id?: string
+          payment_url?: string | null
+          provider?: string
+          request_id?: string | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +76,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      transaction_status: "pending" | "success" | "failed" | "callback_received"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +203,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      transaction_status: ["pending", "success", "failed", "callback_received"],
+    },
   },
 } as const
