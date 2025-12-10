@@ -26,8 +26,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Allowed payment providers whitelist
-const ALLOWED_PROVIDERS = ['stripe', 'card2crypto', 'paypal'];
+// Allowed payment providers whitelist - must match frontend CARD2CRYPTO_PROVIDERS
+const ALLOWED_PROVIDERS = ['moonpay', 'coinbase', 'transak', 'banxa', 'rampnetwork', 'stripe', 'mercuryo', 'simplex', 'revolut'];
 
 // Rate limiting map (in production, use Redis or similar)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
