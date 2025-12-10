@@ -7,6 +7,11 @@ import { ChevronLeft, ChevronRight, CreditCard, Wallet, Zap } from "lucide-react
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CoinflowCheckout } from "./CoinflowCheckout";
+import { z } from "zod";
+
+// Input validation schemas
+const emailSchema = z.string().trim().email("Invalid email address").max(254);
+const amountSchema = z.number().positive("Amount must be positive").max(10000, "Maximum amount is $10,000");
 
 interface ApiConfig {
   id: string;
@@ -87,17 +92,31 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   };
 
   const handleCard2CryptoPayment = async () => {
-    if (!amount || !email) {
+    // Validate email
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) {
       toast({
-        title: "Missing Information",
-        description: "Please enter amount and email address.",
+        title: "Invalid Email",
+        description: emailResult.error.errors[0]?.message || "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate amount
+    const parsedAmount = parseFloat(amount);
+    const amountResult = amountSchema.safeParse(parsedAmount);
+    if (!amountResult.success) {
+      toast({
+        title: "Invalid Amount",
+        description: amountResult.error.errors[0]?.message || "Please enter a valid amount.",
         variant: "destructive",
       });
       return;
     }
 
     const provider = CARD2CRYPTO_PROVIDERS.find(p => p.id === selectedProvider);
-    if (provider && parseFloat(amount) < provider.minAmount) {
+    if (provider && parsedAmount < provider.minAmount) {
       toast({
         title: "Amount Too Low",
         description: `Minimum amount for ${provider.name} is $${provider.minAmount}`,
@@ -111,9 +130,9 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
     try {
       const { data, error } = await supabase.functions.invoke('card2crypto', {
         body: {
-          amount: parseFloat(amount),
+          amount: parsedAmount,
           provider: selectedProvider,
-          email,
+          email: emailResult.data,
           currency: 'USD',
           orderId: `order_${Date.now()}`,
         },
@@ -122,14 +141,13 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       if (error) throw error;
 
       if (data?.paymentUrl) {
-        // Redirect to payment page
         window.location.href = data.paymentUrl;
       }
-    } catch (error: any) {
-      console.error('Card2Crypto error:', error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create payment link. Please try again.";
       toast({
         title: "Payment Error",
-        description: error.message || "Failed to create payment link. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
