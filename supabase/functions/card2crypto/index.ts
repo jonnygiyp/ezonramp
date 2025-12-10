@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Get allowed origins from environment or default to restrictive list
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
@@ -13,6 +14,11 @@ const getCorsHeaders = (origin: string | null) => {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
 };
+
+// Initialize Supabase client with service role for audit logging
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Allowed payment providers whitelist
 const ALLOWED_PROVIDERS = ['stripe', 'card2crypto', 'paypal'];
@@ -58,6 +64,15 @@ function validateCurrency(currency: string): boolean {
   return allowedCurrencies.includes(currency.toUpperCase());
 }
 
+// Hash function for PII (simple hash for audit purposes)
+async function hashForAudit(value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(value + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.slice(0, 10));
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
 // Redact sensitive data for logging
 function redactEmail(email: string): string {
   const [local, domain] = email.split('@');
@@ -68,6 +83,68 @@ function redactEmail(email: string): string {
 function redactWallet(wallet: string): string {
   if (wallet.length < 10) return '***';
   return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
+}
+
+// Audit logging function
+async function logTransaction(data: {
+  wallet_address: string;
+  amount: number;
+  email: string;
+  provider: string;
+  currency: string;
+  crypto_currency: string;
+  status: 'pending' | 'success' | 'failed' | 'callback_received';
+  client_ip: string;
+  error_message?: string;
+  payment_url?: string;
+  request_id?: string;
+  callback_data?: Record<string, unknown>;
+}) {
+  try {
+    const emailHash = await hashForAudit(data.email);
+    const ipHash = await hashForAudit(data.client_ip);
+    
+    const { error } = await supabase.from('transaction_audit_log').insert({
+      wallet_address: data.wallet_address,
+      amount: data.amount,
+      email_hash: emailHash,
+      provider: data.provider,
+      currency: data.currency,
+      crypto_currency: data.crypto_currency,
+      status: data.status,
+      client_ip_hash: ipHash,
+      error_message: data.error_message,
+      payment_url: data.payment_url,
+      request_id: data.request_id,
+      callback_data: data.callback_data,
+    });
+    
+    if (error) {
+      console.error('Failed to log transaction:', error.message);
+    }
+  } catch (err) {
+    console.error('Audit log error:', err instanceof Error ? err.message : 'Unknown');
+  }
+}
+
+// Update transaction status
+async function updateTransactionStatus(
+  requestId: string,
+  status: 'pending' | 'success' | 'failed' | 'callback_received',
+  updates?: { error_message?: string; callback_data?: Record<string, unknown> }
+) {
+  try {
+    const { error } = await supabase
+      .from('transaction_audit_log')
+      .update({ status, ...updates })
+      .eq('request_id', requestId);
+    
+    if (error) {
+      console.error('Failed to update transaction status:', error.message);
+    }
+  } catch (err) {
+    console.error('Status update error:', err instanceof Error ? err.message : 'Unknown');
+  }
 }
 
 serve(async (req) => {
@@ -109,6 +186,7 @@ serve(async (req) => {
     if (action === 'callback') {
       const valueCoin = url.searchParams.get('value_coin');
       const orderId = url.searchParams.get('order_id');
+      const requestId = url.searchParams.get('request_id');
       
       // Log without sensitive data
       console.log('Card2Crypto callback received:', { 
@@ -116,7 +194,13 @@ serve(async (req) => {
         orderId: orderId ? `${orderId.slice(0, 8)}***` : null 
       });
       
-      // Here you could update order status in your database
+      // Update transaction status if we have a request_id
+      if (requestId) {
+        await updateTransactionStatus(requestId, 'callback_received', {
+          callback_data: { value_coin: valueCoin, order_id: orderId }
+        });
+      }
+      
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -126,6 +210,7 @@ serve(async (req) => {
     if (req.method === 'POST') {
       const body = await req.json();
       const { amount, provider, email, currency, orderId } = body;
+      const requestId = crypto.randomUUID();
 
       // Validate all required fields
       const validationErrors: string[] = [];
@@ -173,12 +258,13 @@ serve(async (req) => {
         provider: provider.toLowerCase(), 
         currency: currency.toUpperCase(),
         email: redactEmail(email),
-        orderId: orderId ? `${String(orderId).slice(0, 8)}***` : 'auto-generated'
+        orderId: orderId ? `${String(orderId).slice(0, 8)}***` : 'auto-generated',
+        requestId
       });
 
       // Step 1: Create encrypted wallet address
       const safeOrderId = orderId || Date.now();
-      const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/card2crypto?action=callback&order_id=${safeOrderId}`;
+      const callbackUrl = `${supabaseUrl}/functions/v1/card2crypto?action=callback&order_id=${safeOrderId}&request_id=${requestId}`;
       const encodedCallback = encodeURIComponent(callbackUrl);
       
       const walletResponse = await fetch(
@@ -187,6 +273,21 @@ serve(async (req) => {
       
       if (!walletResponse.ok) {
         console.error('Failed to create wallet - status:', walletResponse.status);
+        
+        // Log failed transaction
+        await logTransaction({
+          wallet_address: PAYOUT_WALLET,
+          amount: Number(amount),
+          email,
+          provider: provider.toLowerCase(),
+          currency: currency.toUpperCase(),
+          crypto_currency: 'USDC',
+          status: 'failed',
+          client_ip: clientId,
+          error_message: `Wallet creation failed: ${walletResponse.status}`,
+          request_id: requestId,
+        });
+        
         return new Response(JSON.stringify({ error: 'Failed to create payment wallet' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -205,9 +306,24 @@ serve(async (req) => {
       const encodedEmail = encodeURIComponent(email);
       const paymentUrl = `https://pay.card2crypto.org/process-payment.php?address=${walletData.address_in}&amount=${amount}&provider=${provider.toLowerCase()}&email=${encodedEmail}&currency=${currency.toUpperCase()}`;
 
+      // Log successful transaction creation
+      await logTransaction({
+        wallet_address: walletData.address_in || PAYOUT_WALLET,
+        amount: Number(amount),
+        email,
+        provider: provider.toLowerCase(),
+        currency: currency.toUpperCase(),
+        crypto_currency: 'USDC',
+        status: 'pending',
+        client_ip: clientId,
+        payment_url: paymentUrl,
+        request_id: requestId,
+      });
+
       return new Response(JSON.stringify({ 
         paymentUrl,
-        trackingAddress: walletData.polygon_address_in ? redactWallet(walletData.polygon_address_in) : null
+        trackingAddress: walletData.polygon_address_in ? redactWallet(walletData.polygon_address_in) : null,
+        requestId
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
