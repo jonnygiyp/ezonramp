@@ -70,6 +70,40 @@ function validateCurrency(currency: string): boolean {
   return allowedCurrencies.includes(currency.toUpperCase());
 }
 
+// HMAC signature verification for callbacks
+async function verifyCallbackSignature(payload: string, signature: string): Promise<boolean> {
+  const secret = Deno.env.get('CALLBACK_SECRET');
+  if (!secret) {
+    console.error('CALLBACK_SECRET not configured');
+    return false;
+  }
+  
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign', 'verify']
+    );
+    
+    const signatureBuffer = new Uint8Array(
+      signature.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+    );
+    
+    return await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signatureBuffer,
+      encoder.encode(payload)
+    );
+  } catch (err) {
+    console.error('Signature verification error:', err instanceof Error ? err.message : 'Unknown');
+    return false;
+  }
+}
+
 // Hash function for PII (simple hash for audit purposes)
 async function hashForAudit(value: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -193,6 +227,35 @@ serve(async (req) => {
       const valueCoin = url.searchParams.get('value_coin');
       const orderId = url.searchParams.get('order_id');
       const requestId = url.searchParams.get('request_id');
+      const signature = url.searchParams.get('signature') || req.headers.get('x-signature');
+      
+      // Verify HMAC signature if CALLBACK_SECRET is configured
+      const callbackSecret = Deno.env.get('CALLBACK_SECRET');
+      if (callbackSecret) {
+        if (!signature) {
+          console.warn('Callback missing signature');
+          return new Response(JSON.stringify({ error: 'Missing signature' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // Create payload from callback parameters for verification
+        const payload = `${requestId || ''}:${orderId || ''}:${valueCoin || ''}`;
+        const isValid = await verifyCallbackSignature(payload, signature);
+        
+        if (!isValid) {
+          console.warn('Invalid callback signature for request:', requestId?.slice(0, 8));
+          return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        console.log('Callback signature verified successfully');
+      } else {
+        console.warn('CALLBACK_SECRET not set - skipping signature verification');
+      }
       
       // Log without sensitive data
       console.log('Card2Crypto callback received:', { 
