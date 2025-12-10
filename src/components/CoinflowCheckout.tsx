@@ -8,7 +8,8 @@ import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
-const MERCHANT_ID = 'lovable-test'; // Sandbox merchant ID
+// Use environment variable for merchant ID, fallback to sandbox for development
+const MERCHANT_ID = import.meta.env.VITE_COINFLOW_MERCHANT_ID || 'lovable-test';
 const SOLANA_MAINNET_CHAIN_ID = 101;
 
 // Solana address validation schema
