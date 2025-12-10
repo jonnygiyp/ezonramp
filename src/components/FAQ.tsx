@@ -1,17 +1,21 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useFAQContent } from "@/hooks/useSiteContent";
 
 interface FAQProps {
   onNavigate: (section: string) => void;
 }
 
 const FAQ = ({ onNavigate }: FAQProps) => {
-  const faqs = [
+  const { data, isLoading } = useFAQContent();
+
+  // Default FAQs if no database content
+  const defaultFaqs = [
     {
       question: "What is a crypto onramp?",
       answer:
@@ -39,6 +43,8 @@ const FAQ = ({ onNavigate }: FAQProps) => {
     },
   ];
 
+  const faqs = data?.items?.length ? data.items : defaultFaqs;
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
       <button
@@ -49,18 +55,25 @@ const FAQ = ({ onNavigate }: FAQProps) => {
         <span className="text-sm">Back to Onramp</span>
       </button>
       <h1 className="text-4xl font-semibold mb-8">Frequently Asked Questions</h1>
-      <Accordion type="single" collapsible className="w-full">
-        {faqs.map((faq, index) => (
-          <AccordionItem key={index} value={`item-${index}`}>
-            <AccordionTrigger className="text-left text-base">
-              {faq.question}
-            </AccordionTrigger>
-            <AccordionContent className="text-muted-foreground">
-              {faq.answer}
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+      
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <Accordion type="single" collapsible className="w-full">
+          {faqs.map((faq, index) => (
+            <AccordionItem key={index} value={`item-${index}`}>
+              <AccordionTrigger className="text-left text-base">
+                {faq.question}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                {faq.answer}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      )}
     </div>
   );
 };
