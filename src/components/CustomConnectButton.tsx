@@ -1,6 +1,7 @@
 import { useAccount, useModal, useDisconnect } from '@particle-network/connectkit';
-import { User, LogOut, ChevronDown } from 'lucide-react';
+import { User, LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,13 +10,32 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const CustomConnectButton = () => {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address, isConnecting } = useAccount();
   const { setOpen } = useModal();
   const { disconnect } = useDisconnect();
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Give Particle SDK time to check for existing session
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
+
+  // Show loading state while checking for existing session
+  if (isInitializing || isConnecting) {
+    return (
+      <Button variant="outline" disabled className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-xs">Checking session...</span>
+      </Button>
+    );
+  }
 
   if (isConnected && address) {
     return (
