@@ -3,7 +3,7 @@ import { useFAQContent, useUpdateSiteContent, type FAQContent, type FAQItem } fr
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import type { Json } from '@/integrations/supabase/types';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
@@ -122,11 +122,10 @@ export default function FAQEditor() {
             </div>
             <div className="space-y-2">
               <Label>Answer</Label>
-              <Textarea
+              <RichTextEditor
                 value={item.answer}
-                onChange={(e) => handleUpdateItem(index, 'answer', e.target.value)}
+                onChange={(value) => handleUpdateItem(index, 'answer', value)}
                 placeholder="Enter answer..."
-                rows={3}
               />
             </div>
           </div>
