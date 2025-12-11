@@ -26,24 +26,11 @@ const About = ({ onNavigate }: AboutProps) => {
       ) : (
         <>
           <h1 className="text-4xl font-semibold mb-8">{data?.title || "About Us"}</h1>
-          <div className="space-y-4 text-muted-foreground leading-relaxed">
-            <p>
-              <a 
-                href="https://EZOnRamp.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                EZOnRamp.com
-              </a>{" "}
-              was created for people who want to buy crypto or stablecoins for the first time, but have no clue where to get started.
-            </p>
-            {data?.description && <p>{data.description}</p>}
-            <p>
-              Whether you're new to cryptocurrency or an experienced user, our platform
-              is designed to meet your needs with minimal friction and maximum clarity.
-            </p>
-          </div>
+          {data?.description && (
+            <div className="space-y-4 text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              {data.description}
+            </div>
+          )}
         </>
       )}
     </div>
