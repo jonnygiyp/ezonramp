@@ -67,8 +67,8 @@ const FAQ = ({ onNavigate }: FAQProps) => {
               <AccordionTrigger className="text-left text-base">
                 {faq.question}
               </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {faq.answer}
+              <AccordionContent className="text-muted-foreground prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline">
+                <div dangerouslySetInnerHTML={{ __html: faq.answer }} />
               </AccordionContent>
             </AccordionItem>
           ))}
