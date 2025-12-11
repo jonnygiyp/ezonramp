@@ -1,4 +1,5 @@
 import { ArrowLeft, Loader2 } from "lucide-react";
+import DOMPurify from "dompurify";
 import {
   Accordion,
   AccordionContent,
@@ -68,7 +69,7 @@ const FAQ = ({ onNavigate }: FAQProps) => {
                 {faq.question}
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline">
-                <div dangerouslySetInnerHTML={{ __html: faq.answer }} />
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
               </AccordionContent>
             </AccordionItem>
           ))}
