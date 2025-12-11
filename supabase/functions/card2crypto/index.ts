@@ -254,7 +254,11 @@ serve(async (req) => {
         
         console.log('Callback signature verified successfully');
       } else {
-        console.warn('CALLBACK_SECRET not set - skipping signature verification');
+        console.error('CALLBACK_SECRET not configured - rejecting callback');
+        return new Response(JSON.stringify({ error: 'Callback verification not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
       
       // Log without sensitive data
