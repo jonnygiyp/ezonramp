@@ -9,13 +9,6 @@ import { CoinflowCheckout } from "./CoinflowCheckout";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 import { useAccount } from "@particle-network/connectkit";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 
 // Input validation schemas
 const emailSchema = z.string().trim().email("Invalid email address").max(254);
@@ -45,20 +38,6 @@ const CARD2CRYPTO_PROVIDERS = [
   { id: 'revolut', name: 'Revolut', minAmount: 15 },
 ];
 
-const SUPPORTED_ASSETS = [
-  { id: 'ETH', name: 'Ethereum (ETH)' },
-  { id: 'USDC', name: 'USD Coin (USDC)' },
-  { id: 'BTC', name: 'Bitcoin (BTC)' },
-  { id: 'SOL', name: 'Solana (SOL)' },
-  { id: 'MATIC', name: 'Polygon (MATIC)' },
-];
-
-const SUPPORTED_NETWORKS = [
-  { id: 'ethereum', name: 'Ethereum' },
-  { id: 'base', name: 'Base' },
-  { id: 'polygon', name: 'Polygon' },
-  { id: 'solana', name: 'Solana' },
-];
 
 const getTabIcon = (name: string) => {
   switch (name) {
@@ -87,10 +66,12 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
 
   // Coinbase Headless Onramp state
   const [coinbaseAmount, setCoinbaseAmount] = useState('');
-  const [selectedAsset, setSelectedAsset] = useState('USDC');
-  const [selectedNetwork, setSelectedNetwork] = useState('base');
   const [isCoinbaseProcessing, setIsCoinbaseProcessing] = useState(false);
   const [manualAddress, setManualAddress] = useState('');
+  
+  // Fixed asset and network for Coinbase - USDC on Solana only
+  const COINBASE_ASSET = 'USDC';
+  const COINBASE_NETWORK = 'solana';
 
   // Set initial tab when providers load
   useEffect(() => {
@@ -145,12 +126,12 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       const { data, error } = await supabase.functions.invoke('coinbase-onramp', {
         body: {
           destinationAddress,
-          blockchains: [selectedNetwork],
-          assets: [selectedAsset],
+          blockchains: [COINBASE_NETWORK],
+          assets: [COINBASE_ASSET],
           presetFiatAmount: parsedAmount,
           fiatCurrency: 'USD',
-          defaultAsset: selectedAsset,
-          defaultNetwork: selectedNetwork,
+          defaultAsset: COINBASE_ASSET,
+          defaultNetwork: COINBASE_NETWORK,
         },
       });
 
@@ -330,9 +311,9 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
         {activeTab === 'coinbase' && (
           <div className="space-y-8 animate-fade-in">
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with Coinbase</h1>
+              <h1 className="text-4xl font-bold tracking-tight">Buy USDC with Coinbase</h1>
               <p className="text-xl text-muted-foreground">
-                Purchase cryptocurrency quickly and securely using your preferred payment method
+                Purchase USDC on Solana quickly and securely using your preferred payment method
               </p>
             </div>
 
@@ -376,34 +357,16 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Asset</Label>
-                    <Select value={selectedAsset} onValueChange={setSelectedAsset}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select asset" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SUPPORTED_ASSETS.map((asset) => (
-                          <SelectItem key={asset.id} value={asset.id}>
-                            {asset.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center h-10 px-3 bg-muted rounded-md border border-input">
+                      <span className="text-sm font-medium">USDC</span>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Network</Label>
-                    <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select network" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SUPPORTED_NETWORKS.map((network) => (
-                          <SelectItem key={network.id} value={network.id}>
-                            {network.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center h-10 px-3 bg-muted rounded-md border border-input">
+                      <span className="text-sm font-medium">Solana</span>
+                    </div>
                   </div>
                 </div>
               </div>
