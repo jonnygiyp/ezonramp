@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { initOnRamp, CBPayInstanceType } from "@coinbase/cbpay-js";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -56,6 +56,9 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
   const [activeTab, setActiveTab] = useState<string>('');
   const [onrampInstance, setOnrampInstance] = useState<CBPayInstanceType | null>(null);
+  const [coinbaseLoading, setCoinbaseLoading] = useState(true);
+  const coinbaseContainerRef = useRef<HTMLDivElement>(null);
+  const instanceRef = useRef<CBPayInstanceType | null>(null);
   
   // Card2Crypto state
   const [amount, setAmount] = useState('');
@@ -73,12 +76,23 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const enabledTabs = providers?.map(p => p.name) || [];
   const currentIndex = enabledTabs.indexOf(activeTab);
 
-  useEffect(() => {
+  // Initialize Coinbase embedded widget
+  const initCoinbaseWidget = useCallback(() => {
     if (apis.length === 0 || !apis[0].appId) return;
+    if (!coinbaseContainerRef.current) return;
+    
+    // Destroy existing instance if any
+    if (instanceRef.current) {
+      instanceRef.current.destroy();
+      instanceRef.current = null;
+    }
+
+    setCoinbaseLoading(true);
 
     initOnRamp(
       {
         appId: apis[0].appId,
+        target: '#coinbase-onramp-container',
         widgetParameters: {
           addresses: { 
             '0x0000000000000000000000000000000000000000': ['ethereum', 'base', 'polygon'] 
@@ -87,31 +101,59 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
         },
         onSuccess: () => {
           console.log('Onramp purchase successful');
+          toast({
+            title: "Purchase Successful",
+            description: "Your crypto purchase was completed successfully!",
+          });
         },
         onExit: () => {
           console.log('Onramp closed');
         },
         onEvent: (event) => {
           console.log('Onramp event:', event);
+          if (event.eventName === 'open') {
+            setCoinbaseLoading(false);
+          }
         },
-        experienceLoggedIn: 'popup',
-        experienceLoggedOut: 'popup',
-        closeOnExit: true,
-        closeOnSuccess: true,
+        experienceLoggedIn: 'embedded',
+        experienceLoggedOut: 'embedded',
+        closeOnExit: false,
+        closeOnSuccess: false,
+        embeddedContentStyles: {
+          target: '#coinbase-onramp-container',
+          width: '100%',
+          height: '600px',
+        },
       },
-      (_, instance) => {
+      (error, instance) => {
+        if (error) {
+          console.error('Coinbase init error:', error);
+          setCoinbaseLoading(false);
+          return;
+        }
+        instanceRef.current = instance;
         setOnrampInstance(instance);
+        // Open the widget immediately to embed it
+        instance?.open();
       }
     );
+  }, [apis, toast]);
 
+  // Initialize when coinbase tab is active
+  useEffect(() => {
+    if (activeTab === 'coinbase' && apis.length > 0 && apis[0].appId) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(initCoinbaseWidget, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, apis, initCoinbaseWidget]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      onrampInstance?.destroy();
+      instanceRef.current?.destroy();
     };
-  }, [apis]);
-
-  const handleOpenOnramp = () => {
-    onrampInstance?.open();
-  };
+  }, []);
 
   const handleCard2CryptoPayment = async () => {
     // Validate email
@@ -270,43 +312,49 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       {/* Content Area */}
       <div className="w-full max-w-2xl mx-auto">
         {activeTab === 'coinbase' && (
-          <div className="text-center space-y-8 animate-fade-in">
-            <div className="space-y-4">
+          <div className="space-y-6 animate-fade-in">
+            <div className="text-center space-y-4">
               <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with Coinbase</h1>
               <p className="text-xl text-muted-foreground">
                 Purchase cryptocurrency quickly and securely using your preferred payment method
               </p>
             </div>
             
-            <div className="space-y-6">
-              <Button 
-                onClick={handleOpenOnramp}
-                size="lg"
-                className="text-lg px-8 py-6 hover-scale"
-                disabled={!onrampInstance}
-              >
-                {onrampInstance ? 'Buy Crypto Now' : 'Loading...'}
-              </Button>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-2xl">⚡</span>
+            {/* Embedded Coinbase Widget Container */}
+            <div className="relative w-full min-h-[600px] bg-card border border-border rounded-xl overflow-hidden">
+              {coinbaseLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-card z-10">
+                  <div className="text-center space-y-4">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    <p className="text-muted-foreground">Loading Coinbase...</p>
                   </div>
-                  <p className="font-medium">Fast Transactions</p>
                 </div>
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-2xl">🔒</span>
-                  </div>
-                  <p className="font-medium">Secure Processing</p>
+              )}
+              <div 
+                id="coinbase-onramp-container" 
+                ref={coinbaseContainerRef}
+                className="w-full h-[600px]"
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-2xl">⚡</span>
                 </div>
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-2xl">🌐</span>
-                  </div>
-                  <p className="font-medium">Multiple Blockchains</p>
+                <p className="font-medium">Fast Transactions</p>
+              </div>
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-2xl">🔒</span>
                 </div>
+                <p className="font-medium">Secure Processing</p>
+              </div>
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-2xl">🌐</span>
+                </div>
+                <p className="font-medium">Multiple Blockchains</p>
               </div>
             </div>
           </div>
