@@ -21,6 +21,7 @@ import {
 const emailSchema = z.string().trim().email("Invalid email address").max(254);
 const amountSchema = z.number().positive("Amount must be positive").max(10000, "Maximum amount is $10,000");
 const coinbaseAmountSchema = z.number().positive("Amount must be positive").min(1, "Minimum amount is $1").max(10000, "Maximum amount is $10,000");
+const walletAddressSchema = z.string().trim().min(26, "Invalid wallet address").max(128, "Invalid wallet address").regex(/^[a-zA-Z0-9]+$/, "Invalid wallet address format");
 
 interface ApiConfig {
   id: string;
@@ -89,6 +90,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const [selectedAsset, setSelectedAsset] = useState('USDC');
   const [selectedNetwork, setSelectedNetwork] = useState('base');
   const [isCoinbaseProcessing, setIsCoinbaseProcessing] = useState(false);
+  const [manualAddress, setManualAddress] = useState('');
 
   // Set initial tab when providers load
   useEffect(() => {
@@ -101,13 +103,29 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const currentIndex = enabledTabs.indexOf(activeTab);
 
   const handleCoinbaseOnramp = async () => {
-    if (!isConnected || !address) {
+    // Determine destination address: use connected wallet or manual entry
+    const destinationAddress = isConnected && address ? address : manualAddress;
+
+    if (!destinationAddress) {
       toast({
-        title: "Wallet Not Connected",
-        description: "Please connect your wallet first to receive crypto.",
+        title: "Address Required",
+        description: "Please connect your wallet or enter a receiving address.",
         variant: "destructive",
       });
       return;
+    }
+
+    // Validate manual address if not connected
+    if (!isConnected) {
+      const addressResult = walletAddressSchema.safeParse(destinationAddress);
+      if (!addressResult.success) {
+        toast({
+          title: "Invalid Address",
+          description: addressResult.error.errors[0]?.message || "Please enter a valid wallet address.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     const parsedAmount = parseFloat(coinbaseAmount);
@@ -126,7 +144,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
     try {
       const { data, error } = await supabase.functions.invoke('coinbase-onramp', {
         body: {
-          destinationAddress: address,
+          destinationAddress,
           blockchains: [selectedNetwork],
           assets: [selectedAsset],
           presetFiatAmount: parsedAmount,
@@ -318,86 +336,94 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
               </p>
             </div>
 
-            {!isConnected ? (
-              <div className="text-center space-y-4 p-8 bg-muted/50 rounded-xl border border-border">
-                <Wallet className="h-12 w-12 mx-auto text-muted-foreground" />
-                <p className="text-lg text-muted-foreground">
-                  Connect your wallet to buy crypto directly to your address
-                </p>
-              </div>
-            ) : (
-              <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-                <div className="space-y-4">
+            <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+              <div className="space-y-4">
+                {isConnected && address ? (
                   <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Receiving Address</p>
+                    <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
                     <p className="font-mono text-sm truncate">{address}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-address">Receiving Address</Label>
+                    <Input
+                      id="manual-address"
+                      type="text"
+                      placeholder="Enter your wallet address"
+                      value={manualAddress}
+                      onChange={(e) => setManualAddress(e.target.value)}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Or connect your wallet above to auto-fill this field
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="coinbase-amount">Amount (USD)</Label>
+                  <Input
+                    id="coinbase-amount"
+                    type="number"
+                    placeholder="Enter amount"
+                    value={coinbaseAmount}
+                    onChange={(e) => setCoinbaseAmount(e.target.value)}
+                    min="1"
+                    max="10000"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Asset</Label>
+                    <Select value={selectedAsset} onValueChange={setSelectedAsset}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select asset" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_ASSETS.map((asset) => (
+                          <SelectItem key={asset.id} value={asset.id}>
+                            {asset.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="coinbase-amount">Amount (USD)</Label>
-                    <Input
-                      id="coinbase-amount"
-                      type="number"
-                      placeholder="Enter amount"
-                      value={coinbaseAmount}
-                      onChange={(e) => setCoinbaseAmount(e.target.value)}
-                      min="1"
-                      max="10000"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Asset</Label>
-                      <Select value={selectedAsset} onValueChange={setSelectedAsset}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select asset" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUPPORTED_ASSETS.map((asset) => (
-                            <SelectItem key={asset.id} value={asset.id}>
-                              {asset.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Network</Label>
-                      <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select network" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUPPORTED_NETWORKS.map((network) => (
-                            <SelectItem key={network.id} value={network.id}>
-                              {network.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Label>Network</Label>
+                    <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select network" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_NETWORKS.map((network) => (
+                          <SelectItem key={network.id} value={network.id}>
+                            {network.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-
-                <Button 
-                  onClick={handleCoinbaseOnramp}
-                  size="lg"
-                  className="w-full text-lg py-6 hover-scale"
-                  disabled={isCoinbaseProcessing || !coinbaseAmount}
-                >
-                  {isCoinbaseProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Buy Crypto Now'
-                  )}
-                </Button>
               </div>
-            )}
+
+              <Button 
+                onClick={handleCoinbaseOnramp}
+                size="lg"
+                className="w-full text-lg py-6 hover-scale"
+                disabled={isCoinbaseProcessing || !coinbaseAmount || (!isConnected && !manualAddress)}
+              >
+                {isCoinbaseProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Buy Crypto Now'
+                )}
+              </Button>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
               <div className="flex flex-col items-center space-y-2">
