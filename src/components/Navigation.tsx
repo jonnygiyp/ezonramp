@@ -4,7 +4,7 @@ interface NavigationProps {
 }
 
 const Navigation = ({ activeSection, onNavigate }: NavigationProps) => {
-  const navItems = ["ABOUT", "FAQ", "CONTACT"];
+  const navItems = ["HOME", "ABOUT", "FAQ", "CONTACT"];
 
   return (
     <nav className="border-b border-border">
