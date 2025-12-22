@@ -64,15 +64,6 @@ export function OnboardingTutorial() {
     }
   }, [isActive, currentTutorialStep]);
 
-  useEffect(() => {
-    const hasCompleted = localStorage.getItem(STORAGE_KEY);
-    if (!hasCompleted) {
-      // Small delay to let the page render
-      setTimeout(() => {
-        setIsActive(true);
-      }, 500);
-    }
-  }, []);
 
   useEffect(() => {
     updateTargetPosition();
