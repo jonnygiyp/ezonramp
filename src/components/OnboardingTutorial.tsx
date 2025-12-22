@@ -18,8 +18,8 @@ const tutorialSteps: TutorialStep[] = [
   },
   {
     target: "[data-tutorial='provider-tabs']",
-    title: "Onramp Providers",
-    description: "Choose from different payment providers to buy crypto. Each has different features and fees.",
+    title: "Select An Onramp",
+    description: "Select an onramp to buy crypto. Each has different features, processing times and fees.",
     position: "bottom",
   },
   {
