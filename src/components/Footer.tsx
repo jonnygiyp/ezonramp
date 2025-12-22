@@ -12,9 +12,9 @@ const Footer = () => {
             <Link to="/terms" className="hover:text-foreground transition-colors">
               Terms of Service
             </Link>
-            <a href="#" className="hover:text-foreground transition-colors">
+            <Link to="/privacy" className="hover:text-foreground transition-colors">
               Privacy Policy
-            </a>
+            </Link>
           </div>
         </div>
       </div>
