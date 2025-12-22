@@ -250,7 +250,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   }
 
   return (
-    <div className="w-full min-h-[600px] flex flex-col items-center justify-center px-6 py-12">
+    <div className="w-full min-h-[600px] flex flex-col items-center justify-center px-6 py-6">
       {/* Tab Switcher */}
       <div className="flex items-center justify-center gap-4 mb-8">
         <Button
@@ -294,17 +294,6 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
         </Button>
       </div>
 
-      {/* Dot Indicators */}
-      <div className="flex gap-2 mb-8">
-        {providers.map((provider) => (
-          <div
-            key={provider.id}
-            className={`w-2 h-2 rounded-full transition-all ${
-              activeTab === provider.name ? 'bg-primary w-4' : 'bg-muted-foreground/30'
-            }`}
-          />
-        ))}
-      </div>
 
       {/* Content Area */}
       <div className="w-full max-w-2xl mx-auto">
