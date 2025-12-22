@@ -9,6 +9,7 @@ import FAQEditor from '@/components/admin/FAQEditor';
 import ContactEditor from '@/components/admin/ContactEditor';
 import OnrampManager from '@/components/admin/OnrampManager';
 import AdminInvites from '@/components/admin/AdminInvites';
+import TermsEditor from '@/components/admin/TermsEditor';
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading, signOut } = useAuth();
@@ -72,10 +73,11 @@ export default function AdminDashboard() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <Tabs defaultValue="about" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="faq">FAQ</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
+            <TabsTrigger value="terms">Terms</TabsTrigger>
             <TabsTrigger value="onramps">Onramps</TabsTrigger>
             <TabsTrigger value="invites">Invites</TabsTrigger>
           </TabsList>
@@ -90,6 +92,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="contact">
             <ContactEditor />
+          </TabsContent>
+
+          <TabsContent value="terms">
+            <TermsEditor />
           </TabsContent>
 
           <TabsContent value="onramps">
