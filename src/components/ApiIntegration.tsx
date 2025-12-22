@@ -376,6 +376,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
                 size="lg"
                 className="w-full text-lg py-6 hover-scale"
                 disabled={isCoinbaseProcessing || !coinbaseAmount || (!isConnected && !manualAddress)}
+                data-tutorial="buy-button"
               >
                 {isCoinbaseProcessing ? (
                   <>
