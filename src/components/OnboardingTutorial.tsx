@@ -23,15 +23,15 @@ const tutorialSteps: TutorialStep[] = [
     position: "bottom",
   },
   {
-    target: "[data-tutorial='amount-input']",
-    title: "Enter Amount",
-    description: "Type the amount you want to spend in USD to purchase crypto.",
-    position: "top",
-  },
-  {
     target: "[data-tutorial='wallet-input']",
     title: "Wallet Address",
     description: "Paste your Solana wallet address where you want to receive the crypto.",
+    position: "top",
+  },
+  {
+    target: "[data-tutorial='amount-input']",
+    title: "Enter Amount",
+    description: "Type the amount you want to spend in USD to purchase crypto.",
     position: "top",
   },
 ];
