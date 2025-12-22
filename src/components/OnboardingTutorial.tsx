@@ -11,6 +11,12 @@ interface TutorialStep {
 
 const tutorialSteps: TutorialStep[] = [
   {
+    target: "[data-tutorial='particle-connect']",
+    title: "Create Your Wallet",
+    description: "Sign up for a free wallet through Particle Network to get started!",
+    position: "bottom",
+  },
+  {
     target: "[data-tutorial='provider-tabs']",
     title: "Onramp Providers",
     description: "Choose from different payment providers to buy crypto. Each has different features and fees.",
