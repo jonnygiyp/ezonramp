@@ -190,7 +190,7 @@ export function OnboardingTutorial() {
         onClick={startTutorial}
         variant="outline"
         size="icon"
-        className="fixed bottom-4 right-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow"
+        className="fixed bottom-16 right-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow"
         aria-label="Start tutorial"
       >
         <HelpCircle className="h-5 w-5" />
