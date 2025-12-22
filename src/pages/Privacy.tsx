@@ -84,7 +84,6 @@ const defaultContent = `
 
 <h2>13. Contact</h2>
 <p>Email: <a href="mailto:hello@ezonramp.com">hello@ezonramp.com</a></p>
-<p><em>Legal Notice: This Privacy Policy is provided for general informational purposes and does not constitute legal advice.</em></p>
 `;
 
 export default function Privacy() {

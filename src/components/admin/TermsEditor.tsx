@@ -63,7 +63,6 @@ const defaultContent = `
 
 <h2>11. Contact</h2>
 <p>Email: <a href="mailto:hello@ezonramp.com">hello@ezonramp.com</a></p>
-<p><em>Legal Notice: This document is for general informational purposes and does not constitute legal advice.</em></p>
 `;
 
 export default function TermsEditor() {
