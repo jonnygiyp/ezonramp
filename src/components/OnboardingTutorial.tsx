@@ -29,12 +29,6 @@ const tutorialSteps: TutorialStep[] = [
     position: "top",
   },
   {
-    target: "[data-tutorial='email-input']",
-    title: "Your Email",
-    description: "Enter your email address for transaction confirmations and receipts.",
-    position: "top",
-  },
-  {
     target: "[data-tutorial='wallet-input']",
     title: "Wallet Address",
     description: "Paste your Solana wallet address where you want to receive the crypto.",
