@@ -311,8 +311,8 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
         {activeTab === 'coinbase' && (
           <div className="space-y-8 animate-fade-in">
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold tracking-tight">Buy USDC with Coinbase</h1>
-              <p className="text-xl text-muted-foreground">
+              <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Buy USDC with Coinbase</h1>
+              <p className="text-lg md:text-xl text-muted-foreground">
                 Purchase USDC on Solana quickly and securely using your preferred payment method
               </p>
             </div>
