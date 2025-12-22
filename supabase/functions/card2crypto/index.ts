@@ -1,6 +1,33 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// =============================================================================
+// STARTUP CONFIGURATION VALIDATION
+// Validates that all required secrets are configured before the function starts
+// =============================================================================
+const REQUIRED_SECRETS = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'PAYOUT_WALLET',
+  'CALLBACK_SECRET',
+  'ALLOWED_ORIGINS'
+] as const;
+
+const missingSecrets = REQUIRED_SECRETS.filter(name => !Deno.env.get(name));
+if (missingSecrets.length > 0) {
+  console.error(`[CRITICAL] Missing required secrets: ${missingSecrets.join(', ')}`);
+  console.error('[CRITICAL] Edge function may not operate correctly. Please configure all required secrets.');
+}
+
+// Log configuration status on startup (without exposing secret values)
+console.log('[STARTUP] Configuration status:', {
+  SUPABASE_URL: !!Deno.env.get('SUPABASE_URL'),
+  SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+  PAYOUT_WALLET: !!Deno.env.get('PAYOUT_WALLET'),
+  CALLBACK_SECRET: !!Deno.env.get('CALLBACK_SECRET'),
+  ALLOWED_ORIGINS: !!Deno.env.get('ALLOWED_ORIGINS'),
+});
+
 // Get allowed origins from environment or default to restrictive list
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
 
