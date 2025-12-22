@@ -6,6 +6,7 @@ import About from "@/components/About";
 import FAQ from "@/components/FAQ";
 import Contact from "@/components/Contact";
 import ApiIntegration from "@/components/ApiIntegration";
+import { OnboardingTutorial } from "@/components/OnboardingTutorial";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("home");
@@ -60,6 +61,7 @@ const Index = () => {
       </main>
 
       <Footer />
+      <OnboardingTutorial />
     </div>
   );
 };

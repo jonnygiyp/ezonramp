@@ -263,7 +263,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
           <ChevronLeft className="h-6 w-6" />
         </Button>
         
-        <div className="flex gap-2 bg-muted rounded-full p-1">
+        <div className="flex gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
           {providers.map((provider) => {
             const Icon = getTabIcon(provider.name);
             return (
@@ -325,7 +325,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
                     <p className="font-mono text-sm truncate">{address}</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tutorial="wallet-input">
                     <Label htmlFor="manual-address">Receiving Address</Label>
                     <Input
                       id="manual-address"
@@ -341,7 +341,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
                   </div>
                 )}
 
-                <div className="space-y-2">
+                <div className="space-y-2" data-tutorial="amount-input">
                   <Label htmlFor="coinbase-amount">Amount (USD)</Label>
                   <Input
                     id="coinbase-amount"
@@ -434,7 +434,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2" data-tutorial="email-input">
                   <Label htmlFor="email">Email Address</Label>
                   <Input
                     id="email"
