@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const Footer = () => {
   return (
     <footer className="border-t border-border mt-auto">
@@ -7,9 +9,9 @@ const Footer = () => {
             <p>&copy; {new Date().getFullYear()} EZOnRamp. All rights reserved.</p>
           </div>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-foreground transition-colors">
+            <Link to="/terms" className="hover:text-foreground transition-colors">
               Terms of Service
-            </a>
+            </Link>
             <a href="#" className="hover:text-foreground transition-colors">
               Privacy Policy
             </a>
