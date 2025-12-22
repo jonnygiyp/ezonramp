@@ -34,6 +34,12 @@ const tutorialSteps: TutorialStep[] = [
     description: "Type the amount you want to spend in USD to purchase crypto.",
     position: "top",
   },
+  {
+    target: "[data-tutorial='buy-button']",
+    title: "Complete Your Purchase",
+    description: "Once you've signed up or filled in the required information, click here to complete your purchase.",
+    position: "top",
+  },
 ];
 
 const STORAGE_KEY = "onboarding_completed";
