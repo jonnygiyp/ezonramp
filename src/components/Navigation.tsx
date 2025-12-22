@@ -13,6 +13,7 @@ const Navigation = ({ activeSection, onNavigate }: NavigationProps) => {
           {navItems.map((item) => (
             <button
               key={item}
+              data-tutorial={`nav-${item.toLowerCase()}`}
               onClick={() => onNavigate(item.toLowerCase())}
               className={`text-sm font-medium tracking-wide transition-colors ${
                 activeSection === item.toLowerCase()
