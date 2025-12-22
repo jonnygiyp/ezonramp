@@ -20,7 +20,7 @@ const Header = ({ onNavigate }: HeaderProps) => {
             className="flex items-center gap-3 transition-opacity hover:opacity-70"
           >
             <img src={logo} alt="EZ Logo" className="h-12 w-auto" />
-            <span className="text-2xl font-semibold">EZOnRamp</span>
+            <span className="text-xl md:text-2xl font-semibold">EZOnRamp</span>
           </button>
           
           <div className="flex items-center gap-4">
