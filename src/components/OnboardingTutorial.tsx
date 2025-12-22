@@ -25,7 +25,7 @@ const tutorialSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='wallet-input']",
     title: "Wallet Address",
-    description: "Paste your Solana wallet address where you want to receive the crypto.",
+    description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own wallet, paste the address here.",
     position: "top",
   },
   {
