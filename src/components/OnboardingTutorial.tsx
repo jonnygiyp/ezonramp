@@ -11,30 +11,6 @@ interface TutorialStep {
 
 const tutorialSteps: TutorialStep[] = [
   {
-    target: "[data-tutorial='nav-home']",
-    title: "Home",
-    description: "Click here to return to the main onramp page where you can buy crypto.",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='nav-about']",
-    title: "About",
-    description: "Learn more about our service and how we help you buy crypto easily.",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='nav-faq']",
-    title: "FAQ",
-    description: "Find answers to common questions about our crypto onramp services.",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='nav-contact']",
-    title: "Contact",
-    description: "Get in touch with our support team if you need assistance.",
-    position: "bottom",
-  },
-  {
     target: "[data-tutorial='provider-tabs']",
     title: "Onramp Providers",
     description: "Choose from different payment providers to buy crypto. Each has different features and fees.",
