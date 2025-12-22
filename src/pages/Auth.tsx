@@ -26,7 +26,7 @@ export default function AuthPage() {
 
   const inviteToken = searchParams.get('invite');
 
-  // Check if invite token is valid
+  // Check if invite token is valid using secure RPC function
   useEffect(() => {
     const checkInvite = async () => {
       if (!inviteToken) {
@@ -34,25 +34,21 @@ export default function AuthPage() {
         return;
       }
 
+      // Use security definer function to validate token without exposing the full table
       const { data, error } = await supabase
-        .from('admin_invites')
-        .select('email, expires_at, used_at')
-        .eq('token', inviteToken)
-        .maybeSingle();
+        .rpc('validate_invite_token', { invite_token: inviteToken });
 
-      if (error || !data) {
+      if (error || !data || data.length === 0) {
         setInviteValid(false);
         setInviteLoading(false);
         return;
       }
 
-      const isExpired = new Date(data.expires_at) < new Date();
-      const isUsed = data.used_at !== null;
-
-      if (!isExpired && !isUsed) {
+      const invite = data[0];
+      if (invite.is_valid) {
         setInviteValid(true);
         setIsSignUp(true);
-        setEmail(data.email);
+        setEmail(invite.email);
       }
       setInviteLoading(false);
     };
