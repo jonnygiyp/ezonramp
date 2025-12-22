@@ -66,6 +66,7 @@ const CustomConnectButton = () => {
       variant="outline"
       onClick={() => setOpen(true)}
       className="flex flex-col items-center gap-1 h-auto py-2 px-4"
+      data-tutorial="particle-connect"
     >
       <User className="h-5 w-5" />
       <span className="text-xs">Sign In / Sign Up</span>
