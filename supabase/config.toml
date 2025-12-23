@@ -2,3 +2,6 @@ project_id = "aryusbuyyoxkeigzsnko"
 
 [functions.card2crypto]
 verify_jwt = false
+
+[functions.coinbase-onramp]
+verify_jwt = false
