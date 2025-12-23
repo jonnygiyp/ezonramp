@@ -63,35 +63,99 @@ async function generateCDPJWT(
   const payloadB64 = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const message = `${headerB64}.${payloadB64}`;
 
-  // Parse the PEM private key (handle both PKCS#8 and SEC1 formats)
-  let pemContent = apiKeySecret
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace('-----BEGIN EC PRIVATE KEY-----', '')
-    .replace('-----END EC PRIVATE KEY-----', '')
-    .replace(/\s/g, '');
-  
-  // Decode base64 to binary
+  // Parse and decode PEM private key (tolerate common formatting issues)
+  const isSec1EcKey = apiKeySecret.includes('BEGIN EC PRIVATE KEY');
+
+  const pemMatch = apiKeySecret.match(/-----BEGIN [^-]+-----([\s\S]*?)-----END [^-]+-----/);
+  const rawBody = pemMatch ? pemMatch[1] : apiKeySecret;
+
+  // Remove whitespace, escaped newlines ("\\n"), and any non-base64 characters.
+  const b64BodyUnpadded = rawBody
+    .replace(/\\r/g, '')
+    .replace(/\\n/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[^A-Za-z0-9+/=]/g, '');
+
+  // Some copy/paste flows remove base64 padding; restore it.
+  const b64Body = b64BodyUnpadded + '='.repeat((4 - (b64BodyUnpadded.length % 4)) % 4);
+
+  // Decode base64 to binary DER
   let binaryDer: Uint8Array;
   try {
-    const decoded = atob(pemContent);
+    const decoded = atob(b64Body);
     binaryDer = new Uint8Array(decoded.length);
     for (let i = 0; i < decoded.length; i++) {
       binaryDer[i] = decoded.charCodeAt(i);
     }
-  } catch (e) {
-    console.error('Failed to decode base64 from API secret. Ensure COINBASE_API_SECRET is the full PEM key.');
+  } catch (_e) {
+    console.error('Failed to decode base64 from COINBASE_API_SECRET. Store the full PEM (including BEGIN/END lines) or the raw base64 body.');
     throw new Error('Invalid API key format');
   }
 
-  // Import the key for signing
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    binaryDer.buffer as ArrayBuffer,
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign']
-  );
+  const concatBytes = (...parts: Uint8Array[]) => {
+    const total = parts.reduce((sum, p) => sum + p.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const p of parts) {
+      out.set(p, offset);
+      offset += p.length;
+    }
+    return out;
+  };
+
+  const derLength = (len: number) => {
+    if (len < 128) return new Uint8Array([len]);
+    const bytes: number[] = [];
+    let n = len;
+    while (n > 0) {
+      bytes.unshift(n & 0xff);
+      n >>= 8;
+    }
+    return new Uint8Array([0x80 | bytes.length, ...bytes]);
+  };
+
+  const derTLV = (tag: number, value: Uint8Array) => concatBytes(new Uint8Array([tag]), derLength(value.length), value);
+  const derSeq = (value: Uint8Array) => derTLV(0x30, value);
+  const derInt0 = () => derTLV(0x02, new Uint8Array([0x00]));
+  const derOctetString = (value: Uint8Array) => derTLV(0x04, value);
+
+  // OIDs (already TLV-encoded): id-ecPublicKey and secp256r1
+  const OID_EC_PUBLIC_KEY = new Uint8Array([0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01]);
+  const OID_SECP256R1 = new Uint8Array([0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07]);
+
+  const wrapSec1ToPkcs8 = (sec1Der: Uint8Array) => {
+    const algId = derSeq(concatBytes(OID_EC_PUBLIC_KEY, OID_SECP256R1));
+    return derSeq(concatBytes(derInt0(), algId, derOctetString(sec1Der)));
+  };
+
+  const importPkcs8P256 = (pkcs8Der: Uint8Array) =>
+    crypto.subtle.importKey(
+      'pkcs8',
+      new Uint8Array(pkcs8Der).buffer,
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      false,
+      ['sign']
+    );
+
+  // Import the key for signing.
+  // - If it's already PKCS#8, import directly.
+  // - If it's SEC1 (ECPrivateKey), wrap into PKCS#8 and retry.
+  let cryptoKey: CryptoKey;
+  try {
+    cryptoKey = await importPkcs8P256(isSec1EcKey ? wrapSec1ToPkcs8(binaryDer) : binaryDer);
+  } catch (e1) {
+    if (!isSec1EcKey) {
+      try {
+        cryptoKey = await importPkcs8P256(wrapSec1ToPkcs8(binaryDer));
+      } catch (_e2) {
+        console.error('Failed to import COINBASE_API_SECRET as PKCS#8 (or wrapped SEC1).');
+        throw new Error('Invalid Coinbase API secret (expected ES256 P-256 PKCS#8 PEM)');
+      }
+    } else {
+      console.error('Failed to import COINBASE_API_SECRET as PKCS#8 after SEC1 wrap:', e1 instanceof Error ? e1.message : String(e1));
+      throw new Error('Invalid Coinbase API secret (expected ES256 P-256 PKCS#8 PEM)');
+    }
+  }
 
   // Sign the message
   const signature = await crypto.subtle.sign(
