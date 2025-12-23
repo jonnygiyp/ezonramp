@@ -63,18 +63,31 @@ async function generateCDPJWT(
   const payloadB64 = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const message = `${headerB64}.${payloadB64}`;
 
-  // Parse the PEM private key
-  const pemContent = apiKeySecret
+  // Parse the PEM private key (handle both PKCS#8 and SEC1 formats)
+  let pemContent = apiKeySecret
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
     .replace('-----BEGIN EC PRIVATE KEY-----', '')
     .replace('-----END EC PRIVATE KEY-----', '')
     .replace(/\s/g, '');
   
-  const binaryDer = Uint8Array.from(atob(pemContent), c => c.charCodeAt(0));
+  // Decode base64 to binary
+  let binaryDer: Uint8Array;
+  try {
+    const decoded = atob(pemContent);
+    binaryDer = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) {
+      binaryDer[i] = decoded.charCodeAt(i);
+    }
+  } catch (e) {
+    console.error('Failed to decode base64 from API secret. Ensure COINBASE_API_SECRET is the full PEM key.');
+    throw new Error('Invalid API key format');
+  }
 
   // Import the key for signing
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8',
-    binaryDer,
+    binaryDer.buffer as ArrayBuffer,
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
