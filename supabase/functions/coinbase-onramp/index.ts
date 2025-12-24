@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { SignJWT, importPKCS8, importJWK } from "https://deno.land/x/jose@v5.2.0/index.ts";
 
 // CORS headers - allow all origins for this public endpoint
 const corsHeaders = {
@@ -33,7 +34,7 @@ function checkRateLimit(clientId: string): boolean {
   return true;
 }
 
-// Generate CDP JWT for API authentication
+// Generate CDP JWT for API authentication using jose library
 async function generateCDPJWT(
   apiKeyId: string, 
   apiKeySecret: string,
@@ -41,69 +42,207 @@ async function generateCDPJWT(
   requestHost: string,
   requestPath: string
 ): Promise<string> {
-  const header = {
-    alg: 'ES256',
-    kid: apiKeyId,
-    typ: 'JWT',
-    nonce: crypto.randomUUID(),
-  };
-
   const now = Math.floor(Date.now() / 1000);
-  const payload = {
+  const nonce = crypto.randomUUID();
+
+  // Normalize the secret - handle escaped newlines from env vars
+  let normalizedSecret = apiKeySecret
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .trim();
+
+  console.log('Secret length:', normalizedSecret.length);
+
+  let privateKey;
+  let algorithm: string;
+
+  // Detect key type based on format
+  if (normalizedSecret.includes('-----BEGIN')) {
+    // PEM format - ES256 EC key
+    algorithm = 'ES256';
+    if (normalizedSecret.includes('BEGIN EC PRIVATE KEY')) {
+      normalizedSecret = await convertSec1ToPkcs8(normalizedSecret);
+    }
+    privateKey = await importPKCS8(normalizedSecret, algorithm);
+  } else {
+    // Raw base64 - Ed25519 key
+    algorithm = 'EdDSA';
+    console.log('Detected Ed25519 key (raw base64)');
+    
+    // Decode base64 to get raw key bytes
+    const keyBytes = Uint8Array.from(atob(normalizedSecret), c => c.charCodeAt(0));
+    console.log('Key bytes length:', keyBytes.length);
+    
+    // Ed25519 private key is 32 bytes, but Coinbase gives 64 bytes (seed + public key)
+    // We only need the first 32 bytes (the seed/private key)
+    const privateKeyBytes = keyBytes.slice(0, 32);
+    
+    // Import as JWK
+    const d = btoa(String.fromCharCode(...privateKeyBytes))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    
+    privateKey = await importJWK({ kty: 'OKP', crv: 'Ed25519', d }, 'EdDSA');
+  }
+
+  const jwt = await new SignJWT({
     sub: apiKeyId,
     iss: 'cdp',
     nbf: now,
-    exp: now + 120, // 2 minutes
+    exp: now + 120,
     uris: [`${requestMethod} ${requestHost}${requestPath}`],
-  };
+  })
+    .setProtectedHeader({ alg: algorithm, kid: apiKeyId, typ: 'JWT', nonce })
+    .sign(privateKey);
 
-  // Base64url encode header and payload
-  const encoder = new TextEncoder();
-  const headerB64 = btoa(JSON.stringify(header)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const payloadB64 = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const message = `${headerB64}.${payloadB64}`;
+  return jwt;
+}
 
-  // Parse and decode PEM private key (tolerate common formatting issues)
-  const isSec1EcKey = apiKeySecret.includes('BEGIN EC PRIVATE KEY');
-
-  const pemMatch = apiKeySecret.match(/-----BEGIN [^-]+-----([\s\S]*?)-----END [^-]+-----/);
-  const rawBody = pemMatch ? pemMatch[1] : apiKeySecret;
-
-  // Remove whitespace, escaped newlines ("\\n"), and any non-base64 characters.
-  const b64BodyUnpadded = rawBody
-    .replace(/\\r/g, '')
-    .replace(/\\n/g, '')
-    .replace(/\s+/g, '')
-    .replace(/[^A-Za-z0-9+/=]/g, '');
-
-  // Some copy/paste flows remove base64 padding; restore it.
-  const b64Body = b64BodyUnpadded + '='.repeat((4 - (b64BodyUnpadded.length % 4)) % 4);
+// Import key from SEC1 EC private key by extracting raw bytes and using importJWK
+async function importKeyFromSec1(sec1Pem: string): Promise<CryptoKey> {
+  // Extract the base64 content
+  const base64Content = sec1Pem
+    .replace(/-----BEGIN EC PRIVATE KEY-----/, '')
+    .replace(/-----END EC PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
 
   // Decode base64 to binary DER
-  let binaryDer: Uint8Array;
-  try {
-    const decoded = atob(b64Body);
-    binaryDer = new Uint8Array(decoded.length);
-    for (let i = 0; i < decoded.length; i++) {
-      binaryDer[i] = decoded.charCodeAt(i);
-    }
-  } catch (_e) {
-    console.error('Failed to decode base64 from COINBASE_API_SECRET. Store the full PEM (including BEGIN/END lines) or the raw base64 body.');
-    throw new Error('Invalid API key format');
-  }
+  const der = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
 
-  const concatBytes = (...parts: Uint8Array[]) => {
-    const total = parts.reduce((sum, p) => sum + p.length, 0);
-    const out = new Uint8Array(total);
-    let offset = 0;
-    for (const p of parts) {
-      out.set(p, offset);
-      offset += p.length;
+  // Parse the SEC1 ECPrivateKey structure to extract the raw private key bytes
+  // ECPrivateKey ::= SEQUENCE {
+  //   version INTEGER { ecPrivkeyVer1(1) },
+  //   privateKey OCTET STRING,
+  //   parameters [0] ECParameters {{ NamedCurve }} OPTIONAL,
+  //   publicKey [1] BIT STRING OPTIONAL
+  // }
+  
+  // Simple DER parsing - find the private key octet string
+  // The structure starts with SEQUENCE (0x30), then version (0x02 0x01 0x01),
+  // then OCTET STRING (0x04) containing the 32-byte private key
+  
+  let offset = 0;
+  if (der[offset] !== 0x30) throw new Error('Expected SEQUENCE');
+  offset++;
+  
+  // Skip length
+  if (der[offset] & 0x80) {
+    const lenBytes = der[offset] & 0x7f;
+    offset += 1 + lenBytes;
+  } else {
+    offset++;
+  }
+  
+  // Skip version (INTEGER)
+  if (der[offset] !== 0x02) throw new Error('Expected INTEGER for version');
+  offset++;
+  const versionLen = der[offset];
+  offset += 1 + versionLen;
+  
+  // Now we should be at the privateKey OCTET STRING
+  if (der[offset] !== 0x04) throw new Error('Expected OCTET STRING for privateKey');
+  offset++;
+  const privKeyLen = der[offset];
+  offset++;
+  
+  const privateKeyBytes = der.slice(offset, offset + privKeyLen);
+  offset += privKeyLen;
+  
+  // Try to find the public key (tagged [1])
+  let publicKeyBytes: Uint8Array | null = null;
+  while (offset < der.length) {
+    const tag = der[offset];
+    offset++;
+    let len = der[offset];
+    offset++;
+    if (len & 0x80) {
+      const lenBytes = len & 0x7f;
+      len = 0;
+      for (let i = 0; i < lenBytes; i++) {
+        len = (len << 8) | der[offset + i];
+      }
+      offset += lenBytes;
     }
-    return out;
+    
+    if (tag === 0xa1) { // [1] - publicKey
+      // It's a BIT STRING, skip the first byte (unused bits count)
+      if (der[offset] === 0x03) { // BIT STRING
+        offset++;
+        let pubLen = der[offset];
+        offset++;
+        if (pubLen & 0x80) {
+          const lenBytes = pubLen & 0x7f;
+          pubLen = 0;
+          for (let i = 0; i < lenBytes; i++) {
+            pubLen = (pubLen << 8) | der[offset + i];
+          }
+          offset += lenBytes;
+        }
+        const unusedBits = der[offset];
+        offset++;
+        publicKeyBytes = der.slice(offset, offset + pubLen - 1);
+      }
+      break;
+    } else {
+      offset += len;
+    }
+  }
+  
+  // Convert to JWK format
+  const base64url = (bytes: Uint8Array) => 
+    btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  
+  // Pad private key to 32 bytes if needed
+  const paddedPrivKey = new Uint8Array(32);
+  paddedPrivKey.set(privateKeyBytes, 32 - privateKeyBytes.length);
+  
+  const jwk = {
+    kty: 'EC',
+    crv: 'P-256',
+    d: base64url(paddedPrivKey),
+  } as Record<string, unknown>;
+  
+  // If we found the public key, add x and y coordinates
+  if (publicKeyBytes && publicKeyBytes.length === 65 && publicKeyBytes[0] === 0x04) {
+    jwk.x = base64url(publicKeyBytes.slice(1, 33));
+    jwk.y = base64url(publicKeyBytes.slice(33, 65));
+  }
+  
+  console.log('Importing via JWK, has public key:', !!jwk.x);
+  
+  return await importJWK(jwk, 'ES256') as CryptoKey;
+}
+
+// Convert SEC1 EC private key (BEGIN EC PRIVATE KEY) to PKCS#8 (BEGIN PRIVATE KEY)
+async function convertSec1ToPkcs8(sec1Pem: string): Promise<string> {
+  // Extract the base64 content
+  const base64Content = sec1Pem
+    .replace(/-----BEGIN EC PRIVATE KEY-----/, '')
+    .replace(/-----END EC PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+
+  // Decode base64 to binary
+  const sec1Der = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+
+  // PKCS#8 wrapper for EC key with P-256 curve
+  // Structure: SEQUENCE { INTEGER 0, SEQUENCE { OID ecPublicKey, OID secp256r1 }, OCTET STRING { SEC1 key } }
+  const ecPublicKeyOid = new Uint8Array([0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01]); // 1.2.840.10045.2.1
+  const secp256r1Oid = new Uint8Array([0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07]); // 1.2.840.10045.3.1.7
+
+  const concat = (...arrays: Uint8Array[]) => {
+    const total = arrays.reduce((sum, a) => sum + a.length, 0);
+    const result = new Uint8Array(total);
+    let offset = 0;
+    for (const a of arrays) {
+      result.set(a, offset);
+      offset += a.length;
+    }
+    return result;
   };
 
-  const derLength = (len: number) => {
+  const derLength = (len: number): Uint8Array => {
     if (len < 128) return new Uint8Array([len]);
     const bytes: number[] = [];
     let n = len;
@@ -114,63 +253,28 @@ async function generateCDPJWT(
     return new Uint8Array([0x80 | bytes.length, ...bytes]);
   };
 
-  const derTLV = (tag: number, value: Uint8Array) => concatBytes(new Uint8Array([tag]), derLength(value.length), value);
-  const derSeq = (value: Uint8Array) => derTLV(0x30, value);
-  const derInt0 = () => derTLV(0x02, new Uint8Array([0x00]));
-  const derOctetString = (value: Uint8Array) => derTLV(0x04, value);
-
-  // OIDs (already TLV-encoded): id-ecPublicKey and secp256r1
-  const OID_EC_PUBLIC_KEY = new Uint8Array([0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01]);
-  const OID_SECP256R1 = new Uint8Array([0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07]);
-
-  const wrapSec1ToPkcs8 = (sec1Der: Uint8Array) => {
-    const algId = derSeq(concatBytes(OID_EC_PUBLIC_KEY, OID_SECP256R1));
-    return derSeq(concatBytes(derInt0(), algId, derOctetString(sec1Der)));
+  const wrapTag = (tag: number, content: Uint8Array): Uint8Array => {
+    return concat(new Uint8Array([tag]), derLength(content.length), content);
   };
 
-  const importPkcs8P256 = (pkcs8Der: Uint8Array) =>
-    crypto.subtle.importKey(
-      'pkcs8',
-      new Uint8Array(pkcs8Der).buffer,
-      { name: 'ECDSA', namedCurve: 'P-256' },
-      false,
-      ['sign']
-    );
-
-  // Import the key for signing.
-  // - If it's already PKCS#8, import directly.
-  // - If it's SEC1 (ECPrivateKey), wrap into PKCS#8 and retry.
-  let cryptoKey: CryptoKey;
-  try {
-    cryptoKey = await importPkcs8P256(isSec1EcKey ? wrapSec1ToPkcs8(binaryDer) : binaryDer);
-  } catch (e1) {
-    if (!isSec1EcKey) {
-      try {
-        cryptoKey = await importPkcs8P256(wrapSec1ToPkcs8(binaryDer));
-      } catch (_e2) {
-        console.error('Failed to import COINBASE_API_SECRET as PKCS#8 (or wrapped SEC1).');
-        throw new Error('Invalid Coinbase API secret (expected ES256 P-256 PKCS#8 PEM)');
-      }
-    } else {
-      console.error('Failed to import COINBASE_API_SECRET as PKCS#8 after SEC1 wrap:', e1 instanceof Error ? e1.message : String(e1));
-      throw new Error('Invalid Coinbase API secret (expected ES256 P-256 PKCS#8 PEM)');
-    }
-  }
-
-  // Sign the message
-  const signature = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    cryptoKey,
-    encoder.encode(message)
+  // Build algorithm identifier: SEQUENCE { OID, OID }
+  const algIdContent = concat(
+    wrapTag(0x06, ecPublicKeyOid),
+    wrapTag(0x06, secp256r1Oid)
   );
+  const algId = wrapTag(0x30, algIdContent);
 
-  // Convert signature to base64url
-  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  // Build PKCS#8: SEQUENCE { INTEGER 0, algId, OCTET STRING { SEC1 key } }
+  const version = wrapTag(0x02, new Uint8Array([0x00]));
+  const privateKeyOctet = wrapTag(0x04, sec1Der);
+  const pkcs8Content = concat(version, algId, privateKeyOctet);
+  const pkcs8Der = wrapTag(0x30, pkcs8Content);
 
-  return `${message}.${signatureB64}`;
+  // Convert to base64 and wrap in PEM
+  const pkcs8Base64 = btoa(String.fromCharCode(...pkcs8Der));
+  const lines = pkcs8Base64.match(/.{1,64}/g) || [];
+  
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`;
 }
 
 serve(async (req) => {
