@@ -8,7 +8,6 @@ import AboutEditor from '@/components/admin/AboutEditor';
 import FAQEditor from '@/components/admin/FAQEditor';
 import ContactEditor from '@/components/admin/ContactEditor';
 import OnrampManager from '@/components/admin/OnrampManager';
-import AdminInvites from '@/components/admin/AdminInvites';
 import TermsEditor from '@/components/admin/TermsEditor';
 import PrivacyEditor from '@/components/admin/PrivacyEditor';
 
@@ -35,7 +34,7 @@ export default function AdminDashboard() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
         <h1 className="text-2xl font-semibold">Access Denied</h1>
         <p className="text-muted-foreground text-center">
-          You don't have admin privileges. Contact an existing admin to receive an invite.
+          You don't have admin privileges.
         </p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate('/')}>
@@ -74,14 +73,13 @@ export default function AdminDashboard() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <Tabs defaultValue="about" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="faq">FAQ</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
             <TabsTrigger value="terms">Terms</TabsTrigger>
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
             <TabsTrigger value="onramps">Onramps</TabsTrigger>
-            <TabsTrigger value="invites">Invites</TabsTrigger>
           </TabsList>
 
           <TabsContent value="about">
@@ -106,10 +104,6 @@ export default function AdminDashboard() {
 
           <TabsContent value="onramps">
             <OnrampManager />
-          </TabsContent>
-
-          <TabsContent value="invites">
-            <AdminInvites />
           </TabsContent>
         </Tabs>
       </main>
