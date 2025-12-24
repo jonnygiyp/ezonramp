@@ -15,18 +15,26 @@ export function useOnrampProviders(showAll = false) {
   return useQuery({
     queryKey: ['onramp_providers', showAll],
     queryFn: async () => {
-      let query = supabase
-        .from('onramp_providers')
-        .select('*')
-        .order('sort_order', { ascending: true });
-      
-      if (!showAll) {
-        query = query.eq('enabled', true);
+      if (showAll) {
+        // Admins can access the full table directly (requires admin role via RLS)
+        const { data, error } = await supabase
+          .from('onramp_providers')
+          .select('*')
+          .order('sort_order', { ascending: true });
+        
+        if (error) throw error;
+        return data as OnrampProvider[];
+      } else {
+        // Public access uses secure RPC function that excludes sensitive config
+        const { data, error } = await supabase.rpc('get_public_onramp_providers');
+        
+        if (error) throw error;
+        // Map to OnrampProvider type with empty config for public view
+        return (data || []).map((p: { id: string; name: string; display_name: string; enabled: boolean; sort_order: number }) => ({
+          ...p,
+          config: {} as Json, // Config is hidden from public access
+        })) as OnrampProvider[];
       }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as OnrampProvider[];
     },
   });
 }
