@@ -169,6 +169,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_public_onramp_providers: {
+        Args: never
+        Returns: {
+          display_name: string
+          enabled: boolean
+          id: string
+          name: string
+          sort_order: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
