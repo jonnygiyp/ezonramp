@@ -6,13 +6,11 @@ import { Label } from "./ui/label";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@particle-network/connectkit";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 const amountSchema = z.number().positive("Amount must be positive").min(1, "Minimum amount is $1").max(10000, "Maximum amount is $10,000");
 const walletAddressSchema = z.string().trim().min(26, "Invalid wallet address").max(128, "Invalid wallet address").regex(/^[a-zA-Z0-9]+$/, "Invalid wallet address format");
-
-// Coinbase CDP Project ID - this is a publishable key
-const COINBASE_APP_ID = "e7041872-c6f2-4de1-826a-8c20f4d26e7f";
 
 interface CoinbaseEmbeddedOnrampProps {
   defaultAsset?: string;
@@ -29,12 +27,45 @@ export function CoinbaseEmbeddedOnramp({
   const [manualAddress, setManualAddress] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [appId, setAppId] = useState<string | null>(null);
+  const [isLoadingAppId, setIsLoadingAppId] = useState(true);
   const onrampInstanceRef = useRef<CBPayInstanceType | null>(null);
 
   // Determine the destination address
   const destinationAddress = isConnected && address ? address : manualAddress;
 
-  // Initialize the onramp instance when we have an address
+  // Fetch App ID from backend on mount
+  useEffect(() => {
+    const fetchAppId = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('coinbase-onramp', {
+          body: { getAppIdOnly: true }
+        });
+        
+        if (error) {
+          console.error('Failed to fetch Coinbase App ID:', error);
+          toast({
+            title: "Configuration Error",
+            description: "Failed to load payment configuration.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (data?.appId) {
+          setAppId(data.appId);
+        }
+      } catch (err) {
+        console.error('Error fetching App ID:', err);
+      } finally {
+        setIsLoadingAppId(false);
+      }
+    };
+    
+    fetchAppId();
+  }, [toast]);
+
+  // Initialize the onramp instance when we have an address and app ID
   const initializeOnramp = useCallback(() => {
     // Clean up existing instance
     if (onrampInstanceRef.current) {
@@ -43,7 +74,7 @@ export function CoinbaseEmbeddedOnramp({
       setIsReady(false);
     }
 
-    if (!destinationAddress) return;
+    if (!destinationAddress || !appId) return;
 
     // Validate address
     const addressResult = walletAddressSchema.safeParse(destinationAddress);
@@ -60,7 +91,7 @@ export function CoinbaseEmbeddedOnramp({
     }
 
     const options = {
-      appId: COINBASE_APP_ID,
+      appId,
       widgetParameters: {
         addresses,
         assets: [defaultAsset],
@@ -117,7 +148,7 @@ export function CoinbaseEmbeddedOnramp({
         console.log("Coinbase onramp initialized");
       }
     });
-  }, [destinationAddress, amount, defaultAsset, defaultNetwork, toast]);
+  }, [destinationAddress, amount, defaultAsset, defaultNetwork, toast, appId]);
 
   // Re-initialize when address or amount changes
   useEffect(() => {
@@ -267,10 +298,15 @@ export function CoinbaseEmbeddedOnramp({
           onClick={handleBuy}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
-          disabled={isProcessing || (!isConnected && !manualAddress)}
+          disabled={isProcessing || isLoadingAppId || !appId || (!isConnected && !manualAddress)}
           data-tutorial="buy-button"
         >
-          {isProcessing ? (
+          {isLoadingAppId ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading...
+            </>
+          ) : isProcessing ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Processing...
