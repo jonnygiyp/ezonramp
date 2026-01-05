@@ -179,6 +179,15 @@ export type Database = {
           sort_order: number
         }[]
       }
+      get_public_site_content: {
+        Args: never
+        Returns: {
+          content: Json
+          id: string
+          section: string
+          updated_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
