@@ -6,15 +6,13 @@ import { ChevronLeft, ChevronRight, CreditCard, Wallet, Zap, Loader2 } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CoinflowCheckout } from "./CoinflowCheckout";
+import { CoinbaseEmbeddedOnramp } from "./CoinbaseEmbeddedOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
-import { useAccount } from "@particle-network/connectkit";
 
 // Input validation schemas
 const emailSchema = z.string().trim().email("Invalid email address").max(254);
 const amountSchema = z.number().positive("Amount must be positive").max(10000, "Maximum amount is $10,000");
-const coinbaseAmountSchema = z.number().positive("Amount must be positive").min(1, "Minimum amount is $1").max(10000, "Maximum amount is $10,000");
-const walletAddressSchema = z.string().trim().min(26, "Invalid wallet address").max(128, "Invalid wallet address").regex(/^[a-zA-Z0-9]+$/, "Invalid wallet address format");
 
 interface ApiConfig {
   id: string;
@@ -55,7 +53,6 @@ const getTabIcon = (name: string) => {
 const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const { toast } = useToast();
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
-  const { address, isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState<string>('');
   
   // Card2Crypto state
@@ -63,15 +60,6 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   const [email, setEmail] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('moonpay');
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Coinbase Headless Onramp state
-  const [coinbaseAmount, setCoinbaseAmount] = useState('');
-  const [isCoinbaseProcessing, setIsCoinbaseProcessing] = useState(false);
-  const [manualAddress, setManualAddress] = useState('');
-  
-  // Fixed asset and network for Coinbase - USDC on Solana only
-  const COINBASE_ASSET = 'USDC';
-  const COINBASE_NETWORK = 'solana';
 
   // Set initial tab when providers load
   useEffect(() => {
@@ -82,77 +70,6 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
 
   const enabledTabs = providers?.map(p => p.name) || [];
   const currentIndex = enabledTabs.indexOf(activeTab);
-
-  const handleCoinbaseOnramp = async () => {
-    // Determine destination address: use connected wallet or manual entry
-    const destinationAddress = isConnected && address ? address : manualAddress;
-
-    if (!destinationAddress) {
-      toast({
-        title: "Address Required",
-        description: "Please connect your wallet or enter a receiving address.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate manual address if not connected
-    if (!isConnected) {
-      const addressResult = walletAddressSchema.safeParse(destinationAddress);
-      if (!addressResult.success) {
-        toast({
-          title: "Invalid Address",
-          description: addressResult.error.errors[0]?.message || "Please enter a valid wallet address.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    const parsedAmount = parseFloat(coinbaseAmount);
-    const amountResult = coinbaseAmountSchema.safeParse(parsedAmount);
-    if (!amountResult.success) {
-      toast({
-        title: "Invalid Amount",
-        description: amountResult.error.errors[0]?.message || "Please enter a valid amount.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsCoinbaseProcessing(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('coinbase-onramp', {
-        body: {
-          destinationAddress,
-          blockchains: [COINBASE_NETWORK],
-          assets: [COINBASE_ASSET],
-          presetFiatAmount: parsedAmount,
-          fiatCurrency: 'USD',
-          defaultAsset: COINBASE_ASSET,
-          defaultNetwork: COINBASE_NETWORK,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.onrampUrl) {
-        window.open(data.onrampUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        throw new Error('No onramp URL returned');
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to create onramp session. Please try again.";
-      toast({
-        title: "Onramp Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsCoinbaseProcessing(false);
-    }
-  };
 
   const handleCard2CryptoPayment = async () => {
     const emailResult = emailSchema.safeParse(email);
@@ -298,107 +215,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       {/* Content Area */}
       <div className="w-full max-w-2xl mx-auto">
         {activeTab === 'coinbase' && (
-          <div className="space-y-8 animate-fade-in">
-            <div className="text-center space-y-4">
-              <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Buy USDC with Coinbase</h1>
-              <p className="text-lg md:text-xl text-muted-foreground">
-                Purchase USDC on Solana quickly and securely using your preferred payment method
-              </p>
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-              <div className="space-y-4">
-                {isConnected && address ? (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
-                    <p className="font-mono text-sm truncate">{address}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2" data-tutorial="wallet-input">
-                    <Label htmlFor="manual-address">Receiving Address</Label>
-                    <Input
-                      id="manual-address"
-                      type="text"
-                      placeholder="Enter your wallet address"
-                      value={manualAddress}
-                      onChange={(e) => setManualAddress(e.target.value)}
-                      className="font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Or connect your wallet above to auto-fill this field
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-2" data-tutorial="amount-input">
-                  <Label htmlFor="coinbase-amount">Amount (USD)</Label>
-                  <Input
-                    id="coinbase-amount"
-                    type="number"
-                    placeholder="Enter amount"
-                    value={coinbaseAmount}
-                    onChange={(e) => setCoinbaseAmount(e.target.value)}
-                    min="1"
-                    max="10000"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Asset</Label>
-                    <div className="flex items-center h-10 px-3 bg-muted rounded-md border border-input">
-                      <span className="text-sm font-medium">USDC</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Network</Label>
-                    <div className="flex items-center h-10 px-3 bg-muted rounded-md border border-input">
-                      <span className="text-sm font-medium">Solana</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Button 
-                onClick={handleCoinbaseOnramp}
-                size="lg"
-                className="w-full text-lg py-6 hover-scale"
-                disabled={isCoinbaseProcessing || !coinbaseAmount || (!isConnected && !manualAddress)}
-                data-tutorial="buy-button"
-              >
-                {isCoinbaseProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  'Buy Crypto Now'
-                )}
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground pt-4">
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-2xl">⚡</span>
-                </div>
-                <p className="font-medium">Fast Transactions</p>
-              </div>
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-2xl">🔒</span>
-                </div>
-                <p className="font-medium">Secure Processing</p>
-              </div>
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-2xl">🌐</span>
-                </div>
-                <p className="font-medium">Multiple Blockchains</p>
-              </div>
-            </div>
-          </div>
+          <CoinbaseEmbeddedOnramp defaultAsset="USDC" defaultNetwork="solana" />
         )}
 
         {activeTab === 'card2crypto' && (
@@ -483,9 +300,9 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
               </div>
               <div className="flex flex-col items-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-2xl">⚡</span>
+                  <span className="text-2xl">🌍</span>
                 </div>
-                <p className="font-medium">Instant Settlement</p>
+                <p className="font-medium">Global Coverage</p>
               </div>
             </div>
           </div>

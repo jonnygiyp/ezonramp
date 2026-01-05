@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coinbase/cbpay-js": "^2.4.0",
     "@coinflowlabs/react": "^5.5.1",
     "@hookform/resolvers": "^3.10.0",
     "@particle-network/connectkit": "^2.1.3",
