@@ -365,7 +365,22 @@ serve(async (req) => {
       defaultAsset,
       defaultNetwork,
       redirectUrl,
+      getAppIdOnly,
     } = body;
+
+    // If only requesting app ID (for embedded SDK initialization)
+    if (getAppIdOnly) {
+      const appId = Deno.env.get('COINBASE_ONRAMP_APP_ID');
+      if (!appId) {
+        return new Response(JSON.stringify({ error: 'Coinbase App ID not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ appId }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!destinationAddress) {
       return new Response(JSON.stringify({ error: 'destinationAddress is required' }), {
