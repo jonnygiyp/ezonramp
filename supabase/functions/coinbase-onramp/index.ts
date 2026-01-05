@@ -69,15 +69,33 @@ async function generateCDPJWT(
     algorithm = 'EdDSA';
     console.log('Detected Ed25519 key (raw base64)');
     
+    // Convert URL-safe base64 to standard base64
+    let base64Standard = normalizedSecret
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    
+    // Add padding if needed
+    while (base64Standard.length % 4 !== 0) {
+      base64Standard += '=';
+    }
+    
+    console.log('Base64 prepared, length:', base64Standard.length);
+    
     // Decode base64 to get raw key bytes
-    const keyBytes = Uint8Array.from(atob(normalizedSecret), c => c.charCodeAt(0));
+    let keyBytes: Uint8Array;
+    try {
+      keyBytes = Uint8Array.from(atob(base64Standard), c => c.charCodeAt(0));
+    } catch (e) {
+      console.error('Failed to decode base64:', e);
+      throw new Error('Invalid API secret format - failed to decode base64');
+    }
     console.log('Key bytes length:', keyBytes.length);
     
     // Ed25519 private key is 32 bytes, but Coinbase gives 64 bytes (seed + public key)
     // We only need the first 32 bytes (the seed/private key)
     const privateKeyBytes = keyBytes.slice(0, 32);
     
-    // Import as JWK
+    // Import as JWK - convert to URL-safe base64 for JWK 'd' parameter
     const d = btoa(String.fromCharCode(...privateKeyBytes))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     
