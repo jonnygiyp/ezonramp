@@ -52,6 +52,7 @@ async function generateCDPJWT(
     .trim();
 
   console.log('Secret length:', normalizedSecret.length);
+  console.log('Secret starts with:', normalizedSecret.substring(0, 20));
 
   let privateKey;
   let algorithm: string;
@@ -64,13 +65,45 @@ async function generateCDPJWT(
       normalizedSecret = await convertSec1ToPkcs8(normalizedSecret);
     }
     privateKey = await importPKCS8(normalizedSecret, algorithm);
+  } else if (normalizedSecret.startsWith('{')) {
+    // JSON format - parse and extract the key
+    algorithm = 'EdDSA';
+    console.log('Detected JSON format key');
+    try {
+      const parsed = JSON.parse(normalizedSecret);
+      // Coinbase CDP keys have a "privateKey" field
+      const keyData = parsed.privateKey || parsed.private_key || parsed.key || parsed.d;
+      if (!keyData) {
+        throw new Error('No private key field found in JSON');
+      }
+      
+      // The key data might be in various formats
+      let keyBytes: Uint8Array;
+      if (typeof keyData === 'string') {
+        // Convert URL-safe base64 to standard
+        let base64 = keyData.replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4 !== 0) base64 += '=';
+        keyBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      } else {
+        throw new Error('Unexpected key format in JSON');
+      }
+      
+      const privateKeyBytes = keyBytes.slice(0, 32);
+      const d = btoa(String.fromCharCode(...privateKeyBytes))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      privateKey = await importJWK({ kty: 'OKP', crv: 'Ed25519', d }, 'EdDSA');
+    } catch (e) {
+      console.error('Failed to parse JSON key:', e);
+      throw new Error('Invalid JSON key format');
+    }
   } else {
     // Raw base64 - Ed25519 key
     algorithm = 'EdDSA';
     console.log('Detected Ed25519 key (raw base64)');
     
-    // Convert URL-safe base64 to standard base64
+    // Remove any whitespace and convert URL-safe base64 to standard base64
     let base64Standard = normalizedSecret
+      .replace(/\s/g, '')
       .replace(/-/g, '+')
       .replace(/_/g, '/');
     
@@ -87,6 +120,8 @@ async function generateCDPJWT(
       keyBytes = Uint8Array.from(atob(base64Standard), c => c.charCodeAt(0));
     } catch (e) {
       console.error('Failed to decode base64:', e);
+      // Log first few chars to debug (safe since it's just format info)
+      console.error('First 30 chars:', normalizedSecret.substring(0, 30));
       throw new Error('Invalid API secret format - failed to decode base64');
     }
     console.log('Key bytes length:', keyBytes.length);
