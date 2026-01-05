@@ -406,14 +406,13 @@ serve(async (req) => {
       requestPath
     );
 
-    // Build session token request
-    const tokenRequestBody = {
+    // Build session token request - omit clientIp as edge functions don't have reliable access to it
+    const tokenRequestBody: Record<string, unknown> = {
       addresses: [{
         address: destinationAddress,
         blockchains: blockchains,
       }],
       assets: assets,
-      clientIp: clientId !== 'unknown' ? clientId : '0.0.0.0',
     };
 
     console.log('Requesting Coinbase session token for address:', destinationAddress.slice(0, 10) + '...');
