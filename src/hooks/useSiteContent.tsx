@@ -25,9 +25,9 @@ export function useSiteContent<T>(section: string) {
   return useQuery({
     queryKey: ['site_content', section],
     queryFn: async () => {
+      // Use RPC function to avoid exposing admin user IDs (updated_by column)
       const { data, error } = await supabase
-        .from('site_content')
-        .select('content')
+        .rpc('get_public_site_content')
         .eq('section', section)
         .maybeSingle();
       
