@@ -48,7 +48,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pt-[92px]">
+    <div className="min-h-screen flex flex-col pt-[96px]">
       <Header onNavigate={handleNavigate} />
       <Navigation activeSection={activeSection} onNavigate={handleNavigate} />
       
