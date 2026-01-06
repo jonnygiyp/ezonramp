@@ -349,12 +349,12 @@ export function CoinbaseHeadlessOnramp({
   const currentStepIndex = steps.indexOf(step === 'processing' ? 'complete' : step);
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="text-center space-y-4">
-        <h1 className="text-xl md:text-4xl font-bold tracking-tight">
+    <div className="space-y-6 animate-fade-in">
+      <div className="text-center space-y-2">
+        <h1 className="text-lg md:text-2xl font-bold tracking-tight">
           Buy {defaultAsset} instantly with debit or Apple Pay
         </h1>
-        <p className="text-sm md:text-xl text-muted-foreground">
+        <p className="text-xs md:text-sm text-muted-foreground">
           US users can purchase up to $500 per week - no Coinbase account required.
         </p>
       </div>
