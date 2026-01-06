@@ -389,54 +389,95 @@ serve(async (req) => {
       }
 
       case 'generateBuyUrl': {
-        // Generate a one-click-buy URL using quote endpoint with destination_address
+        // Generate an Onramp URL using session token approach
         const { 
           purchaseCurrency, 
           purchaseNetwork, 
           paymentAmount, 
           paymentCurrency,
-          paymentMethod,
           country,
           destinationAddress,
         } = body;
 
-        if (!purchaseCurrency || !paymentAmount || !paymentCurrency || !country || !destinationAddress) {
+        if (!purchaseCurrency || !paymentAmount || !destinationAddress || !purchaseNetwork) {
           return new Response(JSON.stringify({ error: 'Missing required parameters for buy URL' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        const quoteBody: Record<string, unknown> = {
-          purchase_currency: purchaseCurrency,
-          purchase_network: purchaseNetwork,
-          payment_amount: paymentAmount,
-          payment_currency: paymentCurrency,
-          payment_method: paymentMethod || 'CARD',
-          country,
-          destination_address: destinationAddress,
+        // Map network names to Coinbase blockchain identifiers
+        const networkMap: Record<string, string> = {
+          'solana': 'solana',
+          'ethereum': 'ethereum',
+          'base': 'base',
+          'polygon': 'polygon',
+          'arbitrum': 'arbitrum',
+          'optimism': 'optimism',
         };
 
-        console.log('Generating buy URL for:', destinationAddress.slice(0, 10) + '...');
+        const blockchain = networkMap[purchaseNetwork.toLowerCase()] || purchaseNetwork;
 
-        const response = await callCDPApi('POST', '/onramp/v1/buy/quote', quoteBody);
-        const data = await response.json();
+        console.log('Generating session token for:', destinationAddress.slice(0, 10) + '...');
 
-        if (!response.ok) {
-          console.error('CDP buy URL error:', data);
+        // Step 1: Get session token
+        const sessionBody = {
+          addresses: [{
+            address: destinationAddress,
+            blockchains: [blockchain],
+          }],
+          assets: [purchaseCurrency],
+        };
+
+        const tokenResponse = await callCDPApi('POST', '/onramp/v1/token', sessionBody);
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenResponse.ok) {
+          console.error('CDP session token error:', tokenData);
           return new Response(JSON.stringify({ 
-            error: data.message || 'Failed to generate buy URL',
-            details: data,
+            error: tokenData.message || 'Failed to get session token',
+            details: tokenData,
           }), {
-            status: response.status,
+            status: tokenResponse.status,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        // The API returns a one_click_buy_url when destination_address is provided
+        const sessionToken = tokenData.token;
+        if (!sessionToken) {
+          console.error('No session token in response:', tokenData);
+          return new Response(JSON.stringify({ 
+            error: 'No session token received',
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log('Session token obtained, building URL');
+
+        // Step 2: Build the Coinbase Pay URL with parameters
+        const appId = Deno.env.get('COINBASE_ONRAMP_APP_ID') || '';
+        
+        const urlParams = new URLSearchParams({
+          sessionToken: sessionToken,
+          defaultAsset: purchaseCurrency,
+          defaultNetwork: blockchain,
+          presetFiatAmount: paymentAmount,
+          fiatCurrency: paymentCurrency || 'USD',
+        });
+
+        if (appId) {
+          urlParams.set('appId', appId);
+        }
+
+        const buyUrl = `https://pay.coinbase.com/buy?${urlParams.toString()}`;
+
+        console.log('Generated buy URL successfully');
+
         return new Response(JSON.stringify({
-          buyUrl: data.one_click_buy_url || null,
-          quote: data,
+          buyUrl,
+          sessionToken,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
