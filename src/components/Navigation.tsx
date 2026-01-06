@@ -7,7 +7,7 @@ const Navigation = ({ activeSection, onNavigate }: NavigationProps) => {
   const navItems = ["HOME", "ABOUT", "FAQ", "CONTACT"];
 
   return (
-    <nav className="border-b border-border">
+    <nav className="fixed top-[88px] left-0 right-0 z-40 bg-background border-b border-border">
       <div className="container mx-auto px-6 pt-6 pb-2">
         <div className="flex gap-8 justify-center">
           {navItems.map((item) => (
