@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, CreditCard, Wallet, Zap, Loader2 } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CoinflowCheckout } from "./CoinflowCheckout";
-import { CoinbaseEmbeddedOnramp } from "./CoinbaseEmbeddedOnramp";
+import { CoinbaseHeadlessOnramp } from "./CoinbaseHeadlessOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 
@@ -215,7 +215,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       {/* Content Area */}
       <div className="w-full max-w-2xl mx-auto">
         {activeTab === 'coinbase' && (
-          <CoinbaseEmbeddedOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
         )}
 
         {activeTab === 'card2crypto' && (

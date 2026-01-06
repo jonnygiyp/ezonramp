@@ -3,5 +3,8 @@ project_id = "aryusbuyyoxkeigzsnko"
 [functions.card2crypto]
 verify_jwt = false
 
-[functions.coinbase-onramp]
+[functions.twilio-verify]
+verify_jwt = false
+
+[functions.coinbase-headless]
 verify_jwt = false
