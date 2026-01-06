@@ -360,16 +360,20 @@ export function CoinbaseHeadlessOnramp({
       </div>
 
       {/* Progress indicator */}
-      <div className="flex justify-center gap-2" role="progressbar" aria-valuenow={currentStepIndex + 1} aria-valuemin={1} aria-valuemax={steps.length}>
-        <span className="sr-only">Step {currentStepIndex + 1} of {steps.length}</span>
-        {steps.map((s, i) => (
-          <div
-            key={s}
-            className={`h-2 w-8 rounded-full transition-colors ${
-              i <= currentStepIndex ? 'bg-primary' : 'bg-muted'
-            }`}
-          />
-        ))}
+      <div className="flex flex-col items-center gap-1" role="progressbar" aria-valuenow={currentStepIndex + 1} aria-valuemin={1} aria-valuemax={steps.length}>
+        <div className="flex justify-center gap-2">
+          {steps.map((s, i) => (
+            <div
+              key={s}
+              className={`h-2 w-8 rounded-full transition-colors ${
+                i <= currentStepIndex ? 'bg-primary' : 'bg-muted'
+              }`}
+            />
+          ))}
+        </div>
+        <span className="text-[10px] text-muted-foreground/70">
+          {step === 'complete' || step === 'processing' ? 'Done!' : `Step ${currentStepIndex + 1} of ${steps.length - 1}`}
+        </span>
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
@@ -414,7 +418,7 @@ export function CoinbaseHeadlessOnramp({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground/70">
                   Used only to send your verification code. No marketing messages.
                 </p>
               </div>
@@ -435,7 +439,7 @@ export function CoinbaseHeadlessOnramp({
                     maxLength={10}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground/70">
                   Used only to send your verification code. No marketing messages.
                 </p>
               </div>
@@ -453,8 +457,8 @@ export function CoinbaseHeadlessOnramp({
                   onChange={(e) => setManualAddress(e.target.value)}
                   className="font-mono"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Make sure this address supports Solana USDC. Funds can't be reversed.
+                <p className="text-[10px] text-muted-foreground/70">
+                  This wallet must support Solana USDC. Transactions can't be reversed.
                 </p>
               </div>
             )}
@@ -484,7 +488,7 @@ export function CoinbaseHeadlessOnramp({
                 </>
               ) : (
                 <>
-                  Continue
+                  Continue securely
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
