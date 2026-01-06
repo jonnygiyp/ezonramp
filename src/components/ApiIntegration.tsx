@@ -182,7 +182,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
       {/* Tab Switcher - only show if multiple providers */}
       {providers.length > 1 && (
         <div className="flex items-center justify-center mb-4">
-          <div className="flex gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
+          <div className="flex flex-wrap justify-center gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
             {providers.map((provider) => {
               const Icon = getTabIcon(provider.name);
               return (
