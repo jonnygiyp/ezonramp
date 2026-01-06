@@ -384,26 +384,23 @@ export function CoinbaseHeadlessOnramp({
             </div>
 
             {/* Channel selector */}
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground text-center">Select a purchase provider</p>
-              <div className="flex gap-2" data-tutorial="verification-method">
-                <Button
-                  variant={verifyChannel === 'sms' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => setVerifyChannel('sms')}
-                >
-                  <Phone className="mr-2 h-4 w-4" />
-                  Phone (SMS)
-                </Button>
-                <Button
-                  variant={verifyChannel === 'email' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => setVerifyChannel('email')}
-                >
-                  <Mail className="mr-2 h-4 w-4" />
-                  Email
-                </Button>
-              </div>
+            <div className="flex gap-2" data-tutorial="verification-method">
+              <Button
+                variant={verifyChannel === 'sms' ? 'default' : 'outline'}
+                className="flex-1"
+                onClick={() => setVerifyChannel('sms')}
+              >
+                <Phone className="mr-2 h-4 w-4" />
+                Phone (SMS)
+              </Button>
+              <Button
+                variant={verifyChannel === 'email' ? 'default' : 'outline'}
+                className="flex-1"
+                onClick={() => setVerifyChannel('email')}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Email
+              </Button>
             </div>
 
             {/* Input fields */}
