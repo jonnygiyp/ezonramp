@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, HelpCircle, ShieldCheck, ArrowRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, HelpCircle, ShieldCheck, ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,10 +10,15 @@ interface TutorialStep {
   title: string;
   description: string;
   position: "top" | "bottom" | "left" | "right";
-  mock?: 'verification-code' | 'verified-state';
+  mock?: 'verification-code' | 'verified-state' | 'global-buy-button';
 }
 
-const tutorialSteps: TutorialStep[] = [
+interface OnboardingTutorialProps {
+  selectedProvider?: string;
+}
+
+// Coinbase US tutorial steps
+const coinbaseUSSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='particle-connect']",
     title: "Create Your Wallet",
@@ -57,6 +62,41 @@ const tutorialSteps: TutorialStep[] = [
     description: "Once verified, you'll see your verification status and can proceed directly to purchasing. Your verification is valid for 60 days!",
     position: "top",
     mock: 'verified-state',
+  },
+];
+
+// Coinbase Global tutorial steps
+const coinbaseGlobalSteps: TutorialStep[] = [
+  {
+    target: "[data-tutorial='particle-connect']",
+    title: "Create Your Wallet",
+    description: "Sign up for a free wallet through Particle Network to get started!",
+    position: "bottom",
+  },
+  {
+    target: "[data-tutorial='provider-tabs']",
+    title: "Select An Onramp",
+    description: "Select an onramp to buy crypto. Each has different features, processing times and fees.",
+    position: "bottom",
+  },
+  {
+    target: "[data-tutorial='global-amount-input']",
+    title: "Enter Amount",
+    description: "Enter the amount of USDC you would like to purchase.",
+    position: "top",
+  },
+  {
+    target: "[data-tutorial='global-wallet-input']",
+    title: "Receiving Wallet Address",
+    description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own wallet, paste the address here.",
+    position: "top",
+  },
+  {
+    target: "[data-tutorial='mock-global-buy-button']",
+    title: "Complete Purchase",
+    description: "Click this button to open Coinbase and complete your USDC purchase. A new window will open to finalize the transaction.",
+    position: "top",
+    mock: 'global-buy-button',
   },
 ];
 
@@ -146,7 +186,35 @@ function MockVerifiedState() {
   );
 }
 
-export function OnboardingTutorial() {
+// Mock component for global buy button
+function MockGlobalBuyButton() {
+  return (
+    <div 
+      data-tutorial="mock-global-buy-button"
+      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
+    >
+      <div className="space-y-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold">Ready to Purchase</h2>
+          <p className="text-sm text-muted-foreground">
+            Click the button below to open Coinbase and complete your purchase.
+          </p>
+        </div>
+
+        <Button size="lg" className="w-full" disabled>
+          Buy USDC with Coinbase
+          <ExternalLink className="ml-2 h-4 w-4" />
+        </Button>
+
+        <p className="text-xs text-center text-muted-foreground">
+          A Coinbase window will open to complete your purchase.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function OnboardingTutorial({ selectedProvider = 'coinbase' }: OnboardingTutorialProps) {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
@@ -154,13 +222,21 @@ export function OnboardingTutorial() {
   
   const { isConnected } = useAccount();
   
+  // Get the appropriate tutorial steps based on selected provider
+  const baseTutorialSteps = useMemo(() => {
+    if (selectedProvider === 'coinbase_global') {
+      return coinbaseGlobalSteps;
+    }
+    return coinbaseUSSteps;
+  }, [selectedProvider]);
+  
   // Filter out step 1 (wallet creation) if user is already connected
   const activeSteps = useMemo(() => {
     if (isConnected) {
-      return tutorialSteps.slice(1); // Skip first step
+      return baseTutorialSteps.slice(1); // Skip first step
     }
-    return tutorialSteps;
-  }, [isConnected]);
+    return baseTutorialSteps;
+  }, [isConnected, baseTutorialSteps]);
 
   const currentTutorialStep = activeSteps[currentStep];
   const currentMock = currentTutorialStep?.mock;
@@ -321,6 +397,7 @@ export function OnboardingTutorial() {
       {/* Mock displays for tutorial steps */}
       {currentMock === 'verification-code' && <MockVerificationCode />}
       {currentMock === 'verified-state' && <MockVerifiedState />}
+      {currentMock === 'global-buy-button' && <MockGlobalBuyButton />}
 
       {/* Overlay */}
       <div className="fixed inset-0 z-[9998] pointer-events-none">

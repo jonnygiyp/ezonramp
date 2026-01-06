@@ -153,7 +153,7 @@ export function CoinbaseOnrampWidget({
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Amount Input */}
-        <div className="space-y-2">
+        <div className="space-y-2" data-tutorial="global-amount-input">
           <Label htmlFor="amount-global">Amount (USD)</Label>
           <Input
             id="amount-global"
@@ -168,7 +168,7 @@ export function CoinbaseOnrampWidget({
 
         {/* Wallet Address */}
         {!isConnected && (
-          <div className="space-y-2">
+          <div className="space-y-2" data-tutorial="global-wallet-input">
             <Label htmlFor="wallet-global">Receiving Wallet Address</Label>
             <Input
               id="wallet-global"

@@ -23,6 +23,7 @@ interface ApiConfig {
 
 interface ApiIntegrationProps {
   apis: ApiConfig[];
+  onProviderChange?: (provider: string) => void;
 }
 
 const CARD2CRYPTO_PROVIDERS = [
@@ -53,7 +54,7 @@ const getTabIcon = (name: string) => {
   }
 };
 
-const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
+const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   const { toast } = useToast();
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
   const [activeTab, setActiveTab] = useState<string>('');
@@ -68,8 +69,15 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
   useEffect(() => {
     if (providers && providers.length > 0 && !activeTab) {
       setActiveTab(providers[0].name);
+      onProviderChange?.(providers[0].name);
     }
-  }, [providers, activeTab]);
+  }, [providers, activeTab, onProviderChange]);
+
+  // Notify parent when active tab changes
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    onProviderChange?.(tab);
+  };
 
   const enabledTabs = providers?.map(p => p.name) || [];
   const currentIndex = enabledTabs.indexOf(activeTab);
@@ -138,13 +146,13 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
 
   const swipeLeft = () => {
     if (currentIndex > 0) {
-      setActiveTab(enabledTabs[currentIndex - 1]);
+      handleTabChange(enabledTabs[currentIndex - 1]);
     }
   };
 
   const swipeRight = () => {
     if (currentIndex < enabledTabs.length - 1) {
-      setActiveTab(enabledTabs[currentIndex + 1]);
+      handleTabChange(enabledTabs[currentIndex + 1]);
     }
   };
 
@@ -190,7 +198,7 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
               return (
                 <button
                   key={provider.id}
-                  onClick={() => setActiveTab(provider.name)}
+                  onClick={() => handleTabChange(provider.name)}
                   className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-full transition-all ${
                     activeTab === provider.name 
                       ? 'bg-primary text-primary-foreground' 
