@@ -62,15 +62,22 @@ const CustomConnectButton = () => {
   }
 
   return (
-    <Button
-      variant="outline"
-      onClick={() => setOpen(true)}
-      className="flex flex-col items-center gap-1 h-auto py-2 px-4"
-      data-tutorial="particle-connect"
-    >
-      <User className="h-5 w-5" />
-      <span className="text-xs">Sign In / Sign Up</span>
-    </Button>
+    <div className="flex gap-2" data-tutorial="particle-connect">
+      <Button
+        variant="outline"
+        onClick={() => setOpen(true)}
+        className="px-4 py-2 text-sm"
+      >
+        Sign In
+      </Button>
+      <Button
+        variant="default"
+        onClick={() => setOpen(true)}
+        className="px-4 py-2 text-sm"
+      >
+        Sign Up
+      </Button>
+    </div>
   );
 };
 
