@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@particle-network/connectkit";
 import { supabase } from "@/integrations/supabase/client";
-import { generateOnRampURL } from "@coinbase/cbpay-js";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +42,6 @@ export function CoinbaseEmbeddedOnramp({
   const [amount, setAmount] = useState("");
   const [manualAddress, setManualAddress] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [appId, setAppId] = useState<string | null>(null);
 
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -57,24 +55,6 @@ export function CoinbaseEmbeddedOnramp({
 
   // Determine the destination address
   const destinationAddress = isConnected && address ? address : manualAddress;
-
-  // Fetch App ID on mount
-  useEffect(() => {
-    const fetchAppId = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("coinbase-onramp", {
-          body: { getAppIdOnly: true },
-        });
-        if (error) throw error;
-        if (data?.appId) {
-          setAppId(data.appId);
-        }
-      } catch (err) {
-        console.error("Failed to fetch Coinbase App ID:", err);
-      }
-    };
-    fetchAppId();
-  }, []);
 
   // Handle postMessage events from Coinbase iframe
   const handleMessage = useCallback((event: MessageEvent) => {
@@ -155,35 +135,34 @@ export function CoinbaseEmbeddedOnramp({
       presetFiatAmount = parsedAmount;
     }
 
-    if (!appId) {
-      toast({
-        title: "Configuration Error",
-        description: "Coinbase integration not configured. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     setIsProcessing(true);
     try {
-      // Build network list for addresses
-      const networks =
+      // Build network list
+      const blockchains =
         defaultNetwork === "solana"
           ? ["solana"]
           : ["ethereum", "base", "polygon", "arbitrum"];
 
-      // Generate the onramp URL using the SDK with App ID
-      const url = generateOnRampURL({
-        appId,
-        addresses: { [destinationAddress]: networks },
-        assets: [defaultAsset],
-        presetFiatAmount: presetFiatAmount ? presetFiatAmount : undefined,
-        defaultAsset,
-        defaultNetwork,
+      // Call edge function to get session token URL
+      const { data, error } = await supabase.functions.invoke("coinbase-onramp", {
+        body: {
+          destinationAddress,
+          blockchains,
+          assets: [defaultAsset],
+          defaultAsset,
+          defaultNetwork,
+          presetFiatAmount: presetFiatAmount || undefined,
+        },
       });
 
-      console.log("Generated Coinbase URL:", url);
-      setCheckoutUrl(url);
+      if (error) throw error;
+      if (!data?.onrampUrl) {
+        throw new Error("Failed to generate checkout URL");
+      }
+
+      console.log("Generated Coinbase URL with session token:", data.onrampUrl);
+      setCheckoutUrl(data.onrampUrl);
       setIsCheckoutOpen(true);
     } catch (err: unknown) {
       const message =
@@ -277,7 +256,7 @@ export function CoinbaseEmbeddedOnramp({
           onClick={startCheckout}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
-          disabled={isProcessing || (!isConnected && !manualAddress) || !appId}
+          disabled={isProcessing || (!isConnected && !manualAddress)}
           data-tutorial="buy-button"
         >
           {isProcessing ? (
