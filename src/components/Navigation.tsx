@@ -8,7 +8,7 @@ const Navigation = ({ activeSection, onNavigate }: NavigationProps) => {
 
   return (
     <nav className="fixed top-[88px] left-0 right-0 z-40 bg-background border-b border-border">
-      <div className="container mx-auto px-6 py-2">
+      <div className="container mx-auto px-6 py-1.5">
         <div className="flex gap-8 justify-center">
           {navItems.map((item) => (
             <button
