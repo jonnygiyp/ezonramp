@@ -168,48 +168,50 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
 
   return (
     <div className="w-full min-h-[600px] flex flex-col items-center justify-center px-6 py-6">
-      {/* Tab Switcher */}
-      <div className="flex items-center justify-center gap-4 mb-8">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={swipeLeft}
-          className={currentIndex === 0 ? 'opacity-30' : 'hover-scale'}
-          disabled={currentIndex === 0}
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </Button>
-        
-        <div className="flex gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
-          {providers.map((provider) => {
-            const Icon = getTabIcon(provider.name);
-            return (
-              <button
-                key={provider.id}
-                onClick={() => setActiveTab(provider.name)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-                  activeTab === provider.name 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'hover:bg-muted-foreground/10'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="font-medium">{provider.display_name}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Tab Switcher - only show if multiple providers */}
+      {providers.length > 1 && (
+        <div className="flex items-center justify-center gap-4 mb-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={swipeLeft}
+            className={currentIndex === 0 ? 'opacity-30' : 'hover-scale'}
+            disabled={currentIndex === 0}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          
+          <div className="flex gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
+            {providers.map((provider) => {
+              const Icon = getTabIcon(provider.name);
+              return (
+                <button
+                  key={provider.id}
+                  onClick={() => setActiveTab(provider.name)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+                    activeTab === provider.name 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'hover:bg-muted-foreground/10'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="font-medium">{provider.display_name}</span>
+                </button>
+              );
+            })}
+          </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={swipeRight}
-          className={currentIndex === enabledTabs.length - 1 ? 'opacity-30' : 'hover-scale'}
-          disabled={currentIndex === enabledTabs.length - 1}
-        >
-          <ChevronRight className="h-6 w-6" />
-        </Button>
-      </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={swipeRight}
+            className={currentIndex === enabledTabs.length - 1 ? 'opacity-30' : 'hover-scale'}
+            disabled={currentIndex === enabledTabs.length - 1}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
 
 
       {/* Content Area */}
