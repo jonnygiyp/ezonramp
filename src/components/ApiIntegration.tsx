@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { ChevronLeft, ChevronRight, CreditCard, Wallet, Zap, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CreditCard, Wallet, Zap, Loader2, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CoinflowCheckout } from "./CoinflowCheckout";
 import { CoinbaseHeadlessOnramp } from "./CoinbaseHeadlessOnramp";
+import { CoinbaseOnrampWidget } from "./CoinbaseOnrampWidget";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 
@@ -41,6 +42,8 @@ const getTabIcon = (name: string) => {
   switch (name) {
     case 'coinbase':
       return Wallet;
+    case 'coinbase_global':
+      return Globe;
     case 'card2crypto':
       return CreditCard;
     case 'coinflow':
@@ -218,6 +221,10 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
       <div className="w-full max-w-2xl mx-auto">
         {activeTab === 'coinbase' && (
           <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
+        )}
+
+        {activeTab === 'coinbase_global' && (
+          <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" />
         )}
 
         {activeTab === 'card2crypto' && (
