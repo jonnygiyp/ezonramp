@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { CBPayInstanceType, initOnRamp } from "@coinbase/cbpay-js";
+import { generateOnRampURL } from "@coinbase/cbpay-js";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -20,10 +20,10 @@ export function CoinbaseOnrampWidget({
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   
-  const [onrampInstance, setOnrampInstance] = useState<CBPayInstanceType | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [manualAddress, setManualAddress] = useState("");
   const [amount, setAmount] = useState("100");
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [appId, setAppId] = useState<string | null>(null);
   
   const destinationAddress = isConnected && address ? address : manualAddress;
@@ -39,130 +39,85 @@ export function CoinbaseOnrampWidget({
         }
       } catch (err) {
         console.error("Failed to fetch Coinbase config:", err);
-        setIsInitializing(false);
+      } finally {
+        setIsLoadingConfig(false);
       }
     };
     fetchAppId();
   }, []);
 
-  // Initialize the Coinbase Onramp instance
-  useEffect(() => {
-    if (!destinationAddress || !appId) {
-      setIsInitializing(false);
-      return;
-    }
-
-    // Build addresses object for the widget
-    const addresses: Record<string, string[]> = {};
-    addresses[destinationAddress] = [defaultNetwork];
-
-    initOnRamp(
-      {
-        appId,
-        widgetParameters: {
-          addresses,
-          assets: [defaultAsset],
-          defaultAsset,
-          defaultNetwork,
-          presetFiatAmount: parseFloat(amount) || 100,
-          fiatCurrency: "USD",
-        },
-        onSuccess: () => {
-          console.log("Coinbase Onramp: Success");
-          toast({
-            title: "Purchase Complete",
-            description: `Your ${defaultAsset} purchase was successful!`,
-          });
-        },
-        onExit: () => {
-          console.log("Coinbase Onramp: User exited");
-        },
-        onEvent: (event) => {
-          console.log("Coinbase Onramp Event:", event);
-        },
-        experienceLoggedIn: "popup",
-        experienceLoggedOut: "popup",
-        closeOnExit: true,
-        closeOnSuccess: true,
-      },
-      (error, instance) => {
-        if (error) {
-          console.error("Failed to initialize Coinbase Onramp:", error);
-          toast({
-            title: "Initialization Error",
-            description: "Failed to initialize Coinbase Onramp. Please try again.",
-            variant: "destructive",
-          });
-        }
-        setOnrampInstance(instance || null);
-        setIsInitializing(false);
-      }
-    );
-
-    return () => {
-      onrampInstance?.destroy();
-    };
-  }, [destinationAddress, appId, defaultAsset, defaultNetwork]);
-
-  // Reinitialize when amount changes
-  const reinitializeWithAmount = useCallback(() => {
-    if (!destinationAddress || !appId) return;
-    
-    onrampInstance?.destroy();
-    setIsInitializing(true);
-
-    const addresses: Record<string, string[]> = {};
-    addresses[destinationAddress] = [defaultNetwork];
-
-    initOnRamp(
-      {
-        appId,
-        widgetParameters: {
-          addresses,
-          assets: [defaultAsset],
-          defaultAsset,
-          defaultNetwork,
-          presetFiatAmount: parseFloat(amount) || 100,
-          fiatCurrency: "USD",
-        },
-        onSuccess: () => {
-          toast({
-            title: "Purchase Complete",
-            description: `Your ${defaultAsset} purchase was successful!`,
-          });
-        },
-        onExit: () => {
-          console.log("Coinbase Onramp: User exited");
-        },
-        onEvent: (event) => {
-          console.log("Coinbase Onramp Event:", event);
-        },
-        experienceLoggedIn: "popup",
-        experienceLoggedOut: "popup",
-        closeOnExit: true,
-        closeOnSuccess: true,
-      },
-      (error, instance) => {
-        if (error) {
-          console.error("Failed to reinitialize Coinbase Onramp:", error);
-        }
-        setOnrampInstance(instance || null);
-        setIsInitializing(false);
-      }
-    );
-  }, [destinationAddress, appId, defaultAsset, defaultNetwork, amount, onrampInstance, toast]);
-
-  const handleOpenWidget = () => {
-    if (!onrampInstance) {
+  // Handle the buy action - get session token and open URL
+  const handleBuy = useCallback(async () => {
+    if (!destinationAddress) {
       toast({
-        title: "Not Ready",
-        description: "Please wait for the widget to initialize or enter a wallet address.",
+        title: "Wallet Required",
+        description: "Please connect your wallet or enter a wallet address.",
         variant: "destructive",
       });
       return;
     }
-    onrampInstance.open();
-  };
+
+    setIsLoading(true);
+
+    try {
+      console.log("Fetching session token for:", destinationAddress.slice(0, 10) + "...");
+      
+      // Get session token from the backend
+      const { data, error } = await supabase.functions.invoke("coinbase-headless", {
+        body: {
+          action: "getSessionToken",
+          destinationAddress,
+          destinationNetwork: defaultNetwork,
+          assets: [defaultAsset],
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      const sessionToken = data.sessionToken;
+      if (!sessionToken) {
+        throw new Error("Failed to get session token");
+      }
+
+      console.log("Session token obtained, generating URL...");
+
+      // Generate the onramp URL with the session token
+      const onrampURL = generateOnRampURL({
+        sessionToken,
+        presetFiatAmount: parseFloat(amount) || 100,
+        defaultNetwork,
+        defaultAsset,
+      });
+
+      console.log("Opening Coinbase Onramp...");
+      
+      // Open in a popup window
+      const popup = window.open(onrampURL, '_blank', 'width=460,height=700');
+      
+      if (!popup) {
+        // Popup blocked, redirect instead
+        window.location.href = onrampURL;
+      }
+    } catch (err) {
+      console.error("Failed to initiate purchase:", err);
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to initiate purchase. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [destinationAddress, defaultNetwork, defaultAsset, amount, toast]);
+
+  if (isLoadingConfig) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!appId) {
     return (
@@ -197,36 +152,24 @@ export function CoinbaseOnrampWidget({
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Amount Input */}
         <div className="space-y-2">
-          <Label htmlFor="amount">Amount (USD)</Label>
-          <div className="flex gap-2">
-            <Input
-              id="amount"
-              type="number"
-              placeholder="100"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min="1"
-              className="text-lg"
-            />
-            <Button 
-              variant="outline" 
-              onClick={reinitializeWithAmount}
-              disabled={isInitializing}
-            >
-              Update
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Enter the amount and click Update to set preset value
-          </p>
+          <Label htmlFor="amount-global">Amount (USD)</Label>
+          <Input
+            id="amount-global"
+            type="number"
+            placeholder="100"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            min="1"
+            className="text-lg"
+          />
         </div>
 
         {/* Wallet Address */}
         {!isConnected && (
           <div className="space-y-2">
-            <Label htmlFor="wallet">Receiving Wallet Address</Label>
+            <Label htmlFor="wallet-global">Receiving Wallet Address</Label>
             <Input
-              id="wallet"
+              id="wallet-global"
               type="text"
               placeholder="Enter your wallet address"
               value={manualAddress}
@@ -243,18 +186,20 @@ export function CoinbaseOnrampWidget({
           </div>
         )}
 
-        {/* Open Widget Button */}
+        {/* Buy Button */}
         <Button
-          onClick={handleOpenWidget}
+          onClick={handleBuy}
           size="lg"
           className="w-full"
-          disabled={isInitializing || !onrampInstance || !destinationAddress}
+          disabled={isLoading || !destinationAddress}
         >
-          {isInitializing ? (
+          {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Initializing...
+              Loading...
             </>
+          ) : !destinationAddress ? (
+            "Enter Wallet Address"
           ) : (
             <>
               Buy {defaultAsset} with Coinbase
@@ -264,7 +209,7 @@ export function CoinbaseOnrampWidget({
         </Button>
 
         <p className="text-xs text-center text-muted-foreground">
-          A Coinbase popup will open to complete your purchase. <br />
+          A Coinbase window will open to complete your purchase. <br />
           Available worldwide with support for multiple payment methods.
         </p>
       </div>
