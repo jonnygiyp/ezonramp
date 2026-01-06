@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@particle-network/connectkit";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,50 @@ const codeSchema = z.string().trim().regex(/^\d{4,8}$/, "Enter a valid verificat
 
 type Step = 'identity' | 'verify' | 'amount' | 'confirm' | 'processing' | 'complete';
 type VerifyChannel = 'sms' | 'email';
+
+// Verification storage key and validity period (60 days in milliseconds)
+const VERIFICATION_STORAGE_KEY = 'coinbase_onramp_verification';
+const VERIFICATION_VALIDITY_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
+
+interface StoredVerification {
+  channel: VerifyChannel;
+  value: string; // email or phone
+  verifiedAt: number; // timestamp
+}
+
+function getStoredVerification(): StoredVerification | null {
+  try {
+    const stored = localStorage.getItem(VERIFICATION_STORAGE_KEY);
+    if (!stored) return null;
+    
+    const parsed: StoredVerification = JSON.parse(stored);
+    const now = Date.now();
+    
+    // Check if verification is still valid (within 60 days)
+    if (now - parsed.verifiedAt < VERIFICATION_VALIDITY_MS) {
+      return parsed;
+    }
+    
+    // Expired, remove it
+    localStorage.removeItem(VERIFICATION_STORAGE_KEY);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function storeVerification(channel: VerifyChannel, value: string): void {
+  const data: StoredVerification = {
+    channel,
+    value,
+    verifiedAt: Date.now(),
+  };
+  localStorage.setItem(VERIFICATION_STORAGE_KEY, JSON.stringify(data));
+}
+
+function clearStoredVerification(): void {
+  localStorage.removeItem(VERIFICATION_STORAGE_KEY);
+}
 
 interface CoinbaseHeadlessOnrampProps {
   defaultAsset?: string;
@@ -27,18 +71,28 @@ export function CoinbaseHeadlessOnramp({
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
 
-  // Step state
-  const [step, setStep] = useState<Step>('identity');
+  // Check for existing verification on mount
+  const storedVerification = getStoredVerification();
+  const hasStoredVerification = !!storedVerification;
 
-  // Identity state
-  const [verifyChannel, setVerifyChannel] = useState<VerifyChannel>('email');
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  // Step state - skip to 'amount' if already verified
+  const [step, setStep] = useState<Step>(hasStoredVerification ? 'amount' : 'identity');
+
+  // Identity state - prefill from stored verification
+  const [verifyChannel, setVerifyChannel] = useState<VerifyChannel>(
+    storedVerification?.channel || 'email'
+  );
+  const [email, setEmail] = useState(
+    storedVerification?.channel === 'email' ? storedVerification.value : ""
+  );
+  const [phone, setPhone] = useState(
+    storedVerification?.channel === 'sms' ? storedVerification.value : ""
+  );
   const [manualAddress, setManualAddress] = useState("");
 
   // Verification state
   const [verificationCode, setVerificationCode] = useState("");
-  const [isVerified, setIsVerified] = useState(false);
+  const [isVerified, setIsVerified] = useState(hasStoredVerification);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
@@ -61,6 +115,14 @@ export function CoinbaseHeadlessOnramp({
 
   const destinationAddress = isConnected && address ? address : manualAddress;
   const identityValue = verifyChannel === 'email' ? email : phone;
+
+  // Calculate days remaining on verification
+  const getDaysRemaining = useCallback(() => {
+    if (!storedVerification) return 0;
+    const elapsed = Date.now() - storedVerification.verifiedAt;
+    const remaining = VERIFICATION_VALIDITY_MS - elapsed;
+    return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
+  }, [storedVerification]);
 
   // Send verification code
   const sendVerificationCode = async () => {
@@ -136,11 +198,14 @@ export function CoinbaseHeadlessOnramp({
         throw new Error('Invalid verification code');
       }
 
+      // Store verification for 60 days
+      storeVerification(verifyChannel, identityValue);
+      
       setIsVerified(true);
       setStep('amount');
       toast({
         title: "Verified",
-        description: "Your identity has been verified successfully",
+        description: "Your identity has been verified for 60 days",
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to verify code';
@@ -253,19 +318,34 @@ export function CoinbaseHeadlessOnramp({
     }
   };
 
-  // Reset flow
+  // Reset flow (keeps verification)
   const resetFlow = () => {
-    setStep('identity');
+    setStep(isVerified ? 'amount' : 'identity');
     setVerificationCode("");
-    setIsVerified(false);
     setCodeSent(false);
     setQuote(null);
     setTransactionId(null);
     setTransactionStatus(null);
   };
 
-  // Step indicators
-  const steps = ['identity', 'verify', 'amount', 'confirm', 'complete'];
+  // Full reset including verification
+  const resetVerification = () => {
+    clearStoredVerification();
+    setIsVerified(false);
+    setEmail("");
+    setPhone("");
+    setStep('identity');
+    setVerificationCode("");
+    setCodeSent(false);
+    setQuote(null);
+    setTransactionId(null);
+    setTransactionStatus(null);
+  };
+
+  // Step indicators - adjust based on verification status
+  const steps = isVerified && hasStoredVerification 
+    ? ['amount', 'confirm', 'complete'] 
+    : ['identity', 'verify', 'amount', 'confirm', 'complete'];
   const currentStepIndex = steps.indexOf(step === 'processing' ? 'complete' : step);
 
   return (
@@ -465,9 +545,27 @@ export function CoinbaseHeadlessOnramp({
           <div className="space-y-6">
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-2 text-green-500 mb-2">
-                <Check className="h-5 w-5" />
-                <span className="text-sm font-medium">Identity Verified</span>
+                <ShieldCheck className="h-5 w-5" />
+                <span className="text-sm font-medium">
+                  {hasStoredVerification 
+                    ? `Verified (${getDaysRemaining()} days remaining)`
+                    : 'Identity Verified'
+                  }
+                </span>
               </div>
+              {hasStoredVerification && storedVerification && (
+                <p className="text-xs text-muted-foreground">
+                  {storedVerification.channel === 'email' ? 'Email' : 'Phone'}: {storedVerification.value}
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    className="text-xs p-0 h-auto ml-2"
+                    onClick={resetVerification}
+                  >
+                    Change
+                  </Button>
+                </p>
+              )}
               <h2 className="text-xl font-semibold">How much do you want to buy?</h2>
             </div>
 
@@ -499,14 +597,16 @@ export function CoinbaseHeadlessOnramp({
             </div>
 
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setStep('identity')}
-                className="flex-1"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
+              {!hasStoredVerification && (
+                <Button
+                  variant="outline"
+                  onClick={() => setStep('identity')}
+                  className="flex-1"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+              )}
               <Button
                 onClick={getQuote}
                 className="flex-1"
