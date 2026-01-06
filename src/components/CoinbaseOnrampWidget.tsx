@@ -82,9 +82,15 @@ export function CoinbaseOnrampWidget({
 
       console.log("Session token obtained, generating URL...");
 
-      // Generate the onramp URL with the session token
+      // Build addresses for the URL
+      const addresses: Record<string, string[]> = {};
+      addresses[destinationAddress] = [defaultNetwork];
+
+      // Generate the onramp URL with the session token and addresses
       const onrampURL = generateOnRampURL({
         sessionToken,
+        addresses,
+        assets: [defaultAsset],
         presetFiatAmount: parseFloat(amount) || 100,
         defaultNetwork,
         defaultAsset,
