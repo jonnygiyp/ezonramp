@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, HelpCircle, ShieldCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface TutorialStep {
   target: string;
   title: string;
   description: string;
   position: "top" | "bottom" | "left" | "right";
+  mock?: 'verification-code' | 'verified-state';
 }
 
 const tutorialSteps: TutorialStep[] = [
@@ -23,26 +26,124 @@ const tutorialSteps: TutorialStep[] = [
     position: "bottom",
   },
   {
+    target: "[data-tutorial='verification-method']",
+    title: "Verification Method",
+    description: "If you're a first time buyer, enter US phone number or your email address for verification purposes.",
+    position: "top",
+  },
+  {
     target: "[data-tutorial='wallet-input']",
     title: "Wallet Address",
     description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own wallet, paste the address here.",
     position: "top",
   },
   {
-    target: "[data-tutorial='amount-input']",
-    title: "Enter Amount",
-    description: "Type the amount you want to spend in USD to purchase crypto.",
+    target: "[data-tutorial='send-verification']",
+    title: "Send Verification Code",
+    description: "Click \"Send Verification Code\" and proceed to the next step where you will enter the code you receive.",
     position: "top",
   },
   {
-    target: "[data-tutorial='buy-button']",
-    title: "Complete Your Purchase",
-    description: "Once you've signed up or filled in the required information, click here to complete your purchase.",
+    target: "[data-tutorial='mock-verification-code']",
+    title: "Enter Verification Code",
+    description: "After receiving your code via SMS or email, enter it here to verify your identity.",
     position: "top",
+    mock: 'verification-code',
+  },
+  {
+    target: "[data-tutorial='mock-verified-state']",
+    title: "Verified User Experience",
+    description: "Once verified, you'll see your verification status and can proceed directly to purchasing. Your verification is valid for 60 days!",
+    position: "top",
+    mock: 'verified-state',
   },
 ];
 
 const STORAGE_KEY = "onboarding_completed";
+
+// Mock component for verification code entry
+function MockVerificationCode() {
+  return (
+    <div 
+      data-tutorial="mock-verification-code"
+      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
+    >
+      <div className="space-y-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold">Enter Verification Code</h2>
+          <p className="text-sm text-muted-foreground">
+            We sent a code to (415) 555-1234
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="mock-code">Verification Code</Label>
+          <Input
+            id="mock-code"
+            type="text"
+            placeholder="Enter 6-digit code"
+            value="123456"
+            readOnly
+            className="text-center text-lg tracking-widest font-mono"
+          />
+        </div>
+
+        <Button size="lg" className="w-full" disabled>
+          Verify Code
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Didn't receive a code? <span className="text-primary">Resend</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Mock component for verified user state
+function MockVerifiedState() {
+  return (
+    <div 
+      data-tutorial="mock-verified-state"
+      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
+    >
+      <div className="space-y-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold">Ready to Purchase</h2>
+          <p className="text-sm text-muted-foreground">
+            Your identity is verified. You can now buy crypto!
+          </p>
+        </div>
+
+        {/* Verified badge */}
+        <div className="flex items-center justify-center gap-3 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+          <ShieldCheck className="h-6 w-6 text-primary" />
+          <div className="text-left">
+            <p className="font-medium text-sm">Verified Account</p>
+            <p className="text-xs text-muted-foreground">+1 (415) 555-1234 • 59 days remaining</p>
+          </div>
+        </div>
+
+        {/* Amount input preview */}
+        <div className="space-y-2">
+          <Label>Purchase Amount (USD)</Label>
+          <Input
+            type="text"
+            value="$100.00"
+            readOnly
+            className="text-lg font-semibold"
+          />
+        </div>
+
+        <Button size="lg" className="w-full" disabled>
+          Get Quote
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function OnboardingTutorial() {
   const [isActive, setIsActive] = useState(false);
@@ -51,17 +152,21 @@ export function OnboardingTutorial() {
   const [showHelpButton, setShowHelpButton] = useState(true);
 
   const currentTutorialStep = tutorialSteps[currentStep];
+  const currentMock = currentTutorialStep?.mock;
 
   const updateTargetPosition = useCallback(() => {
     if (!isActive || !currentTutorialStep) return;
 
-    const element = document.querySelector(currentTutorialStep.target);
-    if (element) {
-      const rect = element.getBoundingClientRect();
-      setTargetRect(rect);
-    } else {
-      setTargetRect(null);
-    }
+    // Small delay to let mock components render
+    setTimeout(() => {
+      const element = document.querySelector(currentTutorialStep.target);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        setTargetRect(rect);
+      } else {
+        setTargetRect(null);
+      }
+    }, 50);
   }, [isActive, currentTutorialStep]);
 
 
@@ -202,6 +307,10 @@ export function OnboardingTutorial() {
 
   return (
     <>
+      {/* Mock displays for tutorial steps */}
+      {currentMock === 'verification-code' && <MockVerificationCode />}
+      {currentMock === 'verified-state' && <MockVerifiedState />}
+
       {/* Overlay */}
       <div className="fixed inset-0 z-[9998] pointer-events-none">
         <svg className="w-full h-full">
