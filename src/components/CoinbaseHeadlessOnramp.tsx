@@ -383,7 +383,7 @@ export function CoinbaseHeadlessOnramp({
             </div>
 
             {/* Channel selector */}
-            <div className="flex gap-2">
+            <div className="flex gap-2" data-tutorial="verification-method">
               <Button
                 variant={verifyChannel === 'sms' ? 'default' : 'outline'}
                 className="flex-1"
@@ -439,7 +439,7 @@ export function CoinbaseHeadlessOnramp({
 
             {/* Wallet address */}
             {!isConnected && (
-              <div className="space-y-2">
+              <div className="space-y-2" data-tutorial="wallet-input">
                 <Label htmlFor="wallet">Receiving Wallet Address</Label>
                 <Input
                   id="wallet"
@@ -453,7 +453,7 @@ export function CoinbaseHeadlessOnramp({
             )}
 
             {isConnected && address && (
-              <div className="p-3 bg-muted/50 rounded-lg">
+              <div className="p-3 bg-muted/50 rounded-lg" data-tutorial="wallet-input">
                 <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
                 <p className="font-mono text-sm truncate">{address}</p>
               </div>
@@ -468,6 +468,7 @@ export function CoinbaseHeadlessOnramp({
                 !identityValue || 
                 (!isConnected && !manualAddress)
               }
+              data-tutorial="send-verification"
             >
               {isSendingCode ? (
                 <>
