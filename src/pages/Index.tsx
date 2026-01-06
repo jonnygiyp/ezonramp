@@ -11,6 +11,7 @@ import { OnboardingTutorial } from "@/components/OnboardingTutorial";
 const Index = () => {
   const [activeSection, setActiveSection] = useState("home");
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState("coinbase");
 
   // Configure your API integrations here
   const apiConfigs = [
@@ -42,7 +43,7 @@ const Index = () => {
       case "contact":
         return <Contact onNavigate={handleNavigate} />;
       default:
-        return <ApiIntegration apis={apiConfigs} />;
+        return <ApiIntegration apis={apiConfigs} onProviderChange={setSelectedProvider} />;
     }
   };
 
@@ -61,7 +62,7 @@ const Index = () => {
       </main>
 
       <Footer />
-      <OnboardingTutorial />
+      <OnboardingTutorial selectedProvider={selectedProvider} />
     </div>
   );
 };
