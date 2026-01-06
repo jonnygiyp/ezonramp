@@ -48,6 +48,13 @@ export function CoinbaseEmbeddedOnramp({
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
+  const isLovablePreviewHost =
+    typeof window !== "undefined" &&
+    (window.location.hostname.endsWith(".lovableproject.com") ||
+      window.location.hostname.endsWith(".lovable.app") ||
+      window.location.hostname === "lovableproject.com" ||
+      window.location.hostname === "lovable.app");
+
   // Determine the destination address
   const destinationAddress = isConnected && address ? address : manualAddress;
 
@@ -284,7 +291,7 @@ export function CoinbaseEmbeddedOnramp({
         </Button>
 
         <p className="text-xs text-center text-muted-foreground">
-          Checkout opens here (embedded) — you won't be redirected away.
+          Checkout opens in a dialog (embedded when available).
         </p>
       </div>
 
@@ -297,16 +304,38 @@ export function CoinbaseEmbeddedOnramp({
       >
         <DialogContent className="max-w-5xl w-[95vw] h-[85vh] p-0 overflow-hidden">
           <DialogHeader className="px-4 py-3 border-b border-border">
-            <DialogTitle>Coinbase Checkout</DialogTitle>
+            <div className="flex items-center justify-between gap-3">
+              <DialogTitle>Coinbase Checkout</DialogTitle>
+              {checkoutUrl ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(checkoutUrl, "_blank", "noopener,noreferrer")}
+                >
+                  Open in new tab
+                </Button>
+              ) : null}
+            </div>
           </DialogHeader>
 
           {checkoutUrl ? (
-            <iframe
-              title="Coinbase onramp checkout"
-              src={checkoutUrl}
-              className="w-full h-[calc(85vh-56px)]"
-              allow="payment *; clipboard-read *; clipboard-write *"
-            />
+            isLovablePreviewHost ? (
+              <div className="flex h-[calc(85vh-56px)] flex-col items-center justify-center gap-4 p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Coinbase blocks embedding on preview domains. Open the checkout in a new tab to test.
+                </p>
+                <Button onClick={() => window.open(checkoutUrl, "_blank", "noopener,noreferrer")}>
+                  Open Coinbase Checkout
+                </Button>
+              </div>
+            ) : (
+              <iframe
+                title="Coinbase onramp checkout"
+                src={checkoutUrl}
+                className="w-full h-[calc(85vh-56px)]"
+                allow="payment *; clipboard-read *; clipboard-write *"
+              />
+            )
           ) : (
             <div className="flex items-center justify-center h-[calc(85vh-56px)]">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
