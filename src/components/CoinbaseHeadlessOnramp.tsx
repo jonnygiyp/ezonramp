@@ -352,10 +352,10 @@ export function CoinbaseHeadlessOnramp({
     <div className="space-y-8 animate-fade-in">
       <div className="text-center space-y-4">
         <h1 className="text-2xl md:text-4xl font-bold tracking-tight">
-          Buy {defaultAsset} with Card
+          Purchase {defaultAsset} with Credit or Debit
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground">
-          Headless checkout with identity verification
+          Buy up to $500 per week without creating a CoinBase account.
         </p>
       </div>
 
