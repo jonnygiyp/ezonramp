@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.coinbase-headless]
 verify_jwt = false
+
+[functions.coinbase-config]
+verify_jwt = false

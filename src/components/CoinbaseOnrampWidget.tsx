@@ -6,6 +6,7 @@ import { Label } from "./ui/label";
 import { Loader2, ExternalLink, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@particle-network/connectkit";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
@@ -23,11 +24,26 @@ export function CoinbaseOnrampWidget({
   const [isInitializing, setIsInitializing] = useState(true);
   const [manualAddress, setManualAddress] = useState("");
   const [amount, setAmount] = useState("100");
+  const [appId, setAppId] = useState<string | null>(null);
   
   const destinationAddress = isConnected && address ? address : manualAddress;
-  
-  // Get the Coinbase Onramp App ID from environment
-  const appId = import.meta.env.VITE_COINBASE_ONRAMP_APP_ID || "";
+
+  // Fetch the App ID from the edge function
+  useEffect(() => {
+    const fetchAppId = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("coinbase-config");
+        if (error) throw error;
+        if (data?.appId) {
+          setAppId(data.appId);
+        }
+      } catch (err) {
+        console.error("Failed to fetch Coinbase config:", err);
+        setIsInitializing(false);
+      }
+    };
+    fetchAppId();
+  }, []);
 
   // Initialize the Coinbase Onramp instance
   useEffect(() => {
