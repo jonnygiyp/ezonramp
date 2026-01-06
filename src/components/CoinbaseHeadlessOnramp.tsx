@@ -355,7 +355,7 @@ export function CoinbaseHeadlessOnramp({
           Buy {defaultAsset} with Debit or Apple Pay
         </h1>
         <p className="text-sm md:text-xl text-muted-foreground">
-          US users can purchase up to $500 per week without creating a Coinbase account.
+          US users can purchase up to $500 per week - no Coinbase account required.
         </p>
       </div>
 
@@ -378,7 +378,7 @@ export function CoinbaseHeadlessOnramp({
             <div className="text-center space-y-2">
               <h2 className="text-lg md:text-xl font-semibold">Get Started</h2>
               <p className="text-xs md:text-sm text-muted-foreground">
-                How would you like to receive your verification code?
+                We'll send a one-time verification code to confirm your purchase.
               </p>
             </div>
 
@@ -413,6 +413,9 @@ export function CoinbaseHeadlessOnramp({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Used only to send your verification code. No marketing messages.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -432,7 +435,7 @@ export function CoinbaseHeadlessOnramp({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Enter your US phone number above.
+                  Used only to send your verification code. No marketing messages.
                 </p>
               </div>
             )}
