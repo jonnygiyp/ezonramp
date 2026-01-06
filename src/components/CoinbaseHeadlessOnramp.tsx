@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
-const phoneSchema = z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Use E.164 format (e.g., +14155551234)");
+const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
 const codeSchema = z.string().trim().regex(/^\d{4,8}$/, "Enter a valid verification code");
 
 type Step = 'identity' | 'verify' | 'amount' | 'confirm' | 'processing' | 'complete';
@@ -86,7 +86,7 @@ export function CoinbaseHeadlessOnramp({
     storedVerification?.channel === 'email' ? storedVerification.value : ""
   );
   const [phone, setPhone] = useState(
-    storedVerification?.channel === 'sms' ? storedVerification.value : ""
+    storedVerification?.channel === 'sms' ? storedVerification.value.replace(/^\+1/, '') : ""
   );
   const [manualAddress, setManualAddress] = useState("");
 
@@ -114,7 +114,7 @@ export function CoinbaseHeadlessOnramp({
   const [transactionStatus, setTransactionStatus] = useState<string | null>(null);
 
   const destinationAddress = isConnected && address ? address : manualAddress;
-  const identityValue = verifyChannel === 'email' ? email : phone;
+  const identityValue = verifyChannel === 'email' ? email : `+1${phone}`;
 
   // Calculate days remaining on verification
   const getDaysRemaining = useCallback(() => {
@@ -417,15 +417,22 @@ export function CoinbaseHeadlessOnramp({
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+14155551234"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+                <div className="flex">
+                  <div className="flex items-center justify-center px-3 bg-muted border border-r-0 border-input rounded-l-md text-sm text-muted-foreground">
+                    +1
+                  </div>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="4155551234"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className="rounded-l-none"
+                    maxLength={10}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Enter in E.164 format with country code
+                  Enter your US phone number above.
                 </p>
               </div>
             )}
