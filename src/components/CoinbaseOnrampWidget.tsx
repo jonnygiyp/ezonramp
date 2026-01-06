@@ -143,10 +143,10 @@ export function CoinbaseOnrampWidget({
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="text-center space-y-4">
-        <h1 className="text-2xl md:text-4xl font-bold tracking-tight">
+        <h1 className="text-xl md:text-4xl font-bold tracking-tight">
           Purchase {defaultAsset} with Coinbase
         </h1>
-        <p className="text-lg md:text-xl text-muted-foreground">
+        <p className="text-sm md:text-xl text-muted-foreground">
           Buy USDC using credit card, debit card, or bank transfer from anywhere!
         </p>
       </div>

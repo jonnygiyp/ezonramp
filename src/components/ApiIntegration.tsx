@@ -184,21 +184,21 @@ const ApiIntegration = ({ apis }: ApiIntegrationProps) => {
             <ChevronLeft className="h-6 w-6" />
           </Button>
           
-          <div className="flex gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
+          <div className="flex gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
             {providers.map((provider) => {
               const Icon = getTabIcon(provider.name);
               return (
                 <button
                   key={provider.id}
                   onClick={() => setActiveTab(provider.name)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+                  className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-full transition-all ${
                     activeTab === provider.name 
                       ? 'bg-primary text-primary-foreground' 
                       : 'hover:bg-muted-foreground/10'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  <span className="font-medium">{provider.display_name}</span>
+                  <Icon className="hidden md:block h-4 w-4" />
+                  <span className="font-medium text-xs md:text-base">{provider.display_name}</span>
                 </button>
               );
             })}
