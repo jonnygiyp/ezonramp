@@ -352,10 +352,10 @@ export function CoinbaseHeadlessOnramp({
     <div className="space-y-8 animate-fade-in">
       <div className="text-center space-y-4">
         <h1 className="text-2xl md:text-4xl font-bold tracking-tight">
-          Purchase {defaultAsset} with Credit or Debit
+          Buy {defaultAsset} with Debit or Apple Pay
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground">
-          Buy up to $500 per week without creating a CoinBase account.
+          US users can purchase up to $500 per week without creating a Coinbase account.
         </p>
       </div>
 
@@ -376,9 +376,9 @@ export function CoinbaseHeadlessOnramp({
         {step === 'identity' && (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h2 className="text-xl font-semibold">Verify Your Identity</h2>
+              <h2 className="text-xl font-semibold">Get Started</h2>
               <p className="text-sm text-muted-foreground">
-                Choose how you'd like to receive your verification code
+                How would you like to receive your verification code?
               </p>
             </div>
 
