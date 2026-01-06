@@ -321,41 +321,55 @@ serve(async (req) => {
         });
       }
 
-      case 'executeBuy': {
-        // Execute the buy transaction
+      case 'getSessionToken': {
+        // Get session token to generate onramp URL
         const { 
-          quoteId,
           destinationAddress,
           destinationNetwork,
-          userToken,
+          assets,
+          clientIp,
         } = body;
 
-        if (!quoteId || !destinationAddress || !destinationNetwork) {
-          return new Response(JSON.stringify({ error: 'Missing required buy parameters' }), {
+        if (!destinationAddress || !destinationNetwork) {
+          return new Response(JSON.stringify({ error: 'Missing required session parameters' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        const buyBody: Record<string, unknown> = {
-          quote_id: quoteId,
-          destination_address: destinationAddress,
-          destination_network: destinationNetwork,
+        // Map network names to Coinbase blockchain identifiers
+        const networkMap: Record<string, string> = {
+          'solana': 'solana',
+          'ethereum': 'ethereum',
+          'base': 'base',
+          'polygon': 'polygon',
+          'arbitrum': 'arbitrum',
+          'optimism': 'optimism',
         };
 
-        if (userToken) {
-          buyBody.user_token = userToken;
+        const blockchain = networkMap[destinationNetwork.toLowerCase()] || destinationNetwork;
+
+        const sessionBody: Record<string, unknown> = {
+          addresses: [{
+            address: destinationAddress,
+            blockchains: [blockchain],
+          }],
+          clientIp: clientIp || '0.0.0.0',
+        };
+
+        if (assets) {
+          sessionBody.assets = assets;
         }
 
-        console.log('Executing buy for address:', destinationAddress.slice(0, 10) + '...');
+        console.log('Creating session token for:', destinationAddress.slice(0, 10) + '...');
 
-        const response = await callCDPApi('POST', '/onramp/v1/buy/execute', buyBody);
+        const response = await callCDPApi('POST', '/onramp/v1/token', sessionBody);
         const data = await response.json();
 
         if (!response.ok) {
-          console.error('CDP buy error:', data);
+          console.error('CDP session token error:', data);
           return new Response(JSON.stringify({ 
-            error: data.message || 'Failed to execute buy',
+            error: data.message || 'Failed to get session token',
             details: data,
           }), {
             status: response.status,
@@ -363,7 +377,67 @@ serve(async (req) => {
           });
         }
 
-        return new Response(JSON.stringify(data), {
+        // Return session token and construct the buy URL
+        const sessionToken = data.token || data.session_token;
+        
+        return new Response(JSON.stringify({
+          sessionToken,
+          ...data,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'generateBuyUrl': {
+        // Generate a one-click-buy URL using quote endpoint with destination_address
+        const { 
+          purchaseCurrency, 
+          purchaseNetwork, 
+          paymentAmount, 
+          paymentCurrency,
+          paymentMethod,
+          country,
+          destinationAddress,
+        } = body;
+
+        if (!purchaseCurrency || !paymentAmount || !paymentCurrency || !country || !destinationAddress) {
+          return new Response(JSON.stringify({ error: 'Missing required parameters for buy URL' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const quoteBody: Record<string, unknown> = {
+          purchase_currency: purchaseCurrency,
+          purchase_network: purchaseNetwork,
+          payment_amount: paymentAmount,
+          payment_currency: paymentCurrency,
+          payment_method: paymentMethod || 'CARD',
+          country,
+          destination_address: destinationAddress,
+        };
+
+        console.log('Generating buy URL for:', destinationAddress.slice(0, 10) + '...');
+
+        const response = await callCDPApi('POST', '/onramp/v1/buy/quote', quoteBody);
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error('CDP buy URL error:', data);
+          return new Response(JSON.stringify({ 
+            error: data.message || 'Failed to generate buy URL',
+            details: data,
+          }), {
+            status: response.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // The API returns a one_click_buy_url when destination_address is provided
+        return new Response(JSON.stringify({
+          buyUrl: data.one_click_buy_url || null,
+          quote: data,
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
