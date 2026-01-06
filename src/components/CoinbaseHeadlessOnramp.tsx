@@ -352,7 +352,7 @@ export function CoinbaseHeadlessOnramp({
     <div className="space-y-8 animate-fade-in">
       <div className="text-center space-y-4">
         <h1 className="text-xl md:text-4xl font-bold tracking-tight">
-          Buy {defaultAsset} with Debit or Apple Pay
+          Buy {defaultAsset} instantly with debit or Apple Pay
         </h1>
         <p className="text-sm md:text-xl text-muted-foreground">
           US users can purchase up to $500 per week - no Coinbase account required.
@@ -360,7 +360,8 @@ export function CoinbaseHeadlessOnramp({
       </div>
 
       {/* Progress indicator */}
-      <div className="flex justify-center gap-2">
+      <div className="flex justify-center gap-2" role="progressbar" aria-valuenow={currentStepIndex + 1} aria-valuemin={1} aria-valuemax={steps.length}>
+        <span className="sr-only">Step {currentStepIndex + 1} of {steps.length}</span>
         {steps.map((s, i) => (
           <div
             key={s}
@@ -383,23 +384,26 @@ export function CoinbaseHeadlessOnramp({
             </div>
 
             {/* Channel selector */}
-            <div className="flex gap-2" data-tutorial="verification-method">
-              <Button
-                variant={verifyChannel === 'sms' ? 'default' : 'outline'}
-                className="flex-1"
-                onClick={() => setVerifyChannel('sms')}
-              >
-                <Phone className="mr-2 h-4 w-4" />
-                Phone
-              </Button>
-              <Button
-                variant={verifyChannel === 'email' ? 'default' : 'outline'}
-                className="flex-1"
-                onClick={() => setVerifyChannel('email')}
-              >
-                <Mail className="mr-2 h-4 w-4" />
-                Email
-              </Button>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground text-center">Select a purchase provider</p>
+              <div className="flex gap-2" data-tutorial="verification-method">
+                <Button
+                  variant={verifyChannel === 'sms' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setVerifyChannel('sms')}
+                >
+                  <Phone className="mr-2 h-4 w-4" />
+                  Phone (SMS)
+                </Button>
+                <Button
+                  variant={verifyChannel === 'email' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setVerifyChannel('email')}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Email
+                </Button>
+              </div>
             </div>
 
             {/* Input fields */}
@@ -419,7 +423,7 @@ export function CoinbaseHeadlessOnramp({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">Mobile Phone Number</Label>
                 <div className="flex">
                   <div className="flex items-center justify-center px-3 bg-muted border border-r-0 border-input rounded-l-md text-sm text-muted-foreground">
                     +1
@@ -452,6 +456,9 @@ export function CoinbaseHeadlessOnramp({
                   onChange={(e) => setManualAddress(e.target.value)}
                   className="font-mono"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Make sure this address supports Solana USDC. Funds can't be reversed.
+                </p>
               </div>
             )}
 
