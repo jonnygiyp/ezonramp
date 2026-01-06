@@ -80,7 +80,7 @@ export function CoinbaseHeadlessOnramp({
 
   // Identity state - prefill from stored verification
   const [verifyChannel, setVerifyChannel] = useState<VerifyChannel>(
-    storedVerification?.channel || 'email'
+    storedVerification?.channel || 'sms'
   );
   const [email, setEmail] = useState(
     storedVerification?.channel === 'email' ? storedVerification.value : ""
@@ -385,20 +385,20 @@ export function CoinbaseHeadlessOnramp({
             {/* Channel selector */}
             <div className="flex gap-2">
               <Button
-                variant={verifyChannel === 'email' ? 'default' : 'outline'}
-                className="flex-1"
-                onClick={() => setVerifyChannel('email')}
-              >
-                <Mail className="mr-2 h-4 w-4" />
-                Email
-              </Button>
-              <Button
                 variant={verifyChannel === 'sms' ? 'default' : 'outline'}
                 className="flex-1"
                 onClick={() => setVerifyChannel('sms')}
               >
                 <Phone className="mr-2 h-4 w-4" />
                 Phone
+              </Button>
+              <Button
+                variant={verifyChannel === 'email' ? 'default' : 'outline'}
+                className="flex-1"
+                onClick={() => setVerifyChannel('email')}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Email
               </Button>
             </div>
 
