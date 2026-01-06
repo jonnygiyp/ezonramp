@@ -63,7 +63,16 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    include: ['@particle-network/thresh-sig'],
+    include: [
+      '@particle-network/thresh-sig',
+      '@particle-network/connectkit',
+      '@particle-network/connectkit/auth',
+      '@particle-network/connectkit/evm',
+      '@particle-network/connectkit/solana',
+      '@particle-network/connectkit/wallet',
+      '@particle-network/connectkit/chains',
+      '@coinbase/cbpay-js',
+    ],
     esbuildOptions: {
       target: 'esnext',
     },
