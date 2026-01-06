@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, HelpCircle, ShieldCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAccount } from "@particle-network/connectkit";
 
 interface TutorialStep {
   target: string;
@@ -150,8 +151,18 @@ export function OnboardingTutorial() {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [showHelpButton, setShowHelpButton] = useState(true);
+  
+  const { isConnected } = useAccount();
+  
+  // Filter out step 1 (wallet creation) if user is already connected
+  const activeSteps = useMemo(() => {
+    if (isConnected) {
+      return tutorialSteps.slice(1); // Skip first step
+    }
+    return tutorialSteps;
+  }, [isConnected]);
 
-  const currentTutorialStep = tutorialSteps[currentStep];
+  const currentTutorialStep = activeSteps[currentStep];
   const currentMock = currentTutorialStep?.mock;
 
   const updateTargetPosition = useCallback(() => {
@@ -182,7 +193,7 @@ export function OnboardingTutorial() {
   }, [updateTargetPosition]);
 
   const handleNext = () => {
-    if (currentStep < tutorialSteps.length - 1) {
+    if (currentStep < activeSteps.length - 1) {
       setCurrentStep((prev) => prev + 1);
     } else {
       handleComplete();
@@ -383,7 +394,7 @@ export function OnboardingTutorial() {
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <span className="text-xs text-muted-foreground">
-            {currentStep + 1} of {tutorialSteps.length}
+            {currentStep + 1} of {activeSteps.length}
           </span>
           <div className="flex gap-2">
             <Button
@@ -396,8 +407,8 @@ export function OnboardingTutorial() {
               Back
             </Button>
             <Button size="sm" onClick={handleNext}>
-              {currentStep === tutorialSteps.length - 1 ? "Finish" : "Next"}
-              {currentStep < tutorialSteps.length - 1 && (
+              {currentStep === activeSteps.length - 1 ? "Finish" : "Next"}
+              {currentStep < activeSteps.length - 1 && (
                 <ChevronRight className="h-4 w-4 ml-1" />
               )}
             </Button>
