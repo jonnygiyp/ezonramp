@@ -50,6 +50,7 @@ export function CoinbaseHeadlessOnramp({
     fee: string;
     total: string;
     quoteId: string;
+    buyUrl: string | null;
   } | null>(null);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
 
@@ -153,7 +154,7 @@ export function CoinbaseHeadlessOnramp({
     }
   };
 
-  // Get quote
+  // Get quote and generate buy URL
   const getQuote = async () => {
     if (!amount || parseFloat(amount) < 1) {
       toast({
@@ -164,28 +165,41 @@ export function CoinbaseHeadlessOnramp({
       return;
     }
 
+    if (!destinationAddress) {
+      toast({
+        title: "Missing Wallet",
+        description: "Please connect your wallet or enter an address",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoadingQuote(true);
     try {
+      // Use generateBuyUrl action which includes destination_address to get one-click-buy URL
       const { data, error } = await supabase.functions.invoke("coinbase-headless", {
         body: {
-          action: 'getQuote',
+          action: 'generateBuyUrl',
           purchaseCurrency: defaultAsset,
           purchaseNetwork: defaultNetwork,
           paymentAmount: amount,
           paymentCurrency: 'USD',
           paymentMethod: 'CARD',
           country: 'US',
+          destinationAddress,
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      const quoteData = data.quote || data;
       setQuote({
-        purchaseAmount: data.purchase_amount?.value || data.purchaseAmount || amount,
-        fee: data.coinbase_fee?.value || data.fee || '0',
-        total: data.payment_total?.value || data.total || amount,
-        quoteId: data.quote_id || data.quoteId || '',
+        purchaseAmount: quoteData.purchase_amount?.value || amount,
+        fee: quoteData.coinbase_fee?.value || '0',
+        total: quoteData.payment_total?.value || amount,
+        quoteId: quoteData.quote_id || '',
+        buyUrl: data.buyUrl || null,
       });
       setStep('confirm');
     } catch (err) {
@@ -200,49 +214,42 @@ export function CoinbaseHeadlessOnramp({
     }
   };
 
-  // Execute buy
+  // Redirect to Coinbase payment page
   const executeBuy = async () => {
-    if (!quote?.quoteId || !destinationAddress) {
+    if (!quote?.buyUrl) {
       toast({
         title: "Error",
-        description: "Missing quote or destination address",
+        description: "No payment URL available. Please try getting a new quote.",
         variant: "destructive",
       });
       return;
     }
 
-    setIsProcessing(true);
-    setStep('processing');
-    try {
-      const { data, error } = await supabase.functions.invoke("coinbase-headless", {
-        body: {
-          action: 'executeBuy',
-          quoteId: quote.quoteId,
-          destinationAddress,
-          destinationNetwork: defaultNetwork,
-        },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      setTransactionId(data.transaction_id || data.transactionId);
-      setTransactionStatus('pending');
-      setStep('complete');
+    // Open Coinbase payment page in a new window
+    const paymentWindow = window.open(quote.buyUrl, '_blank', 'width=500,height=700');
+    
+    if (paymentWindow) {
+      setStep('processing');
       toast({
-        title: "Purchase Initiated",
-        description: "Your crypto purchase is being processed",
+        title: "Complete Payment",
+        description: "Complete your card payment in the Coinbase window",
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to execute purchase';
-      toast({
-        title: "Purchase Failed",
-        description: message,
-        variant: "destructive",
-      });
-      setStep('confirm');
-    } finally {
-      setIsProcessing(false);
+      
+      // Monitor for window close
+      const checkWindow = setInterval(() => {
+        if (paymentWindow.closed) {
+          clearInterval(checkWindow);
+          setStep('complete');
+          setTransactionStatus('pending');
+          toast({
+            title: "Payment Window Closed",
+            description: "Check your wallet for the transaction status",
+          });
+        }
+      }, 1000);
+    } else {
+      // If popup blocked, redirect in same window
+      window.location.href = quote.buyUrl;
     }
   };
 
