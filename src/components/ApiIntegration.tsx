@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { ChevronLeft, ChevronRight, CreditCard, Wallet, Zap, Loader2, Globe } from "lucide-react";
+import { CreditCard, Wallet, Zap, Loader2, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CoinflowCheckout } from "./CoinflowCheckout";
@@ -181,17 +181,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
     <div className="w-full min-h-[600px] flex flex-col items-center justify-center px-6 py-6">
       {/* Tab Switcher - only show if multiple providers */}
       {providers.length > 1 && (
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={swipeLeft}
-            className={currentIndex === 0 ? 'opacity-30' : 'hover-scale'}
-            disabled={currentIndex === 0}
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
-          
+        <div className="flex items-center justify-center mb-8">
           <div className="flex gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
             {providers.map((provider) => {
               const Icon = getTabIcon(provider.name);
@@ -211,16 +201,6 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
               );
             })}
           </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={swipeRight}
-            className={currentIndex === enabledTabs.length - 1 ? 'opacity-30' : 'hover-scale'}
-            disabled={currentIndex === enabledTabs.length - 1}
-          >
-            <ChevronRight className="h-6 w-6" />
-          </Button>
         </div>
       )}
 
