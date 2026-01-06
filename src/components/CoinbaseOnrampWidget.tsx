@@ -142,11 +142,11 @@ export function CoinbaseOnrampWidget({
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="text-center space-y-4">
-        <h1 className="text-xl md:text-4xl font-bold tracking-tight">
+      <div className="text-center space-y-2">
+        <h1 className="text-lg md:text-2xl font-bold tracking-tight">
           Purchase {defaultAsset} with Coinbase
         </h1>
-        <p className="text-sm md:text-xl text-muted-foreground">
+        <p className="text-xs md:text-sm text-muted-foreground">
           Buy USDC using credit card, debit card, or bank transfer from anywhere!
         </p>
       </div>
@@ -169,15 +169,18 @@ export function CoinbaseOnrampWidget({
         {/* Wallet Address */}
         {!isConnected && (
           <div className="space-y-2" data-tutorial="global-wallet-input">
-            <Label htmlFor="wallet-global">Receiving Wallet Address</Label>
+            <Label htmlFor="wallet-global">Wallet address to receive USDC</Label>
             <Input
               id="wallet-global"
               type="text"
-              placeholder="Enter your wallet address"
+              placeholder="Paste your USDC wallet address"
               value={manualAddress}
               onChange={(e) => setManualAddress(e.target.value)}
               className="font-mono"
             />
+            <p className="text-[10px] text-muted-foreground/70">
+              This wallet must support Solana USDC. Transactions can't be reversed.
+            </p>
           </div>
         )}
 
