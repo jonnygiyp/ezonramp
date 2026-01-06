@@ -443,11 +443,11 @@ export function CoinbaseHeadlessOnramp({
             {/* Wallet address */}
             {!isConnected && (
               <div className="space-y-2" data-tutorial="wallet-input">
-                <Label htmlFor="wallet">Receiving Wallet Address</Label>
+                <Label htmlFor="wallet">Wallet address to receive USDC</Label>
                 <Input
                   id="wallet"
                   type="text"
-                  placeholder="Enter your wallet address"
+                  placeholder="Paste your USDC wallet address"
                   value={manualAddress}
                   onChange={(e) => setManualAddress(e.target.value)}
                   className="font-mono"
@@ -480,11 +480,15 @@ export function CoinbaseHeadlessOnramp({
                 </>
               ) : (
                 <>
-                  Send Verification Code
+                  Continue
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
             </Button>
+
+            <p className="text-[10px] text-muted-foreground text-center">
+              Powered by trusted third-party providers. EZOnRamp never stores your payment details.
+            </p>
           </div>
         )}
 
