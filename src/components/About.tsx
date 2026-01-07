@@ -9,29 +9,80 @@ interface AboutProps {
 const About = ({ onNavigate }: AboutProps) => {
   const { data, isLoading } = useAboutContent();
 
+  // Helper to render content with teal underline for trust phrases
+  const renderContent = (text: string) => {
+    // Key trust phrases to emphasize with teal underline
+    const trustPhrases = [
+      "secure",
+      "trusted",
+      "compliant",
+      "transparent",
+      "privacy",
+      "protection",
+      "regulated",
+      "licensed"
+    ];
+    
+    const parts = text.split(/(\n)/);
+    
+    return parts.map((part, index) => {
+      if (part === '\n') return <br key={index} />;
+      
+      // Check for trust phrases and wrap them
+      let processedPart: React.ReactNode = part;
+      trustPhrases.forEach(phrase => {
+        if (typeof processedPart === 'string' && processedPart.toLowerCase().includes(phrase)) {
+          const regex = new RegExp(`(${phrase})`, 'gi');
+          const segments = processedPart.split(regex);
+          processedPart = segments.map((segment, i) => 
+            segment.toLowerCase() === phrase ? (
+              <span key={i} className="underline decoration-primary/60 underline-offset-2">
+                {segment}
+              </span>
+            ) : segment
+          );
+        }
+      });
+      
+      return <span key={index}>{processedPart}</span>;
+    });
+  };
+
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="w-full max-w-md mx-auto px-4 py-8 md:py-12 space-y-8">
+      {/* Back Button - Subtle, secondary styling */}
       <button
         onClick={() => onNavigate("home")}
-        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+        className="flex items-center gap-1.5 text-muted-foreground/70 hover:text-primary transition-colors group"
       >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="text-sm">Back to Onramp</span>
+        <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
+        <span className="text-xs">Back to Onramp</span>
       </button>
       
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <>
-          <h1 className="text-4xl font-semibold mb-8">{data?.title || "About Us"}</h1>
-          {data?.description && (
-            <div className="space-y-4 text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {data.description}
-            </div>
-          )}
-        </>
+        <div className="space-y-8">
+          {/* Page Header - Matches homepage hero weight */}
+          <h1 className="text-lg md:text-2xl font-bold tracking-tight text-foreground">
+            About EZOnRamp
+          </h1>
+          
+          {/* Content Container - Card-like with spacing separation */}
+          <div className="space-y-6">
+            {data?.description && (
+              <div className="text-sm md:text-base text-muted-foreground leading-relaxed space-y-4">
+                {data.description.split('\n\n').map((paragraph, index) => (
+                  <p key={index} className="[&_strong]:text-foreground [&_strong]:font-medium">
+                    {renderContent(paragraph)}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
