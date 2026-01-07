@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useAboutContent } from "@/hooks/useSiteContent";
+import DOMPurify from "dompurify";
 
 interface AboutProps {
   onNavigate: (section: string) => void;
@@ -25,13 +26,10 @@ const About = ({ onNavigate }: AboutProps) => {
           {/* Content Container - Card-like with spacing separation */}
           <div className="space-y-6">
             {data?.description && (
-              <div className="text-sm md:text-base text-muted-foreground leading-relaxed space-y-4 [&_u]:text-primary [&_u]:no-underline [&_u]:underline [&_u]:decoration-primary/60 [&_u]:underline-offset-2">
-                {data.description.split('\n\n').map((paragraph, index) => (
-                  <p key={index} className="[&_strong]:text-foreground [&_strong]:font-medium whitespace-pre-wrap">
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
+              <div 
+                className="text-sm md:text-base text-muted-foreground leading-relaxed prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline [&_u]:text-primary [&_u]:underline [&_u]:decoration-primary/60 [&_u]:underline-offset-2 [&_strong]:text-foreground [&_strong]:font-medium [&_p]:mb-4"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.description) }}
+              />
             )}
           </div>
         </div>
