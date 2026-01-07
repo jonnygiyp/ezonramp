@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import DOMPurify from "dompurify";
+import Footer from "@/components/Footer";
 
 interface TermsContent {
   content: string;
@@ -71,7 +72,7 @@ export default function Terms() {
   const sanitizedContent = DOMPurify.sanitize(content);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16">
       <header className="border-b border-border">
         <div className="container mx-auto px-6 py-4">
           <Link to="/">
@@ -101,6 +102,7 @@ export default function Terms() {
           />
         )}
       </main>
+      <Footer />
     </div>
   );
 }
