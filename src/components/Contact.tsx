@@ -54,7 +54,7 @@ const Contact = ({ onNavigate }: ContactProps) => {
 
   if (isSubmitted) {
     return (
-      <div className="w-full max-w-2xl mx-auto px-6 py-8 md:py-12">
+      <div className="w-full max-w-2xl mx-auto px-6 py-4 md:py-6">
         <div className="flex flex-col items-center justify-center min-h-[300px] animate-fade-in">
           <CheckCircle className="h-16 w-16 text-primary mb-4 animate-scale-in" />
           <h2 className="text-lg md:text-2xl font-bold tracking-tight text-foreground mb-2">Message sent!</h2>
@@ -65,7 +65,7 @@ const Contact = ({ onNavigate }: ContactProps) => {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-6 py-8 md:py-12 space-y-8">
+    <div className="w-full max-w-2xl mx-auto px-6 py-4 md:py-6 space-y-8">
       {/* Back Button - Subtle, secondary styling */}
       <button
         onClick={() => onNavigate("home")}
