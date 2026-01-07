@@ -54,29 +54,33 @@ const Contact = ({ onNavigate }: ContactProps) => {
 
   if (isSubmitted) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16">
-        <div className="flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
-          <CheckCircle className="h-20 w-20 text-green-500 mb-6 animate-scale-in" />
-          <h2 className="text-3xl font-semibold text-foreground mb-2">Message sent!</h2>
-          <p className="text-muted-foreground text-lg">We'll be in touch soon.</p>
+      <div className="w-full max-w-2xl mx-auto px-6 py-8 md:py-12">
+        <div className="flex flex-col items-center justify-center min-h-[300px] animate-fade-in">
+          <CheckCircle className="h-16 w-16 text-primary mb-4 animate-scale-in" />
+          <h2 className="text-lg md:text-2xl font-bold tracking-tight text-foreground mb-2">Message sent!</h2>
+          <p className="text-sm text-muted-foreground">We'll be in touch soon.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-16">
+    <div className="w-full max-w-2xl mx-auto px-6 py-8 md:py-12 space-y-8">
+      {/* Back Button - Subtle, secondary styling */}
       <button
         onClick={() => onNavigate("home")}
-        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70 hover:text-primary transition-colors"
       >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="text-sm">Back to Onramp</span>
+        <ArrowLeft className="h-3.5 w-3.5" />
+        <span>Back to Onramp</span>
       </button>
-      <h1 className="text-4xl font-semibold mb-8">Contact Us</h1>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="name">
+
+      {/* Page Header - Matches homepage hero / About page header */}
+      <h1 className="text-lg md:text-2xl font-bold tracking-tight text-foreground">Contact Us</h1>
+      {/* Form Container */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="name" className="text-sm font-medium text-foreground">
             Name <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -85,11 +89,12 @@ const Contact = ({ onNavigate }: ContactProps) => {
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="Your name"
             required
+            className="text-sm"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="email">
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-sm font-medium text-foreground">
             Email <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -99,22 +104,26 @@ const Contact = ({ onNavigate }: ContactProps) => {
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             placeholder="your@email.com"
             required
+            className="text-sm"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="phone" className="text-sm font-medium text-foreground">
+            Phone Number
+          </Label>
           <Input
             id="phone"
             type="tel"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             placeholder="(123) 456-7890"
+            className="text-sm"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="message">
+        <div className="space-y-1.5">
+          <Label htmlFor="message" className="text-sm font-medium text-foreground">
             Message <span className="text-destructive">*</span>
           </Label>
           <Textarea
@@ -123,8 +132,9 @@ const Contact = ({ onNavigate }: ContactProps) => {
             onChange={(e) => setFormData({ ...formData, message: e.target.value })}
             placeholder="Your message..."
             maxLength={500}
-            rows={6}
+            rows={5}
             required
+            className="text-sm"
           />
           <p className="text-xs text-muted-foreground text-right">
             {formData.message.length}/500 characters
