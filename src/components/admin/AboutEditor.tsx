@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Json } from '@/integrations/supabase/types';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -65,12 +65,10 @@ export default function AboutEditor() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="about-description">Description</Label>
-          <Textarea
-            id="about-description"
+          <RichTextEditor
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(value) => setDescription(value)}
             placeholder="Enter about section content..."
-            rows={6}
           />
         </div>
         <Button onClick={handleSave} disabled={updateMutation.isPending}>
