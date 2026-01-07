@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, CheckCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -66,14 +66,6 @@ const Contact = ({ onNavigate }: ContactProps) => {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-6 py-4 md:py-6 space-y-8">
-      {/* Back Button - Subtle, secondary styling */}
-      <button
-        onClick={() => onNavigate("home")}
-        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70 hover:text-primary transition-colors"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        <span>Back to Onramp</span>
-      </button>
 
       {/* Page Header - Matches homepage hero / About page header */}
       <h1 className="text-lg md:text-2xl font-bold tracking-tight text-foreground">Contact Us</h1>
