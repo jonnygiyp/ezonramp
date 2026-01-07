@@ -50,7 +50,7 @@ const Index = () => {
   const showBackButton = activeSection === "about" || activeSection === "faq" || activeSection === "contact";
 
   return (
-    <div className="min-h-screen flex flex-col pt-[96px]">
+    <div className="min-h-screen flex flex-col pt-[96px] pb-16">
       <Header onNavigate={handleNavigate} />
       <Navigation activeSection={activeSection} onNavigate={handleNavigate} />
       
