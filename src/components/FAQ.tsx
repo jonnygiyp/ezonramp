@@ -47,7 +47,7 @@ const FAQ = ({ onNavigate }: FAQProps) => {
   const faqs = data?.items?.length ? data.items : defaultFaqs;
 
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-8 md:py-12 space-y-8">
+    <div className="w-full max-w-2xl mx-auto px-6 py-8 md:py-12 space-y-8">
       {/* Back Button - Subtle, secondary styling */}
       <button
         onClick={() => onNavigate("home")}
@@ -69,25 +69,23 @@ const FAQ = ({ onNavigate }: FAQProps) => {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        /* FAQ Container - Card-like with spacing separation */
-        <div className="space-y-1">
-          <Accordion type="single" collapsible className="w-full space-y-1">
-            {faqs.map((faq, index) => (
-              <AccordionItem 
-                key={index} 
-                value={`item-${index}`}
-                className="border-0 rounded-lg data-[state=open]:bg-muted/30 transition-colors"
-              >
-                <AccordionTrigger className="text-left text-sm md:text-base font-medium text-foreground hover:no-underline py-4 px-1 [&[data-state=open]>svg]:text-primary [&>svg]:text-muted-foreground [&>svg]:transition-colors">
-                  {faq.question}
-                </AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4 px-1 prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline [&_u]:text-primary [&_u]:underline [&_u]:decoration-primary/60 [&_u]:underline-offset-2">
-                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
+        /* FAQ Container - Clean accordion without extra spacing */
+        <Accordion type="single" collapsible className="w-full">
+          {faqs.map((faq, index) => (
+            <AccordionItem 
+              key={index} 
+              value={`item-${index}`}
+              className="border-b border-border"
+            >
+              <AccordionTrigger className="text-left text-sm md:text-base font-medium text-foreground hover:no-underline py-3 [&[data-state=open]>svg]:text-primary [&>svg]:text-muted-foreground [&>svg]:transition-colors">
+                {faq.question}
+              </AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-3 prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline [&_u]:text-primary [&_u]:underline [&_u]:decoration-primary/60 [&_u]:underline-offset-2">
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       )}
     </div>
   );
