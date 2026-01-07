@@ -1,6 +1,5 @@
-import { ArrowLeft } from "lucide-react";
-import { useAboutContent } from "@/hooks/useSiteContent";
 import { Loader2 } from "lucide-react";
+import { useAboutContent } from "@/hooks/useSiteContent";
 
 interface AboutProps {
   onNavigate: (section: string) => void;
@@ -11,14 +10,6 @@ const About = ({ onNavigate }: AboutProps) => {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-6 py-4 md:py-6 space-y-8">
-      {/* Back Button - Subtle, secondary styling */}
-      <button
-        onClick={() => onNavigate("home")}
-        className="flex items-center gap-1.5 text-muted-foreground/70 hover:text-primary transition-colors group"
-      >
-        <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
-        <span className="text-xs">Back to Onramp</span>
-      </button>
       
       {isLoading ? (
         <div className="flex justify-center py-16">
