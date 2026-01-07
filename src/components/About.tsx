@@ -10,7 +10,7 @@ const About = ({ onNavigate }: AboutProps) => {
   const { data, isLoading } = useAboutContent();
 
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-8 md:py-12 space-y-8">
+    <div className="w-full max-w-2xl mx-auto px-6 py-8 md:py-12 space-y-8">
       {/* Back Button - Subtle, secondary styling */}
       <button
         onClick={() => onNavigate("home")}
