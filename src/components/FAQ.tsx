@@ -47,33 +47,47 @@ const FAQ = ({ onNavigate }: FAQProps) => {
   const faqs = data?.items?.length ? data.items : defaultFaqs;
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="w-full max-w-md mx-auto px-4 py-8 md:py-12 space-y-8">
+      {/* Back Button - Subtle, secondary styling */}
       <button
         onClick={() => onNavigate("home")}
-        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+        className="flex items-center gap-1.5 text-muted-foreground/70 hover:text-primary transition-colors group"
       >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="text-sm">Back to Onramp</span>
+        <ArrowLeft className="h-3.5 w-3.5 group-hover:text-primary transition-colors" />
+        <span className="text-xs font-medium">Back to Onramp</span>
       </button>
-      <h1 className="text-4xl font-semibold mb-8">Frequently Asked Questions</h1>
+
+      {/* Page Header - Matches Homepage/About styling */}
+      <div className="space-y-2">
+        <h1 className="text-lg md:text-2xl font-bold tracking-tight text-foreground">
+          Frequently Asked Questions
+        </h1>
+      </div>
       
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <Accordion type="single" collapsible className="w-full">
-          {faqs.map((faq, index) => (
-            <AccordionItem key={index} value={`item-${index}`}>
-              <AccordionTrigger className="text-left text-base">
-                {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline">
-                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+        /* FAQ Container - Card-like with spacing separation */
+        <div className="space-y-1">
+          <Accordion type="single" collapsible className="w-full space-y-1">
+            {faqs.map((faq, index) => (
+              <AccordionItem 
+                key={index} 
+                value={`item-${index}`}
+                className="border-0 rounded-lg data-[state=open]:bg-muted/30 transition-colors"
+              >
+                <AccordionTrigger className="text-left text-sm md:text-base font-medium text-foreground hover:no-underline py-4 px-1 [&[data-state=open]>svg]:text-primary [&>svg]:text-muted-foreground [&>svg]:transition-colors">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4 px-1 prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline [&_u]:text-primary [&_u]:underline [&_u]:decoration-primary/60 [&_u]:underline-offset-2">
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
       )}
     </div>
   );
