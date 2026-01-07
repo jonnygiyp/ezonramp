@@ -47,10 +47,10 @@ const FAQ = ({ onNavigate }: FAQProps) => {
   const faqs = data?.items?.length ? data.items : defaultFaqs;
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-6 py-4 md:py-6 space-y-8">
+    <div className="w-full max-w-2xl mx-auto px-6 py-4 md:py-6 space-y-4">
 
       {/* Page Header - Matches Homepage/About styling */}
-      <div className="space-y-2">
+      <div>
         <h1 className="text-lg md:text-2xl font-bold tracking-tight text-foreground">
           Frequently Asked Questions
         </h1>
