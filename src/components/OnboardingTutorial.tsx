@@ -392,13 +392,12 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
       <Button
         onClick={startTutorial}
         variant="outline"
-        size="icon"
-        className={`fixed bottom-16 right-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow ${
+        className={`fixed bottom-16 right-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow h-12 w-12 p-0 ${
           isFirstVisit ? "animate-pulse ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
         }`}
         aria-label="Start tutorial"
       >
-        <HelpCircle className="h-6 w-6 text-primary" />
+        <HelpCircle className="h-7 w-7 text-primary" />
       </Button>
     );
   }
