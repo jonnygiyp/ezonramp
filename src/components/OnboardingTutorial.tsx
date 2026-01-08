@@ -397,7 +397,13 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
         }`}
         aria-label="Start tutorial"
       >
-        <HelpCircle className="h-[38px] w-[38px] text-primary" />
+        <span
+          aria-hidden="true"
+          className="text-primary font-semibold leading-none select-none"
+          style={{ fontSize: 38, lineHeight: 1 }}
+        >
+          ?
+        </span>
       </Button>
     );
   }
