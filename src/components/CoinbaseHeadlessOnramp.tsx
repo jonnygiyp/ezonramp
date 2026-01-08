@@ -113,8 +113,22 @@ export function CoinbaseHeadlessOnramp({
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [transactionStatus, setTransactionStatus] = useState<string | null>(null);
 
-  const destinationAddress = isConnected && address ? address : manualAddress;
+  // Validate that connected wallet address matches the target network
+  // Solana addresses are base58, typically 32-44 chars, no 0x prefix
+  // EVM addresses start with 0x and are 42 chars
+  const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
+  const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
+  
+  const connectedAddressValid = isConnected && address && (
+    defaultNetwork === 'solana' ? isSolanaAddress(address) : isEvmAddress(address)
+  );
+  
+  // Use connected address only if it matches the target network, otherwise require manual input
+  const destinationAddress = connectedAddressValid ? address : manualAddress;
   const identityValue = verifyChannel === 'email' ? email : `+1${phone}`;
+  
+  // Show warning if connected to wrong network type
+  const showNetworkMismatch = isConnected && address && !connectedAddressValid;
 
   // Calculate days remaining on verification
   const getDaysRemaining = useCallback(() => {
@@ -445,25 +459,40 @@ export function CoinbaseHeadlessOnramp({
               </div>
             )}
 
-            {/* Wallet address */}
-            {!isConnected && (
+            {/* Network mismatch warning */}
+            {showNetworkMismatch && (
+              <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-2">
+                <p className="text-xs text-destructive font-medium">
+                  Wrong wallet type connected
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  Your connected wallet ({address?.slice(0, 8)}...) is not compatible with {defaultNetwork}. 
+                  Please enter a valid {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet address below.
+                </p>
+              </div>
+            )}
+
+            {/* Wallet address - show if not connected OR if connected to wrong network */}
+            {(!isConnected || showNetworkMismatch) && (
               <div className="space-y-2" data-tutorial="wallet-input">
-                <Label htmlFor="wallet">Wallet address to receive USDC</Label>
+                <Label htmlFor="wallet">
+                  {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet address to receive {defaultAsset}
+                </Label>
                 <Input
                   id="wallet"
                   type="text"
-                  placeholder="Paste your USDC wallet address"
+                  placeholder={defaultNetwork === 'solana' ? 'Paste your Solana wallet address' : 'Paste your EVM wallet address (0x...)'}
                   value={manualAddress}
                   onChange={(e) => setManualAddress(e.target.value)}
                   className="font-mono"
                 />
                 <p className="text-[10px] text-muted-foreground/70">
-                  This wallet must support Solana USDC. Transactions can't be reversed.
+                  This wallet must support {defaultNetwork === 'solana' ? 'Solana' : 'the selected network'} {defaultAsset}. Transactions can't be reversed.
                 </p>
               </div>
             )}
 
-            {isConnected && address && (
+            {isConnected && address && connectedAddressValid && (
               <div className="p-3 bg-muted/50 rounded-lg" data-tutorial="wallet-input">
                 <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
                 <p className="font-mono text-sm truncate">{address}</p>
@@ -477,7 +506,7 @@ export function CoinbaseHeadlessOnramp({
               disabled={
                 isSendingCode || 
                 !identityValue || 
-                (!isConnected && !manualAddress)
+                !destinationAddress
               }
               data-tutorial="send-verification"
             >
