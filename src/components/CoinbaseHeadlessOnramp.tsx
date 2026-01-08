@@ -233,6 +233,11 @@ export function CoinbaseHeadlessOnramp({
     }
   };
 
+  // Validate destination address matches the target network
+  const isValidDestinationAddress = destinationAddress && (
+    defaultNetwork === 'solana' ? isSolanaAddress(destinationAddress) : isEvmAddress(destinationAddress)
+  );
+
   // Get quote and generate buy URL
   const getQuote = async () => {
     if (!amount || parseFloat(amount) < 1) {
@@ -248,6 +253,17 @@ export function CoinbaseHeadlessOnramp({
       toast({
         title: "Missing Wallet",
         description: "Please connect your wallet or enter an address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isValidDestinationAddress) {
+      toast({
+        title: "Invalid Address",
+        description: defaultNetwork === 'solana' 
+          ? "Please enter a valid Solana wallet address (32-44 characters)" 
+          : "Please enter a valid EVM wallet address (starts with 0x)",
         variant: "destructive",
       });
       return;
