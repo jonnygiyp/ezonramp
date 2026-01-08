@@ -40,7 +40,7 @@ const coinbaseUSSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='wallet-input']",
     title: "Wallet Address",
-    description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own wallet, paste the address here.",
+    description: "If you're signed in, your wallet address will automatically populate here. Otherwise, paste your Solana USDC address here.",
     position: "top",
   },
   {
@@ -101,6 +101,7 @@ const coinbaseGlobalSteps: TutorialStep[] = [
 ];
 
 const STORAGE_KEY = "onboarding_completed";
+const FIRST_VISIT_KEY = "tutorial_first_visit";
 
 // Mock component for verification code entry
 function MockVerificationCode() {
@@ -219,8 +220,18 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [showHelpButton, setShowHelpButton] = useState(true);
+  const [isFirstVisit, setIsFirstVisit] = useState(false);
   
   const { isConnected } = useAccount();
+  
+  // Check if this is the user's first visit
+  useEffect(() => {
+    const hasVisited = localStorage.getItem(FIRST_VISIT_KEY);
+    if (!hasVisited) {
+      setIsFirstVisit(true);
+      localStorage.setItem(FIRST_VISIT_KEY, "true");
+    }
+  }, []);
   
   // Get the appropriate tutorial steps based on selected provider
   const baseTutorialSteps = useMemo(() => {
@@ -382,10 +393,12 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
         onClick={startTutorial}
         variant="outline"
         size="icon"
-        className="fixed bottom-16 right-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow"
+        className={`fixed bottom-16 right-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow ${
+          isFirstVisit ? "animate-pulse ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+        }`}
         aria-label="Start tutorial"
       >
-        <HelpCircle className="h-5 w-5" />
+        <HelpCircle className="h-6 w-6 text-primary" />
       </Button>
     );
   }
