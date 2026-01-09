@@ -92,8 +92,18 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       if (!publishableKey) throw new Error("Stripe publishable key not configured");
 
       // Load Stripe Onramp
-      const stripeOnramp = await loadStripeOnramp(publishableKey);
-      if (!stripeOnramp) throw new Error("Failed to load Stripe Onramp");
+      console.log("Loading Stripe Onramp with key:", publishableKey.substring(0, 20) + "...");
+      let stripeOnramp;
+      try {
+        stripeOnramp = await loadStripeOnramp(publishableKey);
+      } catch (loadError) {
+        console.error("Stripe Onramp load error:", loadError);
+        throw new Error(`Failed to load Stripe Onramp SDK: ${loadError instanceof Error ? loadError.message : 'Unknown error'}`);
+      }
+      
+      if (!stripeOnramp) {
+        throw new Error("Stripe Onramp SDK returned null - check if crypto onramp is enabled for your Stripe account");
+      }
 
       onrampInstanceRef.current = stripeOnramp;
       setShowWidget(true);
