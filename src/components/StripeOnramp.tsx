@@ -1,114 +1,30 @@
-import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from "react";
-import { loadStripeOnramp, type StripeOnramp as StripeOnrampType, type OnrampSession } from "@stripe/crypto";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { useAccount } from '@particle-network/connectkit';
-
-// CryptoElements context for StripeOnramp instance
-interface CryptoElementsContextValue {
-  onramp: StripeOnrampType | null;
-}
-
-const CryptoElementsContext = createContext<CryptoElementsContextValue>({ onramp: null });
-
-interface CryptoElementsProps {
-  stripeOnramp: Promise<StripeOnrampType | null>;
-  children: ReactNode;
-}
-
-function CryptoElements({ stripeOnramp, children }: CryptoElementsProps) {
-  const [ctx, setCtx] = useState<CryptoElementsContextValue>({ onramp: null });
-
-  useEffect(() => {
-    let mounted = true;
-    stripeOnramp.then((onramp) => {
-      if (mounted && onramp) {
-        setCtx({ onramp });
-      }
-    });
-    return () => { mounted = false; };
-  }, [stripeOnramp]);
-
-  return (
-    <CryptoElementsContext.Provider value={ctx}>
-      {children}
-    </CryptoElementsContext.Provider>
-  );
-}
-
-// OnrampElement component
-interface OnrampElementProps {
-  clientSecret: string;
-  appearance?: { theme: "light" | "dark" };
-  onReady?: () => void;
-  onChange?: (status: string) => void;
-}
-
-function OnrampElement({ clientSecret, appearance, onReady, onChange }: OnrampElementProps) {
-  const { onramp } = useContext(CryptoElementsContext);
-  const [session, setSession] = useState<OnrampSession | null>(null);
-
-  useEffect(() => {
-    if (!onramp || !clientSecret) return;
-
-    const onrampSession = onramp.createSession({
-      clientSecret,
-      appearance: appearance || { theme: "light" },
-    });
-
-    setSession(onrampSession);
-
-    // Mount the session
-    const container = document.getElementById("onramp-element");
-    if (container) {
-      onrampSession.mount("#onramp-element");
-    }
-
-    // Set up event listeners
-    if (onReady) {
-      onrampSession.addEventListener("onramp_ui_loaded", onReady);
-    }
-    if (onChange) {
-      onrampSession.addEventListener("onramp_session_updated", (event) => {
-        const status = event.payload?.session?.status;
-        if (status) {
-          onChange(status);
-        }
-      });
-    }
-
-    return () => {
-      // Cleanup happens automatically when component unmounts
-    };
-  }, [onramp, clientSecret, appearance, onReady, onChange]);
-
-  return <div id="onramp-element" className="min-h-[500px] w-full" />;
-}
 
 // Validate Solana address
 const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
 const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 
 // Main StripeOnramp component
-interface StripeOnrampComponentProps {
+interface StripeOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
 }
 
-export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampComponentProps) {
+export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   
-  const [stripeOnrampPromise, setStripeOnrampPromise] = useState<Promise<StripeOnrampType | null> | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showOnramp, setShowOnramp] = useState(false);
-  const [sessionStatus, setSessionStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
   // Validate wallet address matches the target network
   const connectedAddressValid = isConnected && address && (
@@ -121,33 +37,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       setWalletAddress(address);
     }
   }, [connectedAddressValid, address, walletAddress]);
-
-  // Initialize Stripe Onramp
-  useEffect(() => {
-    const initStripeOnramp = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('stripe-config');
-        if (error) throw error;
-        
-        const { publishableKey } = data;
-        if (!publishableKey) {
-          throw new Error("Failed to get Stripe publishable key");
-        }
-
-        const promise = loadStripeOnramp(publishableKey);
-        setStripeOnrampPromise(promise);
-      } catch (error) {
-        console.error("Failed to initialize Stripe Onramp:", error);
-        toast({
-          title: "Configuration Error",
-          description: "Failed to initialize Stripe. Please try again later.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    initStripeOnramp();
-  }, [toast]);
 
   const handleStartOnramp = useCallback(async () => {
     if (!walletAddress.trim()) {
@@ -176,9 +65,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     }
 
     setIsLoading(true);
+    setError(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('stripe-onramp', {
+      const { data, error: fnError } = await supabase.functions.invoke('stripe-onramp', {
         body: {
           walletAddress: walletAddress.trim(),
           destinationCurrency: defaultAsset.toLowerCase(),
@@ -186,80 +76,95 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
         },
       });
 
-      if (error) throw error;
+      if (fnError) throw fnError;
 
-      if (!data.clientSecret) {
-        throw new Error("Failed to create onramp session");
+      if (data.error) {
+        // Check if this is the API access error
+        if (data.error.includes("Unrecognized request URL")) {
+          setError("Stripe Crypto Onramp requires account approval. Please submit an application at dashboard.stripe.com/crypto-onramp/get-started");
+        } else {
+          throw new Error(data.error);
+        }
+        return;
       }
 
-      setClientSecret(data.clientSecret);
-      setShowOnramp(true);
-    } catch (error) {
-      console.error("Onramp error:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to start onramp session",
-        variant: "destructive",
-      });
+      if (data.redirectUrl) {
+        setRedirectUrl(data.redirectUrl);
+        // Open in new tab
+        window.open(data.redirectUrl, '_blank');
+      } else if (data.clientSecret) {
+        // For future: when embedded is available
+        toast({
+          title: "Session Created",
+          description: "Redirecting to Stripe checkout...",
+        });
+      }
+    } catch (err) {
+      console.error("Onramp error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to start onramp session";
+      
+      if (errorMessage.includes("Unrecognized request URL")) {
+        setError("Stripe Crypto Onramp requires account approval. Please submit an application at dashboard.stripe.com/crypto-onramp/get-started");
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
   }, [walletAddress, defaultAsset, defaultNetwork, toast]);
 
-  const handleSessionChange = useCallback((status: string) => {
-    setSessionStatus(status);
-    
-    if (status === "fulfillment_complete") {
-      toast({
-        title: "Success!",
-        description: "Your crypto purchase was successful!",
-      });
-      // Reset after successful purchase
-      setTimeout(() => {
-        setShowOnramp(false);
-        setClientSecret(null);
-        setSessionStatus(null);
-      }, 3000);
-    } else if (status === "rejected") {
-      toast({
-        title: "Transaction Rejected",
-        description: "Your transaction could not be completed.",
-        variant: "destructive",
-      });
-    }
-  }, [toast]);
-
-  // Show onramp widget
-  if (showOnramp && clientSecret && stripeOnrampPromise) {
+  // Show error state
+  if (error) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Complete Your Purchase</h2>
+      <div className="space-y-8 animate-fade-in">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold tracking-tight">Stripe Crypto Onramp</h1>
+          <p className="text-xl text-muted-foreground">
+            Secure fiat-to-crypto purchases powered by Stripe
+          </p>
+        </div>
+
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-6 w-6 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="space-y-2">
+              <h3 className="font-semibold text-amber-700 dark:text-amber-400">Approval Required</h3>
+              <p className="text-sm text-muted-foreground">
+                The Stripe Crypto Onramp is in public preview and requires account approval before use.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                To get started:
+              </p>
+              <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+                <li>Sign in to your Stripe Dashboard</li>
+                <li>Navigate to the Crypto Onramp section</li>
+                <li>Submit the onramp application</li>
+                <li>Wait for approval (usually within 48 hours)</li>
+              </ol>
+            </div>
+          </div>
+          
           <Button
             variant="outline"
-            size="sm"
-            onClick={() => {
-              setShowOnramp(false);
-              setClientSecret(null);
-            }}
+            className="w-full"
+            onClick={() => window.open('https://dashboard.stripe.com/crypto-onramp/get-started', '_blank')}
           >
-            Cancel
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Apply for Crypto Onramp Access
+          </Button>
+          
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => setError(null)}
+          >
+            Try Again
           </Button>
         </div>
-        
-        {sessionStatus && (
-          <div className="text-sm text-muted-foreground">
-            Status: {sessionStatus.replace(/_/g, " ")}
-          </div>
-        )}
-
-        <CryptoElements stripeOnramp={stripeOnrampPromise}>
-          <OnrampElement
-            clientSecret={clientSecret}
-            appearance={{ theme: "light" }}
-            onChange={handleSessionChange}
-          />
-        </CryptoElements>
       </div>
     );
   }
@@ -312,6 +217,21 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
             "Buy Crypto with Stripe"
           )}
         </Button>
+
+        {redirectUrl && (
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground mb-2">
+              Payment window opened. If it didn't open, click below:
+            </p>
+            <Button
+              variant="link"
+              onClick={() => window.open(redirectUrl, '_blank')}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open Payment Page
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
