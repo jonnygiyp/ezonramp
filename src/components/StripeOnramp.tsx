@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, AlertCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAccount } from '@particle-network/connectkit';
+import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
 // Validate Solana address
 const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
@@ -23,8 +24,9 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [showWidget, setShowWidget] = useState(false);
+  const onrampContainerRef = useRef<HTMLDivElement>(null);
+  const onrampInstanceRef = useRef<StripeOnrampType | null>(null);
 
   // Validate wallet address matches the target network
   const connectedAddressValid = isConnected && address && (
@@ -65,9 +67,9 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
+      // Get client secret from edge function
       const { data, error: fnError } = await supabase.functions.invoke('stripe-onramp', {
         body: {
           walletAddress: walletAddress.trim(),
@@ -77,94 +79,80 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       });
 
       if (fnError) throw fnError;
+      if (data.error) throw new Error(data.error);
 
-      if (data.error) {
-        // Check if this is the API access error
-        if (data.error.includes("Unrecognized request URL")) {
-          setError("Stripe Crypto Onramp requires account approval. Please submit an application at dashboard.stripe.com/crypto-onramp/get-started");
-        } else {
-          throw new Error(data.error);
+      const { clientSecret } = data;
+      if (!clientSecret) throw new Error("No client secret received");
+
+      // Get publishable key from config
+      const { data: configData, error: configError } = await supabase.functions.invoke('stripe-config');
+      if (configError) throw configError;
+      
+      const publishableKey = configData?.publishableKey;
+      if (!publishableKey) throw new Error("Stripe publishable key not configured");
+
+      // Load Stripe Onramp
+      const stripeOnramp = await loadStripeOnramp(publishableKey);
+      if (!stripeOnramp) throw new Error("Failed to load Stripe Onramp");
+
+      onrampInstanceRef.current = stripeOnramp;
+      setShowWidget(true);
+
+      // Mount the onramp widget
+      setTimeout(() => {
+        if (onrampContainerRef.current && stripeOnramp) {
+          const onrampSession = stripeOnramp.createSession({ clientSecret });
+          
+          onrampSession.addEventListener('onramp_session_updated', (event) => {
+            console.log('Onramp session updated:', event.payload);
+            if (event.payload.session.status === 'fulfillment_complete') {
+              toast({
+                title: "Success!",
+                description: "Your crypto purchase was successful.",
+              });
+            }
+          });
+
+          onrampSession.mount(onrampContainerRef.current);
         }
-        return;
-      }
+      }, 100);
 
-      if (data.redirectUrl) {
-        setRedirectUrl(data.redirectUrl);
-        // Open in new tab
-        window.open(data.redirectUrl, '_blank');
-      } else if (data.clientSecret) {
-        // For future: when embedded is available
-        toast({
-          title: "Session Created",
-          description: "Redirecting to Stripe checkout...",
-        });
-      }
     } catch (err) {
       console.error("Onramp error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to start onramp session";
-      
-      if (errorMessage.includes("Unrecognized request URL")) {
-        setError("Stripe Crypto Onramp requires account approval. Please submit an application at dashboard.stripe.com/crypto-onramp/get-started");
-      } else {
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to start onramp session",
+        variant: "destructive",
+      });
+      setShowWidget(false);
     } finally {
       setIsLoading(false);
     }
   }, [walletAddress, defaultAsset, defaultNetwork, toast]);
 
-  // Show error state
-  if (error) {
+  // Show embedded widget
+  if (showWidget) {
     return (
-      <div className="space-y-8 animate-fade-in">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Stripe Crypto Onramp</h1>
-          <p className="text-xl text-muted-foreground">
-            Secure fiat-to-crypto purchases powered by Stripe
+      <div className="space-y-6 animate-fade-in">
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight">Complete Your Purchase</h2>
+          <p className="text-muted-foreground">
+            Follow the steps below to buy crypto
           </p>
         </div>
-
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 space-y-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-6 w-6 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div className="space-y-2">
-              <h3 className="font-semibold text-amber-700 dark:text-amber-400">Approval Required</h3>
-              <p className="text-sm text-muted-foreground">
-                The Stripe Crypto Onramp is in public preview and requires account approval before use.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                To get started:
-              </p>
-              <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
-                <li>Sign in to your Stripe Dashboard</li>
-                <li>Navigate to the Crypto Onramp section</li>
-                <li>Submit the onramp application</li>
-                <li>Wait for approval (usually within 48 hours)</li>
-              </ol>
-            </div>
-          </div>
-          
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => window.open('https://dashboard.stripe.com/crypto-onramp/get-started', '_blank')}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Apply for Crypto Onramp Access
-          </Button>
-          
-          <Button
-            variant="ghost"
-            className="w-full"
-            onClick={() => setError(null)}
-          >
-            Try Again
-          </Button>
-        </div>
+        
+        <div 
+          ref={onrampContainerRef} 
+          className="min-h-[500px] rounded-xl overflow-hidden border border-border"
+        />
+        
+        <Button
+          variant="ghost"
+          className="w-full"
+          onClick={() => setShowWidget(false)}
+        >
+          Cancel
+        </Button>
       </div>
     );
   }
@@ -217,21 +205,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
             "Buy Crypto with Stripe"
           )}
         </Button>
-
-        {redirectUrl && (
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-2">
-              Payment window opened. If it didn't open, click below:
-            </p>
-            <Button
-              variant="link"
-              onClick={() => window.open(redirectUrl, '_blank')}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open Payment Page
-            </Button>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
