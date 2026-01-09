@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { CreditCard, Wallet, Zap, Loader2, Globe, DollarSign } from "lucide-react";
+import { CreditCard, Wallet, Zap, Loader2, Globe, DollarSign, Moon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CoinflowCheckout } from "./CoinflowCheckout";
 import { CoinbaseHeadlessOnramp } from "./CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "./CoinbaseOnrampWidget";
 import { StripeOnramp } from "./StripeOnramp";
+import { MoonPayOnramp } from "./MoonPayOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 
@@ -52,6 +53,8 @@ const getTabIcon = (name: string) => {
       return Zap;
     case 'stripe':
       return DollarSign;
+    case 'moonpay':
+      return Moon;
     default:
       return CreditCard;
   }
@@ -314,6 +317,10 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
 
         {activeTab === 'stripe' && (
           <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" />
+        )}
+
+        {activeTab === 'moonpay' && (
+          <MoonPayOnramp defaultAsset="USDC" defaultNetwork="solana" />
         )}
       </div>
     </div>
