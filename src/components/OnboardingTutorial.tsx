@@ -115,9 +115,15 @@ const stripeSteps: TutorialStep[] = [
     position: "bottom",
   },
   {
-    target: "[data-tutorial='wallet-input']",
+    target: "[data-tutorial='stripe-wallet-input']",
     title: "Receiving Wallet Address",
     description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own Solana USDC wallet, paste the address here.",
+    position: "top",
+  },
+  {
+    target: "[data-tutorial='stripe-buy-button']",
+    title: "Complete Your Purchase With Stripe",
+    description: "Follow the instructions for verification and then enter your payment information to complete your purchase with Stripe.",
     position: "top",
   },
 ];
