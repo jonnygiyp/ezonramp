@@ -179,7 +179,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         <div className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2" data-tutorial="stripe-wallet-input">
           <Label htmlFor="wallet-address">
               {defaultNetwork === 'solana' ? 'Wallet address to receive Solana USDC' : 'EVM Wallet Address'}
             </Label>
@@ -205,6 +205,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           size="lg"
           className="w-full text-lg py-6 hover-scale"
           disabled={isLoading || !walletAddress}
+          data-tutorial="stripe-buy-button"
         >
           {isLoading ? (
             <>
