@@ -73,9 +73,6 @@ export default defineConfig(({ mode }) => ({
       '@particle-network/connectkit/chains',
       '@coinbase/cbpay-js',
     ],
-    exclude: [
-      '@particle-network/auth-core',
-    ],
     esbuildOptions: {
       target: 'esnext',
     },
