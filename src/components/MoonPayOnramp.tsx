@@ -122,7 +122,7 @@ export function MoonPayOnramp({
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2" data-tutorial="moonpay-amount-input">
                 <Label htmlFor="moonpay-amount">Amount (USD)</Label>
                 <Input
                   id="moonpay-amount"
