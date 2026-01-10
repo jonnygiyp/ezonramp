@@ -220,27 +220,27 @@ export function CoinbaseOnrampWidget({
       </div>
 
       {/* Features */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
-        <div className="flex flex-col items-center space-y-2">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">🌍</span>
+      <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">🌍</span>
           </div>
-          <p className="font-medium">Global Coverage</p>
-          <p className="text-center text-xs">Available in 100+ countries</p>
+          <p className="font-medium text-xs md:text-sm">Global Coverage</p>
+          <p className="text-center text-[10px] md:text-xs hidden md:block">Available in 100+ countries</p>
         </div>
-        <div className="flex flex-col items-center space-y-2">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">💳</span>
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">💳</span>
           </div>
-          <p className="font-medium">Multiple Payment Methods</p>
-          <p className="text-center text-xs">Cards, bank transfers & more</p>
+          <p className="font-medium text-xs md:text-sm text-center">Multiple Methods</p>
+          <p className="text-center text-[10px] md:text-xs hidden md:block">Cards, bank transfers & more</p>
         </div>
-        <div className="flex flex-col items-center space-y-2">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">🔒</span>
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">🔒</span>
           </div>
-          <p className="font-medium">Secure & Trusted</p>
-          <p className="text-center text-xs">Powered by Coinbase</p>
+          <p className="font-medium text-xs md:text-sm">Secure & Trusted</p>
+          <p className="text-center text-[10px] md:text-xs hidden md:block">Powered by Coinbase</p>
         </div>
       </div>
     </div>
