@@ -169,10 +169,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
 
   // Show setup form
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold tracking-tight">Buy Crypto with Stripe</h1>
-        <p className="text-xl text-muted-foreground">
+    <div className="space-y-6 animate-fade-in">
+      <div className="text-center space-y-2">
+        <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy Crypto with Stripe</h1>
+        <p className="text-xs md:text-sm text-muted-foreground">
           Secure fiat-to-crypto purchases powered by Stripe
         </p>
       </div>

@@ -65,13 +65,13 @@ export function MoonPayOnramp({
 
   if (!publishableKey) {
     return (
-      <div className="space-y-8 animate-fade-in">
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            <Moon className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold tracking-tight">MoonPay</h1>
+      <div className="space-y-6 animate-fade-in">
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <Moon className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+            <h1 className="text-lg md:text-2xl font-bold tracking-tight">MoonPay</h1>
           </div>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-xs md:text-sm text-muted-foreground">
             Buy crypto with credit card, debit card, or bank transfer
           </p>
         </div>
@@ -87,13 +87,13 @@ export function MoonPayOnramp({
 
   return (
     <MoonPayProvider apiKey={publishableKey}>
-      <div className="space-y-8 animate-fade-in">
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            <Moon className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold tracking-tight">MoonPay</h1>
+      <div className="space-y-6 animate-fade-in">
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <Moon className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+            <h1 className="text-lg md:text-2xl font-bold tracking-tight">MoonPay</h1>
           </div>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-xs md:text-sm text-muted-foreground">
             Buy crypto with credit card, debit card, or bank transfer
           </p>
         </div>
