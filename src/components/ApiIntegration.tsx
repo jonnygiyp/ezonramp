@@ -184,7 +184,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   }
 
   return (
-    <div className="w-full min-h-[600px] flex flex-col items-center justify-center px-6 py-4">
+    <div className="w-full min-h-[600px] flex flex-col items-center justify-start px-6">
       {/* Tab Switcher - only show if multiple providers */}
       {providers.length > 1 && (
         <div className="flex items-center justify-center mb-4">
