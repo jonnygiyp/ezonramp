@@ -71,6 +71,8 @@ export default defineConfig(({ mode }) => ({
       '@particle-network/connectkit/solana',
       '@particle-network/connectkit/wallet',
       '@particle-network/connectkit/chains',
+      // Fix Particle OTP runtime error in Vite by pre-bundling auth-core
+      '@particle-network/auth-core',
       '@coinbase/cbpay-js',
     ],
     esbuildOptions: {
