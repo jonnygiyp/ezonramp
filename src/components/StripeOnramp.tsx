@@ -221,24 +221,24 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
-        <div className="flex flex-col items-center space-y-2">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">🔒</span>
+      <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">🔒</span>
           </div>
-          <p className="font-medium">Secure Payments</p>
+          <p className="font-medium text-xs md:text-sm">Secure Payments</p>
         </div>
-        <div className="flex flex-col items-center space-y-2">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">⚡</span>
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">⚡</span>
           </div>
-          <p className="font-medium">Instant Delivery</p>
+          <p className="font-medium text-xs md:text-sm">Instant Delivery</p>
         </div>
-        <div className="flex flex-col items-center space-y-2">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">🇺🇸</span>
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">🇺🇸</span>
           </div>
-          <p className="font-medium">USA Supported</p>
+          <p className="font-medium text-xs md:text-sm">USA Supported</p>
         </div>
       </div>
     </div>
