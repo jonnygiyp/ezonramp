@@ -128,6 +128,40 @@ const stripeSteps: TutorialStep[] = [
   },
 ];
 
+// MoonPay tutorial steps
+const moonpaySteps: TutorialStep[] = [
+  {
+    target: "[data-tutorial='particle-connect']",
+    title: "Create Your Wallet",
+    description: "Sign up for a free wallet through Particle Network to get started!",
+    position: "bottom",
+  },
+  {
+    target: "[data-tutorial='provider-tabs']",
+    title: "Select An Onramp",
+    description: "Select an onramp to buy crypto. Each has different features, processing times and fees.",
+    position: "bottom",
+  },
+  {
+    target: "[data-tutorial='moonpay-wallet-input']",
+    title: "Receiving Wallet Address",
+    description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own Solana USDC wallet, paste the address here.",
+    position: "top",
+  },
+  {
+    target: "[data-tutorial='moonpay-amount-input']",
+    title: "Enter Amount",
+    description: "Enter the amount in USD that you would like to spend on crypto.",
+    position: "top",
+  },
+  {
+    target: "[data-tutorial='moonpay-buy-button']",
+    title: "Complete Your Purchase With MoonPay",
+    description: "Click the button to open the MoonPay widget where you can complete your purchase with credit card, debit card, or bank transfer.",
+    position: "top",
+  },
+];
+
 const STORAGE_KEY = "onboarding_completed";
 const FIRST_VISIT_KEY = "tutorial_first_visit";
 
@@ -268,6 +302,9 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
     }
     if (selectedProvider === 'stripe') {
       return stripeSteps;
+    }
+    if (selectedProvider === 'moonpay') {
+      return moonpaySteps;
     }
     return coinbaseUSSteps;
   }, [selectedProvider]);
