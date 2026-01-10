@@ -111,7 +111,9 @@ export function MoonPayOnramp({
                   placeholder={defaultNetwork === 'solana' ? 'Enter your Solana wallet address' : 'Enter your wallet address'}
                   value={walletAddress}
                   onChange={(e) => setWalletAddress(e.target.value)}
-                  className="font-mono text-sm"
+                  readOnly={isConnected && !!particleAddress}
+                  disabled={isConnected && !!particleAddress}
+                  className={`font-mono text-sm ${isConnected && particleAddress ? "bg-muted cursor-not-allowed" : ""}`}
                 />
                 {isConnected && particleAddress && (
                   <p className="text-xs text-muted-foreground">

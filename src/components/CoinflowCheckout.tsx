@@ -156,7 +156,9 @@ export const CoinflowCheckout: FC = () => {
               placeholder="Enter your Solana wallet address"
               value={walletAddress}
               onChange={(e) => setWalletAddress(e.target.value)}
-              className={publicKey ? "border-green-500" : walletAddress ? "border-destructive" : ""}
+              readOnly={wallets.some(w => w.chainId === SOLANA_MAINNET_CHAIN_ID && w.accounts[0])}
+              disabled={wallets.some(w => w.chainId === SOLANA_MAINNET_CHAIN_ID && w.accounts[0])}
+              className={`${publicKey ? "border-green-500" : walletAddress ? "border-destructive" : ""} ${wallets.some(w => w.chainId === SOLANA_MAINNET_CHAIN_ID && w.accounts[0]) ? "bg-muted cursor-not-allowed" : ""}`}
             />
             {walletAddress && !publicKey && (
               <p className="text-sm text-destructive">Please enter a valid Solana address</p>
