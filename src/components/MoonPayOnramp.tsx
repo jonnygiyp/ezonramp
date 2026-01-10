@@ -117,7 +117,7 @@ export function MoonPayOnramp({
                 />
                 {isConnected && particleAddress && (
                   <p className="text-xs text-muted-foreground">
-                    Connected wallet detected: {particleAddress.slice(0, 8)}...{particleAddress.slice(-6)}
+                    Connected wallet detected.
                   </p>
                 )}
               </div>
@@ -145,7 +145,7 @@ export function MoonPayOnramp({
               data-tutorial="moonpay-buy-button"
             >
               <Moon className="mr-2 h-5 w-5" />
-              Buy Crypto with MoonPay
+              Buy with MoonPay
             </Button>
 
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
