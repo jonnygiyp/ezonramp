@@ -73,12 +73,19 @@ export default defineConfig(({ mode }) => ({
       '@particle-network/connectkit/chains',
       '@coinbase/cbpay-js',
     ],
+    exclude: [
+      '@particle-network/auth-core',
+    ],
     esbuildOptions: {
       target: 'esnext',
     },
   },
   build: {
     target: 'esnext',
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
     rollupOptions: {
       // Copy WASM files to output
       output: {
