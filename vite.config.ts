@@ -4,6 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 import fs from "fs";
 
 // Note: vite-plugin-static-copy is installed but not needed since we use custom middleware
@@ -54,6 +55,17 @@ export default defineConfig(({ mode }) => ({
     serveParticleWasm(),
     wasm(),
     topLevelAwait(),
+    nodePolyfills({
+      protocolImports: true,
+      // Particle's OTP flow pulls in Node-core deps (e.g. events/stream) in the browser.
+      // Polyfilling these prevents runtime crashes like "Class extends value undefined".
+      include: ["buffer", "process", "events", "stream", "crypto"],
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+    }),
     react(),
     mode === "development" && componentTagger(),
   ].filter(Boolean),
