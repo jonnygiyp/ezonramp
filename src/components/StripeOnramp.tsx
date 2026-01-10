@@ -191,6 +191,9 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
                 : "Enter your EVM wallet address (0x...)"}
               value={walletAddress}
               onChange={(e) => setWalletAddress(e.target.value)}
+              readOnly={connectedAddressValid}
+              disabled={connectedAddressValid}
+              className={connectedAddressValid ? "bg-muted cursor-not-allowed" : ""}
             />
             {connectedAddressValid && (
               <p className="text-xs text-muted-foreground">
