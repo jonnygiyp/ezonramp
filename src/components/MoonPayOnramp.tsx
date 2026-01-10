@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { MoonPayProvider, MoonPayBuyWidget } from "@moonpay/moonpay-react";
 import { useAccount } from "@particle-network/connectkit";
 import { Input } from "./ui/input";
@@ -25,11 +25,11 @@ export function MoonPayOnramp({
   const publishableKey = import.meta.env.VITE_MOONPAY_PUBLISHABLE_KEY || "";
 
   // Update wallet address when particle connects
-  useState(() => {
+  useEffect(() => {
     if (particleAddress) {
       setWalletAddress(particleAddress);
     }
-  });
+  }, [particleAddress]);
 
   const handleGetSignature = useCallback(async (url: string): Promise<string> => {
     try {
