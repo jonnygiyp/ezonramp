@@ -107,11 +107,23 @@ export default defineConfig(({ mode }) => ({
           }
           return 'assets/[name]-[hash][extname]';
         },
+        // Keep Particle SDK in a single chunk to preserve class inheritance
+        manualChunks(id) {
+          if (id.includes('@particle-network')) {
+            return 'particle-sdk';
+          }
+        },
       },
       // Ensure Particle modules are not mangled
       treeshake: {
         moduleSideEffects: true,
       },
+    },
+    // Disable minification of class names which can break inheritance
+    minify: 'terser',
+    terserOptions: {
+      keep_classnames: true,
+      keep_fnames: true,
     },
   },
   assetsInclude: ['**/*.wasm'],
