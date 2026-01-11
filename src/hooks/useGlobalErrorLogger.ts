@@ -15,7 +15,12 @@ export function useGlobalErrorLogger() {
   useEffect(() => {
     const logError = (log: ErrorLog) => {
       console.error(`[GlobalErrorLogger] ${log.type}:`, log);
-      
+
+      // If early logger is installed, it already persisted the error.
+      const alreadyInstalled = (window as unknown as { __earlyErrorLoggerInstalled?: boolean })
+        .__earlyErrorLoggerInstalled;
+      if (alreadyInstalled) return;
+
       try {
         const logs = JSON.parse(sessionStorage.getItem('global_error_logs') || '[]');
         logs.push(log);
