@@ -26,16 +26,18 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
-    
+
+    const timestamp = new Date().toISOString();
+
     // Log to console for debugging
     console.error('[ErrorBoundary] Caught error:', error);
     console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
-    
+
     // Store in sessionStorage for diagnostics page
     try {
       const crashes = JSON.parse(sessionStorage.getItem('crash_logs') || '[]');
       crashes.push({
-        timestamp: new Date().toISOString(),
+        timestamp,
         message: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack,
@@ -44,6 +46,21 @@ class ErrorBoundary extends Component<Props, State> {
       sessionStorage.setItem('crash_logs', JSON.stringify(crashes.slice(-10)));
     } catch (e) {
       console.error('[ErrorBoundary] Failed to store crash log:', e);
+    }
+
+    // Also persist to the global error store (works even when storage is blocked)
+    try {
+      (window as any).__persistClientErrorLog?.({
+        timestamp,
+        type: 'error',
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        url: typeof window !== 'undefined' ? window.location.href : undefined,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      });
+    } catch {
+      // ignore
     }
   }
 

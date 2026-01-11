@@ -31,18 +31,71 @@ const Diagnostics = () => {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
 
   const loadLogs = () => {
+    const safeParseArray = (raw: string | null): ErrorLogEntry[] => {
+      try {
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? (parsed as ErrorLogEntry[]) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const safeGetSession = (key: string) => {
+      try {
+        if (typeof sessionStorage === 'undefined') return null;
+        return sessionStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    };
+
+    const safeGetLocal = (key: string) => {
+      try {
+        if (typeof localStorage === 'undefined') return null;
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    };
+
+    const readWindowNameLogs = (): ErrorLogEntry[] => {
+      try {
+        const prefix = '__lovable_error_logs__:';
+        const name = typeof window !== 'undefined' ? window.name || '' : '';
+        if (!name.startsWith(prefix)) return [];
+
+        const raw = decodeURIComponent(name.slice(prefix.length));
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? (parsed as ErrorLogEntry[]) : [];
+      } catch {
+        return [];
+      }
+    };
+
     try {
       // sessionStorage is per-tab; production crashes can happen before React mounts.
-      const crashes = JSON.parse(sessionStorage.getItem('crash_logs') || '[]');
-      const errors = JSON.parse(sessionStorage.getItem('global_error_logs') || '[]');
-      const persisted = JSON.parse(localStorage.getItem('global_error_logs_persisted') || '[]');
+      const crashes = safeParseArray(safeGetSession('crash_logs'));
+      const errors = safeParseArray(safeGetSession('global_error_logs'));
+      const persisted = safeParseArray(safeGetLocal('global_error_logs_persisted'));
+      const windowNameLogs = readWindowNameLogs();
+      const runtimeLogs = Array.isArray((window as any).__globalErrorLogsRuntime)
+        ? ((window as any).__globalErrorLogsRuntime as ErrorLogEntry[])
+        : [];
 
-      setCrashLogs(Array.isArray(crashes) ? crashes : []);
-      // Merge session + persisted logs, keep newest at the end (sorted later)
-      setErrorLogs([
-        ...(Array.isArray(errors) ? errors : []),
-        ...(Array.isArray(persisted) ? persisted : []),
-      ]);
+      setCrashLogs(crashes);
+
+      const merged = [...errors, ...persisted, ...windowNameLogs, ...runtimeLogs];
+      const deduped = Array.from(
+        new Map(
+          merged.map((l) => {
+            const key = `${l.timestamp}|${l.type || ''}|${l.message}|${l.stack || ''}|${l.filename || ''}|${l.lineno ?? ''}|${(l as any).colno ?? ''}|${l.componentStack || ''}`;
+            return [key, l] as const;
+          }),
+        ).values(),
+      );
+
+      setErrorLogs(deduped);
     } catch (e) {
       console.error('Failed to load logs:', e);
       setCrashLogs([]);
@@ -51,9 +104,31 @@ const Diagnostics = () => {
   };
 
   const clearLogs = () => {
-    sessionStorage.removeItem('crash_logs');
-    sessionStorage.removeItem('global_error_logs');
-    localStorage.removeItem('global_error_logs_persisted');
+    try {
+      sessionStorage.removeItem('crash_logs');
+      sessionStorage.removeItem('global_error_logs');
+    } catch {
+      // ignore
+    }
+
+    try {
+      localStorage.removeItem('global_error_logs_persisted');
+    } catch {
+      // ignore
+    }
+
+    try {
+      const prefix = '__lovable_error_logs__:';
+      if (typeof window !== 'undefined' && (window.name || '').startsWith(prefix)) {
+        window.name = '';
+      }
+      if (typeof window !== 'undefined') {
+        (window as any).__globalErrorLogsRuntime = [];
+      }
+    } catch {
+      // ignore
+    }
+
     setCrashLogs([]);
     setErrorLogs([]);
   };

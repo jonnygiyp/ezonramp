@@ -16,10 +16,16 @@ export function useGlobalErrorLogger() {
     const logError = (log: ErrorLog) => {
       console.error(`[GlobalErrorLogger] ${log.type}:`, log);
 
-      // If early logger is installed, it already persisted the error.
-      const alreadyInstalled = (window as unknown as { __earlyErrorLoggerInstalled?: boolean })
-        .__earlyErrorLoggerInstalled;
-      if (alreadyInstalled) return;
+      // Prefer the early logger's persister (handles storage-blocked environments via fallbacks).
+      try {
+        const persist = (window as any).__persistClientErrorLog as undefined | ((l: any) => void);
+        if (persist) {
+          persist(log);
+          return;
+        }
+      } catch {
+        // ignore
+      }
 
       try {
         const logs = JSON.parse(sessionStorage.getItem('global_error_logs') || '[]');
