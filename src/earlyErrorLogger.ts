@@ -17,6 +17,7 @@ export type ErrorLog = {
 declare global {
   interface Window {
     __earlyErrorLoggerInstalled?: boolean;
+    __lovableWorkerPatchInstalled?: boolean;
     __globalErrorLogsRuntime?: ErrorLog[];
     __persistClientErrorLog?: (log: ErrorLog) => void;
   }
@@ -88,6 +89,62 @@ function persist(log: ErrorLog) {
   }
 }
 
+function patchWorkersForLogging() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (window.__lovableWorkerPatchInstalled) return;
+    window.__lovableWorkerPatchInstalled = true;
+
+    const NativeWorker = (window as any).Worker as typeof Worker | undefined;
+    if (typeof NativeWorker !== 'function') return;
+
+    const WorkerProxy = function (this: any, scriptURL: string | URL, options?: WorkerOptions) {
+      const worker: Worker = new (NativeWorker as any)(scriptURL as any, options);
+
+      try {
+        worker.addEventListener(
+          'error',
+          (event: ErrorEvent) => {
+            const log: ErrorLog = {
+              timestamp: new Date().toISOString(),
+              type: 'error',
+              message: `[Worker] ${event.message || 'Worker error'}`,
+              stack: (event as any).error?.stack,
+              filename: (event as any).filename,
+              lineno: (event as any).lineno,
+              colno: (event as any).colno,
+              url: typeof window !== 'undefined' ? window.location.href : undefined,
+              userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+            };
+
+            // eslint-disable-next-line no-console
+            console.error('[EarlyErrorLogger] worker error:', log);
+            persist(log);
+          },
+          true,
+        );
+      } catch {
+        // ignore
+      }
+
+      return worker;
+    } as any;
+
+    // Preserve instanceof behavior
+    WorkerProxy.prototype = NativeWorker.prototype;
+    try {
+      Object.setPrototypeOf(WorkerProxy, NativeWorker);
+    } catch {
+      // ignore
+    }
+
+    (window as any).Worker = WorkerProxy;
+  } catch {
+    // ignore
+  }
+}
+
 export function installEarlyErrorLogger() {
   if (typeof window === 'undefined') return;
 
@@ -97,6 +154,9 @@ export function installEarlyErrorLogger() {
   // Expose a single persister so other parts of the app can log even if
   // storage is blocked (they can fall back to window.name/runtime buffer).
   window.__persistClientErrorLog = persist;
+
+  // Capture errors thrown inside WebWorkers (many crypto SDKs run in workers).
+  patchWorkersForLogging();
 
   window.addEventListener(
     'error',
