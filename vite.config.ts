@@ -93,6 +93,10 @@ export default defineConfig(({ mode }) => ({
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true,
+      // Fix "Class extends value undefined" error in production
+      // This ensures proper ESM/CJS interop for Particle Network SDK
+      esmExternals: true,
+      requireReturnsDefault: 'auto',
     },
     rollupOptions: {
       // Copy WASM files to output
@@ -103,6 +107,10 @@ export default defineConfig(({ mode }) => ({
           }
           return 'assets/[name]-[hash][extname]';
         },
+      },
+      // Ensure Particle modules are not mangled
+      treeshake: {
+        moduleSideEffects: true,
       },
     },
   },
