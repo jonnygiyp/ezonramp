@@ -1,20 +1,31 @@
 // Polyfills for browser compatibility - must be imported FIRST
-import { Buffer } from 'buffer';
+import { Buffer } from "buffer";
 
-// Ensure Buffer is globally available before any SDK loads
-if (typeof window !== 'undefined') {
-  (window as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
-  (window as unknown as { global: typeof globalThis }).global = window;
-  
-  // Ensure process.env exists
-  if (typeof (window as unknown as { process: { env: Record<string, string> } }).process === 'undefined') {
-    (window as unknown as { process: { env: Record<string, string> } }).process = { env: {} };
+type GlobalLike = {
+  Buffer?: typeof Buffer;
+  global?: unknown;
+  process?: { env?: Record<string, string> };
+};
+
+function ensureNodeGlobals(target: GlobalLike) {
+  target.Buffer = Buffer;
+  target.global = target as unknown as typeof globalThis;
+  if (typeof target.process === "undefined") {
+    target.process = { env: {} };
+  }
+  if (!target.process.env) {
+    target.process.env = {};
   }
 }
 
-// Also set on globalThis for module contexts
-if (typeof globalThis !== 'undefined') {
-  (globalThis as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
+// Main window context
+if (typeof window !== "undefined") {
+  ensureNodeGlobals(window as unknown as GlobalLike);
+}
+
+// Module / worker-like contexts
+if (typeof globalThis !== "undefined") {
+  ensureNodeGlobals(globalThis as unknown as GlobalLike);
 }
 
 export { Buffer };
