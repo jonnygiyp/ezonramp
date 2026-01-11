@@ -69,6 +69,7 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     include: [
+      'buffer',
       '@particle-network/thresh-sig',
       '@particle-network/connectkit',
       '@particle-network/connectkit/auth',
@@ -82,6 +83,9 @@ export default defineConfig(({ mode }) => ({
     ],
     esbuildOptions: {
       target: 'esnext',
+      define: {
+        global: 'globalThis',
+      },
     },
   },
   build: {
