@@ -12,38 +12,44 @@ async function loadParticleSDK() {
   
   loadPromise = (async () => {
     try {
-      // Ensure Buffer is available before loading SDK
-      if (typeof window !== 'undefined' && !(window as unknown as { Buffer?: unknown }).Buffer) {
-        const { Buffer } = await import('buffer');
-        (window as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
-        (window as unknown as { global: typeof globalThis }).global = window;
+      // Ensure Buffer and global are available before loading SDK
+      if (typeof window !== 'undefined') {
+        if (!(window as unknown as { Buffer?: unknown }).Buffer) {
+          const { Buffer } = await import('buffer');
+          (window as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
+        }
+        if (!(window as unknown as { global?: unknown }).global) {
+          (window as unknown as { global: typeof globalThis }).global = window;
+        }
+        if (!(window as unknown as { process?: unknown }).process) {
+          (window as unknown as { process: { env: Record<string, string> } }).process = { env: {} };
+        }
       }
 
-      // Dynamic imports to ensure proper module resolution order
-      const [
-        connectkitModule,
-        authModule,
-        evmModule,
-        solanaModule,
-        walletModule,
-        chainsModule,
-      ] = await Promise.all([
-        import('@particle-network/connectkit'),
-        import('@particle-network/connectkit/auth'),
-        import('@particle-network/connectkit/evm'),
-        import('@particle-network/connectkit/solana'),
-        import('@particle-network/connectkit/wallet'),
-        import('@particle-network/connectkit/chains'),
-      ]);
-
+      // Import core module first
+      const connectkitModule = await import('@particle-network/connectkit');
       const { createConfig } = connectkitModule;
-      const { authWalletConnectors } = authModule;
-      const { evmWalletConnectors } = evmModule;
-      const { solanaWalletConnectors } = solanaModule;
-      const { EntryPosition, wallet } = walletModule;
+      ConnectKitProvider = connectkitModule.ConnectKitProvider;
+
+      // Import chains before wallet connectors
+      const chainsModule = await import('@particle-network/connectkit/chains');
       const { mainnet, polygon, base, arbitrum, solana } = chainsModule;
 
-      ConnectKitProvider = connectkitModule.ConnectKitProvider;
+      // Import wallet module
+      const walletModule = await import('@particle-network/connectkit/wallet');
+      const { EntryPosition, wallet } = walletModule;
+
+      // Import auth connectors
+      const authModule = await import('@particle-network/connectkit/auth');
+      const { authWalletConnectors } = authModule;
+
+      // Import solana connectors
+      const solanaModule = await import('@particle-network/connectkit/solana');
+      const { solanaWalletConnectors } = solanaModule;
+
+      // Import EVM connectors last (has most dependencies)
+      const evmModule = await import('@particle-network/connectkit/evm');
+      const { evmWalletConnectors } = evmModule;
 
       particleConfig = createConfig({
         projectId: 'e7041872-c6f2-4de1-826a-8c20f4d26e7f',
@@ -62,6 +68,7 @@ async function loadParticleSDK() {
           mode: 'auto',
         },
         walletConnectors: [
+          authWalletConnectors({}),
           solanaWalletConnectors(),
           evmWalletConnectors({
             metadata: {
@@ -71,7 +78,6 @@ async function loadParticleSDK() {
               url: typeof window !== 'undefined' ? window.location.origin : '',
             },
           }),
-          authWalletConnectors({}),
         ],
         plugins: [
           wallet({
