@@ -43,6 +43,37 @@
 
   <body>
     <div id="root"></div>
+    <!-- Buffer polyfill MUST load before any module scripts for Particle SDK -->
+    <script>
+      // Pre-initialize globals that SDKs expect
+      window.global = window;
+      window.process = window.process || { env: {} };
+      // Buffer will be properly set by the polyfills module, but we need a placeholder
+      // to prevent "Buffer is not defined" during chunk loading
+      if (typeof window.Buffer === 'undefined') {
+        window.Buffer = {
+          isBuffer: function() { return false; },
+          from: function(data, encoding) {
+            if (typeof data === 'string') {
+              return new TextEncoder().encode(data);
+            }
+            return new Uint8Array(data);
+          },
+          alloc: function(size) { return new Uint8Array(size); },
+          allocUnsafe: function(size) { return new Uint8Array(size); },
+          concat: function(list) {
+            const totalLength = list.reduce((acc, arr) => acc + arr.length, 0);
+            const result = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const arr of list) {
+              result.set(arr, offset);
+              offset += arr.length;
+            }
+            return result;
+          }
+        };
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
