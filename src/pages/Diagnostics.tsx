@@ -32,18 +32,28 @@ const Diagnostics = () => {
 
   const loadLogs = () => {
     try {
+      // sessionStorage is per-tab; production crashes can happen before React mounts.
       const crashes = JSON.parse(sessionStorage.getItem('crash_logs') || '[]');
       const errors = JSON.parse(sessionStorage.getItem('global_error_logs') || '[]');
-      setCrashLogs(crashes);
-      setErrorLogs(errors);
+      const persisted = JSON.parse(localStorage.getItem('global_error_logs_persisted') || '[]');
+
+      setCrashLogs(Array.isArray(crashes) ? crashes : []);
+      // Merge session + persisted logs, keep newest at the end (sorted later)
+      setErrorLogs([
+        ...(Array.isArray(errors) ? errors : []),
+        ...(Array.isArray(persisted) ? persisted : []),
+      ]);
     } catch (e) {
       console.error('Failed to load logs:', e);
+      setCrashLogs([]);
+      setErrorLogs([]);
     }
   };
 
   const clearLogs = () => {
     sessionStorage.removeItem('crash_logs');
     sessionStorage.removeItem('global_error_logs');
+    localStorage.removeItem('global_error_logs_persisted');
     setCrashLogs([]);
     setErrorLogs([]);
   };
