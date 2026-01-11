@@ -70,6 +70,8 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Force @solana/web3.js to use compatible borsh version
+      "borsh": path.resolve(__dirname, "node_modules/borsh"),
     },
   },
   optimizeDeps: {
