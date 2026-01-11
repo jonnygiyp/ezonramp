@@ -90,16 +90,16 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: 'esnext',
+    // Disable minification to preserve class names for Particle SDK
+    minify: false,
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true,
       // Fix "Class extends value undefined" error in production
-      // This ensures proper ESM/CJS interop for Particle Network SDK
       esmExternals: true,
       requireReturnsDefault: 'auto',
     },
     rollupOptions: {
-      // Copy WASM files to output
       output: {
         assetFileNames: (assetInfo) => {
           if (assetInfo.name?.endsWith('.wasm')) {
@@ -114,16 +114,9 @@ export default defineConfig(({ mode }) => ({
           }
         },
       },
-      // Ensure Particle modules are not mangled
       treeshake: {
         moduleSideEffects: true,
       },
-    },
-    // Disable minification of class names which can break inheritance
-    minify: 'terser',
-    terserOptions: {
-      keep_classnames: true,
-      keep_fnames: true,
     },
   },
   assetsInclude: ['**/*.wasm'],
