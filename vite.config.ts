@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import fs from "fs";
+import inject from "@rollup/plugin-inject";
 
 // Note: vite-plugin-static-copy is installed but not needed since we use custom middleware
 
@@ -54,6 +55,10 @@ export default defineConfig(({ mode }) => ({
     serveParticleWasm(),
     wasm(),
     topLevelAwait(),
+    // Ensure Node-style globals like Buffer exist inside bundled chunks (incl. Particle SDK)
+    inject({
+      Buffer: ["buffer", "Buffer"],
+    }),
     react(),
     mode === "development" && componentTagger(),
   ].filter(Boolean),
