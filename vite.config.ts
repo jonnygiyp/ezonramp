@@ -64,9 +64,11 @@ export default defineConfig(({ mode }) => ({
 
     // Ensure CommonJS deps (e.g. borsh) are transformed so named exports work in Rollup
     commonjs({
-      include: [/node_modules\/borsh/, /node_modules\/@solana/],
-      exclude: [/node_modules\/react/, /node_modules\/react-dom/],
+      include: [/node_modules/],
+      exclude: [/node_modules\/react($|\/)/, /node_modules\/react-dom($|\/)/],
       transformMixedEsModules: true,
+      requireReturnsDefault: 'auto',
+      esmExternals: true,
     }),
 
     react(),
@@ -111,10 +113,10 @@ export default defineConfig(({ mode }) => ({
     minify: false,
     commonjsOptions: {
       include: [/node_modules/],
+      exclude: [/node_modules\/react($|\/)/, /node_modules\/react-dom($|\/)/],
       transformMixedEsModules: true,
-      // Fix "Class extends value undefined" error in production
       esmExternals: true,
-      requireReturnsDefault: "auto",
+      requireReturnsDefault: 'auto',
     },
     rollupOptions: {
       output: {
