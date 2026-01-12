@@ -62,13 +62,11 @@ export default defineConfig(({ mode }) => ({
       Buffer: ["buffer", "Buffer"],
     }),
 
-    // Ensure CommonJS deps (e.g. borsh) are transformed so named exports work in Rollup
+    // Transform only borsh (CommonJS) so named exports work; leave React/ESM alone
     commonjs({
-      include: [/node_modules/],
-      exclude: [/node_modules\/react($|\/)/, /node_modules\/react-dom($|\/)/],
+      include: [/node_modules\/borsh/],
       transformMixedEsModules: true,
       requireReturnsDefault: 'auto',
-      esmExternals: true,
     }),
 
     react(),
@@ -112,10 +110,8 @@ export default defineConfig(({ mode }) => ({
     // Disable minification to preserve class names for Particle SDK
     minify: false,
     commonjsOptions: {
-      include: [/node_modules/],
-      exclude: [/node_modules\/react($|\/)/, /node_modules\/react-dom($|\/)/],
+      include: [/node_modules\/borsh/],
       transformMixedEsModules: true,
-      esmExternals: true,
       requireReturnsDefault: 'auto',
     },
     rollupOptions: {
