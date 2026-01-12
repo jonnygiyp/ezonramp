@@ -64,7 +64,8 @@ export default defineConfig(({ mode }) => ({
 
     // Ensure CommonJS deps (e.g. borsh) are transformed so named exports work in Rollup
     commonjs({
-      include: [/node_modules/],
+      include: [/node_modules\/borsh/, /node_modules\/@solana/],
+      exclude: [/node_modules\/react/, /node_modules\/react-dom/],
       transformMixedEsModules: true,
     }),
 
