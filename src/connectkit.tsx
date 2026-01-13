@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode, useRef } from 'react';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ConnectKitProvider: React.ComponentType<any> | null = null;
@@ -7,50 +7,85 @@ let particleConfig: any = null;
 let loadError: Error | null = null;
 let loadPromise: Promise<void> | null = null;
 
-async function loadParticleSDK() {
+/**
+ * CRITICAL: Particle SDK must ONLY be loaded in browser environment AFTER mount.
+ * The "Class extends value undefined" error occurs when:
+ * 1. SDK is loaded during SSR/build time
+ * 2. SDK is loaded before browser globals (Buffer, crypto, TextEncoder) exist
+ * 3. SDK classes are tree-shaken or split across chunks
+ */
+async function loadParticleSDK(): Promise<void> {
+  // GUARD: Absolutely must be in browser
+  if (typeof window === 'undefined') {
+    throw new Error('Particle SDK can only be loaded in browser environment');
+  }
+
+  // Return existing promise if already loading/loaded
   if (loadPromise) return loadPromise;
   
   loadPromise = (async () => {
     try {
-      // Ensure Buffer and global are available before loading SDK
-      if (typeof window !== 'undefined') {
-        if (!(window as unknown as { Buffer?: unknown }).Buffer) {
-          const { Buffer } = await import('buffer');
-          (window as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
-        }
-        if (!(window as unknown as { global?: unknown }).global) {
-          (window as unknown as { global: typeof globalThis }).global = window;
-        }
-        if (!(window as unknown as { process?: unknown }).process) {
-          (window as unknown as { process: { env: Record<string, string> } }).process = { env: {} };
-        }
+      console.log('[ParticleConnectkit] Starting SDK load...');
+      
+      // Step 1: Ensure ALL browser globals exist before ANY SDK import
+      // Import buffer dynamically to ensure it works with the build
+      const bufferModule = await import('buffer');
+      const Buffer = bufferModule.Buffer;
+      
+      // Set Buffer globally
+      (window as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
+      (globalThis as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
+      
+      // Set global reference
+      (window as unknown as { global: typeof globalThis }).global = window;
+      
+      // Set process.env
+      if (!(window as unknown as { process?: { env: Record<string, string> } }).process) {
+        (window as unknown as { process: { env: Record<string, string> } }).process = { env: {} };
       }
 
-      // Import core module first
+      // Verify crypto and TextEncoder exist
+      if (!window.crypto) {
+        throw new Error('window.crypto is not available');
+      }
+      if (typeof TextEncoder === 'undefined') {
+        throw new Error('TextEncoder is not available');
+      }
+
+      console.log('[ParticleConnectkit] Browser globals ready, loading SDK modules...');
+
+      // Step 2: Import core module first
       const connectkitModule = await import('@particle-network/connectkit');
       const { createConfig } = connectkitModule;
       ConnectKitProvider = connectkitModule.ConnectKitProvider;
 
-      // Import chains before wallet connectors
+      if (!ConnectKitProvider) {
+        throw new Error('ConnectKitProvider not found in module');
+      }
+
+      // Step 3: Import chains before wallet connectors
       const chainsModule = await import('@particle-network/connectkit/chains');
       const { mainnet, polygon, base, arbitrum, solana } = chainsModule;
 
-      // Import wallet module
+      // Step 4: Import wallet module
       const walletModule = await import('@particle-network/connectkit/wallet');
       const { EntryPosition, wallet } = walletModule;
 
-      // Import auth connectors
+      // Step 5: Import auth connectors
       const authModule = await import('@particle-network/connectkit/auth');
       const { authWalletConnectors } = authModule;
 
-      // Import solana connectors
+      // Step 6: Import solana connectors
       const solanaModule = await import('@particle-network/connectkit/solana');
       const { solanaWalletConnectors } = solanaModule;
 
-      // Import EVM connectors last (has most dependencies)
+      // Step 7: Import EVM connectors last (has most dependencies)
       const evmModule = await import('@particle-network/connectkit/evm');
       const { evmWalletConnectors } = evmModule;
 
+      console.log('[ParticleConnectkit] All modules loaded, creating config...');
+
+      // Step 8: Create config only after all modules are loaded
       particleConfig = createConfig({
         projectId: 'e7041872-c6f2-4de1-826a-8c20f4d26e7f',
         clientKey: 'cQYG1BDRMOjRHHfoifZ10kiAXuHGbe5ypVetw2LV',
@@ -73,9 +108,9 @@ async function loadParticleSDK() {
           evmWalletConnectors({
             metadata: {
               name: 'EZOnRamp',
-              icon: typeof window !== 'undefined' ? `${window.location.origin}/favicon.ico` : '',
+              icon: `${window.location.origin}/favicon.ico`,
               description: 'Buy crypto easily with EZOnRamp.',
-              url: typeof window !== 'undefined' ? window.location.origin : '',
+              url: window.location.origin,
             },
           }),
         ],
@@ -87,9 +122,13 @@ async function loadParticleSDK() {
         ],
         chains: [solana, mainnet, polygon, base, arbitrum],
       });
+      
+      console.log('[ParticleConnectkit] Config created successfully');
     } catch (err) {
       loadError = err instanceof Error ? err : new Error(String(err));
       console.error('[ParticleConnectkit] Failed to load SDK:', loadError);
+      // Reset promise so retry is possible
+      loadPromise = null;
       throw loadError;
     }
   })();
@@ -98,46 +137,56 @@ async function loadParticleSDK() {
 }
 
 export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
+  const isMounted = useRef(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [loadingTime, setLoadingTime] = useState(0);
 
   useEffect(() => {
-    let mounted = true;
+    // CRITICAL: Mark as mounted - SDK should ONLY load after this
+    isMounted.current = true;
+    
+    // GUARD: Ensure we're in browser environment
+    if (typeof window === 'undefined') {
+      console.error('[ParticleConnectkit] Not in browser environment');
+      return;
+    }
+
     let timeoutId: ReturnType<typeof setTimeout>;
     let intervalId: ReturnType<typeof setInterval>;
 
     // Track loading time for debugging
     intervalId = setInterval(() => {
-      if (mounted) setLoadingTime((t) => t + 1);
+      if (isMounted.current) setLoadingTime((t) => t + 1);
     }, 1000);
 
     // Timeout after 20 seconds
     timeoutId = setTimeout(() => {
-      if (mounted && !isLoaded) {
+      if (isMounted.current && !isLoaded) {
         console.error('[ParticleConnectkit] SDK load timeout after 20s');
         setError(new Error('Wallet SDK took too long to load. Please refresh the page.'));
       }
     }, 20000);
 
+    // Load SDK only after component has mounted (browser environment confirmed)
     loadParticleSDK()
       .then(() => {
-        if (mounted) {
-          console.log('[ParticleConnectkit] SDK loaded successfully');
+        if (isMounted.current) {
+          console.log('[ParticleConnectkit] SDK loaded and ready');
           setIsLoaded(true);
         }
       })
       .catch((err) => {
         console.error('[ParticleConnectkit] SDK load error:', err);
-        if (mounted) setError(err);
+        if (isMounted.current) setError(err);
       });
 
     return () => {
-      mounted = false;
+      isMounted.current = false;
       clearTimeout(timeoutId);
       clearInterval(intervalId);
     };
-  }, [isLoaded]);
+  }, []); // Empty deps - only run once on mount
 
   if (error) {
     return (
