@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 
 interface ErrorLog {
   timestamp: string;
-  type: 'error' | 'unhandledrejection';
+  type: 'error' | 'unhandledrejection' | 'resourceerror';
   message: string;
   stack?: string;
   filename?: string;
@@ -36,26 +36,42 @@ export function useGlobalErrorLogger() {
       }
     };
 
+    const toSafeString = (value: unknown) => {
+      if (value == null) return '';
+      if (typeof value === 'string') return value;
+      if (value instanceof Error) return value.message;
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
     const handleError = (event: ErrorEvent) => {
+      const derivedMessage =
+        event.message ||
+        (event.error instanceof Error ? event.error.message : toSafeString(event.error)) ||
+        'Unknown error';
+
       const log: ErrorLog = {
         timestamp: new Date().toISOString(),
         type: 'error',
-        message: event.message,
-        stack: event.error?.stack,
+        message: derivedMessage,
+        stack: event.error instanceof Error ? event.error.stack : undefined,
         filename: event.filename,
         lineno: event.lineno,
         colno: event.colno,
       };
-      
+
       logError(log);
-      
+
       // Show toast for critical errors (like the Particle OTP issue)
-      if (event.message.includes('Class extends value undefined')) {
+      if (derivedMessage.includes('Class extends value undefined')) {
         toast.error('Authentication Error', {
           description: 'A compatibility issue occurred. Check /diagnostics for details.',
           duration: 8000,
         });
-      } else if (event.message.includes('undefined is not a constructor')) {
+      } else if (derivedMessage.includes('undefined is not a constructor')) {
         toast.error('Runtime Error', {
           description: 'A module loading issue occurred. Try refreshing the page.',
           duration: 5000,
@@ -63,20 +79,43 @@ export function useGlobalErrorLogger() {
       }
     };
 
+    // Resource errors (script chunk 404s, blocked loads, etc.) are only visible in capture phase.
+    const handleResourceError = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      const isScript = target instanceof HTMLScriptElement;
+      const isLink = target instanceof HTMLLinkElement;
+      const isImg = target instanceof HTMLImageElement;
+      if (!isScript && !isLink && !isImg) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const url = (target as any).src || (target as any).href;
+
+      const log: ErrorLog = {
+        timestamp: new Date().toISOString(),
+        type: 'resourceerror',
+        message: `Failed to load resource: ${url || '(unknown url)'}`,
+        filename: url,
+      };
+
+      logError(log);
+    };
+
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
-      const message = reason instanceof Error ? reason.message : String(reason);
+      const message = reason instanceof Error ? reason.message : toSafeString(reason) || 'Unknown rejection';
       const stack = reason instanceof Error ? reason.stack : undefined;
-      
+
       const log: ErrorLog = {
         timestamp: new Date().toISOString(),
         type: 'unhandledrejection',
         message,
         stack,
       };
-      
+
       logError(log);
-      
+
       // Show toast for network/API errors
       if (message.includes('fetch') || message.includes('network')) {
         toast.error('Network Error', {
@@ -87,10 +126,12 @@ export function useGlobalErrorLogger() {
     };
 
     window.addEventListener('error', handleError);
+    window.addEventListener('error', handleResourceError, true);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
       window.removeEventListener('error', handleError);
+      window.removeEventListener('error', handleResourceError, true);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
