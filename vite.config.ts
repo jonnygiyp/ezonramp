@@ -102,11 +102,12 @@ export default defineConfig(({ mode }) => ({
     // Disable minification to preserve class names for Particle SDK
     minify: false,
     commonjsOptions: {
-      // FIX: Empty include array prevents CommonJS transformation from breaking
-      // ES module class inheritance chains in Particle SDK
-      include: [],
+      // Include node_modules for CommonJS transformation (needed for buffer package)
+      include: [/node_modules/],
       transformMixedEsModules: true,
       requireReturnsDefault: 'auto',
+      // Prevent double-transformation of ES modules that causes class inheritance issues
+      esmExternals: false,
     },
     rollupOptions: {
       output: {
@@ -116,9 +117,10 @@ export default defineConfig(({ mode }) => ({
           }
           return 'assets/[name]-[hash][extname]';
         },
-        // FIX: Disable manualChunks completely to prevent class inheritance breakage
+        // Keep all code in a single chunk to prevent class inheritance breakage
         // The "Class extends value undefined" error occurs when parent classes
         // end up in different chunks than their subclasses
+        inlineDynamicImports: true,
       },
       treeshake: {
         moduleSideEffects: true,
