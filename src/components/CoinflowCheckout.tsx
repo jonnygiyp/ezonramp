@@ -1,7 +1,7 @@
 import { FC, useState, useMemo, useEffect } from 'react';
 import { CoinflowPurchase, Currency } from '@coinflowlabs/react';
 import { Connection, PublicKey, Transaction, VersionedTransaction, clusterApiUrl } from '@solana/web3.js';
-import { useWallets } from '@particle-network/connectkit';
+import { useWallets } from '@/hooks/useParticle';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';

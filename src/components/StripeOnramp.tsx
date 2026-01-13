@@ -5,7 +5,7 @@ import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import { useAccount } from '@particle-network/connectkit';
+import { useAccount } from '@/hooks/useParticle';
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
 // Validate Solana address

@@ -1,4 +1,4 @@
-import { useAccount, useModal, useDisconnect } from '@particle-network/connectkit';
+import { useAccount, useModal, useDisconnect, useParticleReady } from '@/hooks/useParticle';
 import { User, LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
