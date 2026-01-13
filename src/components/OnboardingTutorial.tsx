@@ -53,14 +53,14 @@ const coinbaseUSSteps: TutorialStep[] = [
     target: "[data-tutorial='mock-verification-code']",
     title: "Enter Verification Code",
     description: "After receiving your code via SMS or email, enter it here to verify your identity.",
-    position: "top",
+    position: "bottom",
     mock: 'verification-code',
   },
   {
     target: "[data-tutorial='mock-verified-state']",
     title: "Verified User Experience",
     description: "Once verified, you'll see your verification status and can proceed directly to purchasing. Your verification is valid for 60 days!",
-    position: "top",
+    position: "bottom",
     mock: 'verified-state',
   },
 ];
@@ -170,7 +170,7 @@ function MockVerificationCode() {
   return (
     <div 
       data-tutorial="mock-verification-code"
-      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
+      className="fixed top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
     >
       <div className="space-y-6">
         <div className="text-center space-y-2">
@@ -210,7 +210,7 @@ function MockVerifiedState() {
   return (
     <div 
       data-tutorial="mock-verified-state"
-      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
+      className="fixed top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
     >
       <div className="space-y-6">
         <div className="text-center space-y-2">
