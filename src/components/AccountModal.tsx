@@ -16,8 +16,17 @@ import { Connection, PublicKey } from '@solana/web3.js';
 
 // USDC mint address on Solana mainnet
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-// Using a more reliable RPC endpoint - the public mainnet-beta often rate limits
-const SOLANA_RPC = 'https://solana-mainnet.rpc.extrnode.com';
+
+// Public RPC endpoints can rate-limit or require tokens; use a fallback list.
+const ENV_SOLANA_RPC = import.meta.env.VITE_SOLANA_RPC_URL as string | undefined;
+const SOLANA_RPCS: string[] = ENV_SOLANA_RPC
+  ? [ENV_SOLANA_RPC]
+  : [
+      'https://rpc.ankr.com/solana',
+      'https://solana-rpc.publicnode.com',
+      'https://api.mainnet.solana.com',
+      'https://api.mainnet-beta.solana.com',
+    ];
 
 interface AccountModalProps {
   open: boolean;
@@ -62,26 +71,38 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
   useEffect(() => {
     const fetchBalance = async () => {
       if (!address || !open) return;
-      
+
       setIsLoadingBalance(true);
       try {
-        const connection = new Connection(SOLANA_RPC, 'confirmed');
         const ownerPublicKey = new PublicKey(address);
-        
-        // Get all token accounts for this wallet
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-          ownerPublicKey,
-          { mint: USDC_MINT }
-        );
-        
-        if (tokenAccounts.value.length > 0) {
-          const usdcAccount = tokenAccounts.value[0];
-          const tokenAmount = usdcAccount.account.data.parsed.info.tokenAmount;
-          const uiAmount = tokenAmount.uiAmount || 0;
-          setBalance(uiAmount.toFixed(2));
-        } else {
-          setBalance('0.00');
+
+        let lastError: unknown = null;
+        for (const rpcUrl of SOLANA_RPCS) {
+          try {
+            const connection = new Connection(rpcUrl, 'confirmed');
+
+            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(ownerPublicKey, {
+              mint: USDC_MINT,
+            });
+
+            const totalUiAmount = tokenAccounts.value.reduce((sum, ta) => {
+              const tokenAmount = (ta.account.data as any)?.parsed?.info?.tokenAmount;
+              const uiAmount =
+                typeof tokenAmount?.uiAmount === 'number'
+                  ? tokenAmount.uiAmount
+                  : parseFloat(tokenAmount?.uiAmountString ?? '0');
+              return sum + (Number.isFinite(uiAmount) ? uiAmount : 0);
+            }, 0);
+
+            setBalance(totalUiAmount.toFixed(2));
+            return;
+          } catch (rpcErr) {
+            lastError = rpcErr;
+            console.warn('[USDC balance] RPC failed:', rpcUrl, rpcErr);
+          }
         }
+
+        throw lastError ?? new Error('All Solana RPC endpoints failed');
       } catch (error) {
         console.error('Failed to fetch USDC balance:', error);
         setBalance('0.00');
