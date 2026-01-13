@@ -2,50 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EZOnRamp - Buy Stable Coins Instantly</title>
-    <meta name="description" content="Buy stablecoins instantly with credit card, debit card, or bank transfer. Fast, secure, and easy crypto onramp with competitive rates." />
-    <meta name="author" content="EZOnRamp" />
-    <meta name="keywords" content="stablecoin, USDC, crypto, buy crypto, onramp, cryptocurrency, stable coins, credit card crypto, debit card crypto" />
-    <link rel="canonical" href="https://ezonramp.com/" />
-
-    <meta property="og:title" content="EZOnRamp - Buy Stable Coins Instantly" />
-    <meta property="og:description" content="Buy stablecoins instantly with credit card, debit card, or bank transfer. Fast, secure, and easy crypto onramp." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ezonramp.com/" />
-    <meta property="og:image" content="https://ezonramp.com/og-image.png" />
-    <meta property="og:site_name" content="EZOnRamp" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="EZOnRamp - Buy Stable Coins Instantly" />
-    <meta name="twitter:description" content="Buy stablecoins instantly with credit card, debit card, or bank transfer. Fast, secure, and easy crypto onramp." />
-    <meta name="twitter:image" content="https://ezonramp.com/og-image.png" />
-
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "EZOnRamp",
-      "url": "https://ezonramp.com/",
-      "description": "Buy stablecoins instantly with credit card, debit card, or bank transfer.",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://ezonramp.com/?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
-    }
-    </script>
-    
-    <!-- Stripe.js for crypto onramp -->
-    <script src="https://js.stripe.com/v3" async></script>
-    <script src="https://crypto-js.stripe.com/crypto-onramp-outer.js" async></script>
-  </head>
-
-  <body>
-    <div id="root"></div>
-    <!-- CRITICAL: Error catching BEFORE any modules load -->
+    <!-- CRITICAL: Error catching BEFORE anything else loads -->
     <script>
-      // Catch module-level errors that happen during import/evaluation
+      // Catch ALL errors including module evaluation errors
       window.__earlyErrors = [];
       window.onerror = function(msg, url, line, col, error) {
         var entry = {
@@ -59,7 +18,6 @@
           errorName: error && error.name ? error.name : null
         };
         window.__earlyErrors.push(entry);
-        // Persist to localStorage immediately
         try {
           var existing = [];
           try { existing = JSON.parse(localStorage.getItem('client_error_logs') || '[]'); } catch(e) {}
@@ -70,7 +28,60 @@
         console.error('[EARLY ERROR]', msg, url, line, error);
         return false;
       };
+      // Also catch unhandled promise rejections (async module loading)
+      window.onunhandledrejection = function(event) {
+        var reason = event.reason;
+        var entry = {
+          timestamp: new Date().toISOString(),
+          type: 'unhandled-rejection',
+          message: reason && reason.message ? reason.message : String(reason),
+          stack: reason && reason.stack ? reason.stack : null,
+          errorName: reason && reason.name ? reason.name : null
+        };
+        window.__earlyErrors.push(entry);
+        try {
+          var existing = [];
+          try { existing = JSON.parse(localStorage.getItem('client_error_logs') || '[]'); } catch(e) {}
+          existing.unshift(entry);
+          if (existing.length > 50) existing = existing.slice(0, 50);
+          localStorage.setItem('client_error_logs', JSON.stringify(existing));
+        } catch(e) {}
+        console.error('[UNHANDLED REJECTION]', reason);
+      };
     </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Buy crypto with credit card or bank transfer. Fast, secure cryptocurrency purchases with low fees." />
+    <meta property="og:title" content="Card2Crypto - Buy Crypto Instantly" />
+    <meta property="og:description" content="Fast, secure cryptocurrency purchases with credit card or bank transfer. Low fees, instant delivery." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Card2Crypto - Buy Crypto Instantly" />
+    <meta name="twitter:description" content="Fast, secure cryptocurrency purchases with credit card or bank transfer." />
+    <link rel="canonical" href="https://card2crypto.com" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <!-- Preconnect to CDNs for faster loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FinancialService",
+      "name": "Card2Crypto",
+      "description": "Fast, secure cryptocurrency purchases with credit card or bank transfer",
+      "url": "https://card2crypto.com",
+      "sameAs": [],
+      "offers": {
+        "@type": "Offer",
+        "description": "Cryptocurrency purchase services"
+      }
+    }
+    </script>
+    <title>Card2Crypto - Buy Crypto with Credit Card | Fast & Secure</title>
+  </head>
+
+  <body>
+    <div id="root"></div>
     <!-- Buffer polyfill MUST load before any module scripts for Particle SDK -->
     <script>
       // Pre-initialize globals that SDKs expect
