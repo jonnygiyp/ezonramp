@@ -24,8 +24,6 @@ function serveParticleWasm(): Plugin {
           
           if (fs.existsSync(wasmPath)) {
             res.setHeader('Content-Type', 'application/wasm');
-            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
             const wasmBuffer = fs.readFileSync(wasmPath);
             res.end(wasmBuffer);
             return;
@@ -45,10 +43,6 @@ export default defineConfig(({ mode }) => ({
     fs: {
       allow: ['..', 'node_modules'],
       strict: false,
-    },
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
   plugins: [
