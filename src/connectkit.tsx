@@ -100,22 +100,50 @@ async function loadParticleSDK() {
 export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [loadingTime, setLoadingTime] = useState(0);
+  const [skipWallet, setSkipWallet] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let intervalId: ReturnType<typeof setInterval>;
+
+    // Track loading time for debugging
+    intervalId = setInterval(() => {
+      if (mounted) setLoadingTime((t) => t + 1);
+    }, 1000);
+
+    // Timeout after 20 seconds
+    timeoutId = setTimeout(() => {
+      if (mounted && !isLoaded) {
+        console.error('[ParticleConnectkit] SDK load timeout after 20s');
+        setError(new Error('Wallet SDK took too long to load. Please refresh the page.'));
+      }
+    }, 20000);
 
     loadParticleSDK()
       .then(() => {
-        if (mounted) setIsLoaded(true);
+        if (mounted) {
+          console.log('[ParticleConnectkit] SDK loaded successfully');
+          setIsLoaded(true);
+        }
       })
       .catch((err) => {
+        console.error('[ParticleConnectkit] SDK load error:', err);
         if (mounted) setError(err);
       });
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [isLoaded]);
+
+  // Allow skipping wallet for development/testing
+  if (skipWallet) {
+    return <>{children}</>;
+  }
 
   if (error) {
     return (
@@ -124,20 +152,54 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
         <p className="text-sm text-muted-foreground mb-4">
           {error.message || 'Failed to load wallet SDK'}
         </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded"
-        >
-          Reload Page
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded"
+          >
+            Reload Page
+          </button>
+          <button
+            onClick={() => setSkipWallet(true)}
+            className="px-4 py-2 bg-secondary text-secondary-foreground rounded"
+          >
+            Continue Without Wallet
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!isLoaded || !ConnectKitProvider || !particleConfig) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center justify-center min-h-screen gap-2">
         <div className="animate-pulse text-muted-foreground">Loading wallet...</div>
+        {loadingTime > 3 && (
+          <div className="text-xs text-muted-foreground">
+            {loadingTime}s - This may take a moment on first load
+          </div>
+        )}
+        {loadingTime > 8 && (
+          <div className="flex flex-col items-center gap-2 mt-2">
+            <p className="text-xs text-muted-foreground">
+              Wallet SDK is taking longer than expected
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-3 py-1 text-xs bg-secondary text-secondary-foreground rounded"
+              >
+                Refresh Page
+              </button>
+              <button
+                onClick={() => setSkipWallet(true)}
+                className="px-3 py-1 text-xs bg-muted text-muted-foreground rounded"
+              >
+                Skip Wallet (Dev Mode)
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
