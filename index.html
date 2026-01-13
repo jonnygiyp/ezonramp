@@ -4,50 +4,98 @@
     <meta charset="UTF-8" />
     <!-- CRITICAL: Error catching BEFORE anything else loads -->
     <script>
-      // Catch ALL errors including module evaluation errors
-      window.__earlyErrors = [];
-      window.onerror = function(msg, url, line, col, error) {
-        var entry = {
-          timestamp: new Date().toISOString(),
-          type: 'early-module-error',
-          message: String(msg),
-          filename: url,
-          lineno: line,
-          colno: col,
-          stack: error && error.stack ? error.stack : null,
-          errorName: error && error.name ? error.name : null
+      (function () {
+        // Persist as early as possible using the same storage key the Diagnostics page reads.
+        // This captures module-evaluation failures that can happen before React mounts.
+
+        function safeRead(key) {
+          try {
+            var raw = localStorage.getItem(key);
+            if (!raw) return [];
+            var parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function safeWrite(key, value) {
+          try {
+            localStorage.setItem(key, JSON.stringify(value));
+            return true;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function persist(log) {
+          try {
+            window.__earlyErrors = Array.isArray(window.__earlyErrors) ? window.__earlyErrors : [];
+            window.__earlyErrors.push(log);
+          } catch (e) {
+            // ignore
+          }
+
+          // Match EarlyErrorLogger's key so /diagnostics can show these.
+          try {
+            var key = 'global_error_logs_persisted';
+            var existing = safeRead(key);
+            existing.push(log);
+            if (existing.length > 50) existing = existing.slice(existing.length - 50);
+            safeWrite(key, existing);
+          } catch (e) {
+            // ignore
+          }
+
+          // Also keep a runtime buffer as a fallback (Diagnostics reads this too).
+          try {
+            window.__globalErrorLogsRuntime = Array.isArray(window.__globalErrorLogsRuntime)
+              ? window.__globalErrorLogsRuntime
+              : [];
+            window.__globalErrorLogsRuntime.push(log);
+            if (window.__globalErrorLogsRuntime.length > 50) {
+              window.__globalErrorLogsRuntime = window.__globalErrorLogsRuntime.slice(
+                window.__globalErrorLogsRuntime.length - 50,
+              );
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        window.onerror = function (msg, url, line, col, error) {
+          var entry = {
+            timestamp: new Date().toISOString(),
+            type: 'error',
+            message: String(msg),
+            filename: url,
+            lineno: line,
+            colno: col,
+            stack: error && error.stack ? error.stack : null,
+            url: window.location && window.location.href ? window.location.href : undefined,
+            userAgent: navigator && navigator.userAgent ? navigator.userAgent : undefined,
+          };
+
+          persist(entry);
+          console.error('[EARLY ERROR]', msg, url, line, error);
+          return false;
         };
-        window.__earlyErrors.push(entry);
-        try {
-          var existing = [];
-          try { existing = JSON.parse(localStorage.getItem('client_error_logs') || '[]'); } catch(e) {}
-          existing.unshift(entry);
-          if (existing.length > 50) existing = existing.slice(0, 50);
-          localStorage.setItem('client_error_logs', JSON.stringify(existing));
-        } catch(e) {}
-        console.error('[EARLY ERROR]', msg, url, line, error);
-        return false;
-      };
-      // Also catch unhandled promise rejections (async module loading)
-      window.onunhandledrejection = function(event) {
-        var reason = event.reason;
-        var entry = {
-          timestamp: new Date().toISOString(),
-          type: 'unhandled-rejection',
-          message: reason && reason.message ? reason.message : String(reason),
-          stack: reason && reason.stack ? reason.stack : null,
-          errorName: reason && reason.name ? reason.name : null
+
+        window.onunhandledrejection = function (event) {
+          var reason = event && event.reason;
+          var entry = {
+            timestamp: new Date().toISOString(),
+            type: 'unhandledrejection',
+            message: reason && reason.message ? reason.message : String(reason),
+            stack: reason && reason.stack ? reason.stack : null,
+            url: window.location && window.location.href ? window.location.href : undefined,
+            userAgent: navigator && navigator.userAgent ? navigator.userAgent : undefined,
+          };
+
+          persist(entry);
+          console.error('[UNHANDLED REJECTION]', reason);
         };
-        window.__earlyErrors.push(entry);
-        try {
-          var existing = [];
-          try { existing = JSON.parse(localStorage.getItem('client_error_logs') || '[]'); } catch(e) {}
-          existing.unshift(entry);
-          if (existing.length > 50) existing = existing.slice(0, 50);
-          localStorage.setItem('client_error_logs', JSON.stringify(existing));
-        } catch(e) {}
-        console.error('[UNHANDLED REJECTION]', reason);
-      };
+      })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Buy crypto with credit card or bank transfer. Fast, secure cryptocurrency purchases with low fees." />
