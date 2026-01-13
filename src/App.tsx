@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ParticleConnectkit } from "./connectkit";
+import { ParticleHooksProvider } from "./hooks/useParticle";
 import { AuthProvider } from "./hooks/useAuth";
 import { useGlobalErrorLogger } from "./hooks/useGlobalErrorLogger";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -46,11 +47,13 @@ const App = () => (
   <ErrorBoundary>
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
       <ParticleConnectkit>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
-        </QueryClientProvider>
+        <ParticleHooksProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
+          </QueryClientProvider>
+        </ParticleHooksProvider>
       </ParticleConnectkit>
     </Suspense>
   </ErrorBoundary>

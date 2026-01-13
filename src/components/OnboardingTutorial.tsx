@@ -3,7 +3,7 @@ import { X, ChevronLeft, ChevronRight, HelpCircle, ShieldCheck, ArrowRight, Exte
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAccount } from "@particle-network/connectkit";
+import { useAccount } from "@/hooks/useParticle";
 
 interface TutorialStep {
   target: string;

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { MoonPayProvider, MoonPayBuyWidget } from "@moonpay/moonpay-react";
-import { useAccount } from "@particle-network/connectkit";
+import { useAccount } from "@/hooks/useParticle";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";

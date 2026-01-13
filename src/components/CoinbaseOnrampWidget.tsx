@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Loader2, ExternalLink, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAccount } from "@particle-network/connectkit";
+import { useAccount } from "@/hooks/useParticle";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CoinbaseOnrampWidgetProps {
