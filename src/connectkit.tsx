@@ -139,36 +139,12 @@ async function loadParticleSDK(): Promise<void> {
 export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
   const isMounted = useRef(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [loadingTime, setLoadingTime] = useState(0);
 
   useEffect(() => {
-    // CRITICAL: Mark as mounted - SDK should ONLY load after this
     isMounted.current = true;
     
-    // GUARD: Ensure we're in browser environment
-    if (typeof window === 'undefined') {
-      console.error('[ParticleConnectkit] Not in browser environment');
-      return;
-    }
+    if (typeof window === 'undefined') return;
 
-    let timeoutId: ReturnType<typeof setTimeout>;
-    let intervalId: ReturnType<typeof setInterval>;
-
-    // Track loading time for debugging
-    intervalId = setInterval(() => {
-      if (isMounted.current) setLoadingTime((t) => t + 1);
-    }, 1000);
-
-    // Timeout after 20 seconds
-    timeoutId = setTimeout(() => {
-      if (isMounted.current && !isLoaded) {
-        console.error('[ParticleConnectkit] SDK load timeout after 20s');
-        setError(new Error('Wallet SDK took too long to load. Please refresh the page.'));
-      }
-    }, 20000);
-
-    // Load SDK only after component has mounted (browser environment confirmed)
     loadParticleSDK()
       .then(() => {
         if (isMounted.current) {
@@ -178,57 +154,20 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
       })
       .catch((err) => {
         console.error('[ParticleConnectkit] SDK load error:', err);
-        if (isMounted.current) setError(err);
+        // Don't block the app - just log the error
       });
 
     return () => {
       isMounted.current = false;
-      clearTimeout(timeoutId);
-      clearInterval(intervalId);
     };
-  }, []); // Empty deps - only run once on mount
+  }, []);
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-background">
-        <div className="max-w-md space-y-4">
-          <div className="text-6xl">⚠️</div>
-          <h1 className="text-xl font-semibold text-foreground">Wallet Connection Failed</h1>
-          <p className="text-sm text-muted-foreground">
-            {error.message || 'Failed to load wallet SDK. Please try again.'}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
+  // Render children immediately - don't block on SDK loading
+  if (isLoaded && ConnectKitProvider && particleConfig) {
+    return <ConnectKitProvider config={particleConfig}>{children}</ConnectKitProvider>;
   }
 
-  if (!isLoaded || !ConnectKitProvider || !particleConfig) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-3 bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-        <div className="text-muted-foreground">Loading wallet...</div>
-        {loadingTime > 3 && (
-          <div className="text-xs text-muted-foreground">
-            {loadingTime}s - This may take a moment on first load
-          </div>
-        )}
-        {loadingTime > 10 && (
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-2 px-4 py-2 text-sm bg-secondary text-secondary-foreground rounded hover:opacity-90"
-          >
-            Refresh Page
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return <ConnectKitProvider config={particleConfig}>{children}</ConnectKitProvider>;
+  // Render children without wallet provider while loading
+  // This allows the app to be usable while SDK loads in background
+  return <>{children}</>;
 };
