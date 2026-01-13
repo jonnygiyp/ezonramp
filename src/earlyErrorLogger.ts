@@ -3,7 +3,7 @@
 
 export type ErrorLog = {
   timestamp: string;
-  type: 'error' | 'unhandledrejection';
+  type: 'error' | 'unhandledrejection' | 'resourceerror';
   message: string;
   stack?: string;
   filename?: string;
@@ -12,6 +12,7 @@ export type ErrorLog = {
   componentStack?: string;
   url?: string;
   userAgent?: string;
+  rawError?: string;
 };
 
 declare global {
@@ -26,6 +27,43 @@ declare global {
 const PERSIST_KEY = 'global_error_logs_persisted';
 const WINDOW_NAME_PREFIX = '__lovable_error_logs__:';
 const MAX_LOGS = 50;
+
+function safeStringify(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) {
+    return `${value.name}: ${value.message}`;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function extractErrorMessage(event: ErrorEvent): string {
+  // Try multiple sources for the error message
+  if (event.message && event.message !== 'Script error.' && event.message !== 'Script error') {
+    return event.message;
+  }
+  
+  if (event.error) {
+    if (event.error instanceof Error) {
+      return `${event.error.name}: ${event.error.message}`;
+    }
+    const stringified = safeStringify(event.error);
+    if (stringified && stringified !== '{}') {
+      return stringified;
+    }
+  }
+  
+  // Try to get info from filename
+  if (event.filename) {
+    return `Error in ${event.filename}${event.lineno ? `:${event.lineno}` : ''}`;
+  }
+  
+  return 'Unknown error (no details available)';
+}
 
 function safeReadLocalStorage(key: string): ErrorLog[] {
   try {
@@ -109,7 +147,7 @@ function patchWorkersForLogging() {
             const log: ErrorLog = {
               timestamp: new Date().toISOString(),
               type: 'error',
-              message: `[Worker] ${event.message || 'Worker error'}`,
+              message: `[Worker] ${extractErrorMessage(event)}`,
               stack: (event as any).error?.stack,
               filename: (event as any).filename,
               lineno: (event as any).lineno,
@@ -158,19 +196,62 @@ export function installEarlyErrorLogger() {
   // Capture errors thrown inside WebWorkers (many crypto SDKs run in workers).
   patchWorkersForLogging();
 
+  // Capture resource load errors (script 404s, blocked chunks, etc.)
   window.addEventListener(
     'error',
     (event) => {
+      const target = event.target as HTMLElement | null;
+      
+      // Check if this is a resource loading error (script, link, img)
+      if (target && (target instanceof HTMLScriptElement || target instanceof HTMLLinkElement || target instanceof HTMLImageElement)) {
+        const url = (target as any).src || (target as any).href || 'unknown';
+        const tagName = target.tagName?.toLowerCase() || 'unknown';
+        
+        const log: ErrorLog = {
+          timestamp: new Date().toISOString(),
+          type: 'resourceerror',
+          message: `Failed to load ${tagName}: ${url}`,
+          filename: url,
+          url: typeof window !== 'undefined' ? window.location.href : undefined,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        };
+
+        // eslint-disable-next-line no-console
+        console.error('[EarlyErrorLogger] resource error:', log);
+        persist(log);
+        return;
+      }
+
+      // Regular JS error
+      const errorEvent = event as ErrorEvent;
+      const message = extractErrorMessage(errorEvent);
+      
+      // Try to serialize the raw error for debugging
+      let rawError: string | undefined;
+      try {
+        if (errorEvent.error) {
+          rawError = safeStringify({
+            name: errorEvent.error?.name,
+            message: errorEvent.error?.message,
+            stack: errorEvent.error?.stack,
+            constructor: errorEvent.error?.constructor?.name,
+          });
+        }
+      } catch {
+        // ignore
+      }
+
       const log: ErrorLog = {
         timestamp: new Date().toISOString(),
         type: 'error',
-        message: event.message || 'Unknown error',
-        stack: (event as ErrorEvent).error?.stack,
-        filename: (event as ErrorEvent).filename,
-        lineno: (event as ErrorEvent).lineno,
-        colno: (event as ErrorEvent).colno,
+        message,
+        stack: errorEvent.error?.stack,
+        filename: errorEvent.filename,
+        lineno: errorEvent.lineno,
+        colno: errorEvent.colno,
         url: typeof window !== 'undefined' ? window.location.href : undefined,
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        rawError,
       };
 
       // Keep console output for debugging
@@ -178,15 +259,28 @@ export function installEarlyErrorLogger() {
       console.error('[EarlyErrorLogger] error:', log);
       persist(log);
     },
-    true,
+    true, // Capture phase to catch resource errors
   );
 
   window.addEventListener(
     'unhandledrejection',
     (event) => {
       const reason = (event as PromiseRejectionEvent).reason;
-      const message = reason instanceof Error ? reason.message : String(reason);
-      const stack = reason instanceof Error ? reason.stack : undefined;
+      let message: string;
+      let stack: string | undefined;
+      let rawError: string | undefined;
+
+      if (reason instanceof Error) {
+        message = `${reason.name}: ${reason.message}`;
+        stack = reason.stack;
+      } else {
+        message = safeStringify(reason) || 'Unknown rejection';
+        try {
+          rawError = safeStringify(reason);
+        } catch {
+          // ignore
+        }
+      }
 
       const log: ErrorLog = {
         timestamp: new Date().toISOString(),
@@ -195,6 +289,7 @@ export function installEarlyErrorLogger() {
         stack,
         url: typeof window !== 'undefined' ? window.location.href : undefined,
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        rawError,
       };
 
       // eslint-disable-next-line no-console
