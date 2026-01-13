@@ -112,10 +112,18 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('@particle-network')) {
             return 'particle-sdk';
           }
+          // Keep our Particle hook wrapper in the same chunk
+          if (id.includes('hooks/useParticle')) {
+            return 'particle-sdk';
+          }
         },
+        // Preserve import order to prevent class inheritance issues
+        preserveModulesRoot: 'src',
       },
       treeshake: {
         moduleSideEffects: true,
+        // Don't remove classes that might be extended
+        preset: 'recommended',
       },
     },
   },
