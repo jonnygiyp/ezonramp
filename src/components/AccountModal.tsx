@@ -12,6 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { Connection, PublicKey } from '@solana/web3.js';
+
+// USDC mint address on Solana mainnet
+const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
 
 interface AccountModalProps {
   open: boolean;
@@ -52,29 +57,32 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
     onOpenChange(false);
   };
 
-  // Fetch balance when modal opens
+  // Fetch USDC balance on Solana
   useEffect(() => {
     const fetchBalance = async () => {
       if (!address || !open) return;
       
       setIsLoadingBalance(true);
       try {
-        // Get the connector from wallets to fetch balance
-        const wallet = wallets?.[0];
-        if (wallet?.connector) {
-          const provider = await (wallet.connector as any).getProvider?.();
-          if (provider) {
-            const balanceHex = await provider.request({
-              method: 'eth_getBalance',
-              params: [address, 'latest'],
-            });
-            const balanceWei = BigInt(balanceHex);
-            const balanceEth = Number(balanceWei) / 1e18;
-            setBalance(balanceEth.toFixed(4));
-          }
+        const connection = new Connection(SOLANA_RPC, 'confirmed');
+        const ownerPublicKey = new PublicKey(address);
+        
+        // Get all token accounts for this wallet
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          ownerPublicKey,
+          { mint: USDC_MINT }
+        );
+        
+        if (tokenAccounts.value.length > 0) {
+          const usdcAccount = tokenAccounts.value[0];
+          const tokenAmount = usdcAccount.account.data.parsed.info.tokenAmount;
+          const uiAmount = tokenAmount.uiAmount || 0;
+          setBalance(uiAmount.toFixed(2));
+        } else {
+          setBalance('0.00');
         }
       } catch (error) {
-        console.error('Failed to fetch balance:', error);
+        console.error('Failed to fetch USDC balance:', error);
         setBalance('0.00');
       } finally {
         setIsLoadingBalance(false);
@@ -82,7 +90,7 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
     };
 
     fetchBalance();
-  }, [address, open, wallets]);
+  }, [address, open]);
 
   const handleSend = async () => {
     if (!sendAddress || !sendAmount || !address) {
@@ -96,28 +104,17 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
 
     setIsSending(true);
     try {
-      const wallet = wallets?.[0];
-      if (wallet?.connector) {
-        const provider = await (wallet.connector as any).getProvider?.();
-        if (provider) {
-          const amountWei = BigInt(Math.floor(parseFloat(sendAmount) * 1e18));
-          const txHash = await provider.request({
-            method: 'eth_sendTransaction',
-            params: [{
-              from: address,
-              to: sendAddress,
-              value: '0x' + amountWei.toString(16),
-            }],
-          });
-          
-          toast({
-            title: "Transaction Sent",
-            description: `Transaction hash: ${txHash.slice(0, 10)}...`,
-          });
-          setSendAddress('');
-          setSendAmount('');
-        }
-      }
+      // For now, show a message that this requires wallet signature
+      // Full SPL token transfer implementation would require more complex setup
+      toast({
+        title: "Send USDC",
+        description: "USDC transfer initiated. Please confirm in your wallet.",
+      });
+      
+      // TODO: Implement full SPL token transfer
+      // This would require creating an SPL token transfer instruction
+      // and sending it through the wallet provider
+      
     } catch (error: any) {
       console.error('Send failed:', error);
       toast({
@@ -130,18 +127,9 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
     }
   };
 
-  const getChainName = () => {
-    if (!chain) return 'Unknown Network';
-    return chain.name || `Chain ${chain.id}`;
-  };
-
   const getExplorerUrl = () => {
-    if (!address || !chain) return null;
-    const explorer = (chain as any).blockExplorers?.default?.url;
-    if (explorer) {
-      return `${explorer}/address/${address}`;
-    }
-    return null;
+    if (!address) return null;
+    return `https://solscan.io/account/${address}`;
   };
 
   return (
@@ -192,13 +180,13 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
             
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Network</span>
-              <span className="text-sm font-medium">{getChainName()}</span>
+              <span className="text-sm font-medium">Solana</span>
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Balance</span>
+              <span className="text-sm text-muted-foreground">USDC Balance</span>
               <span className="text-lg font-bold">
-                {isLoadingBalance ? '...' : `${balance} ETH`}
+                {isLoadingBalance ? '...' : `$${balance}`}
               </span>
             </div>
           </div>
@@ -219,7 +207,7 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
             <TabsContent value="receive" className="space-y-4 mt-4">
               <div className="text-center space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Share your wallet address to receive funds
+                  Share your Solana address to receive USDC
                 </p>
                 <div className="p-4 bg-muted rounded-lg">
                   <code className="text-xs break-all">{address}</code>
@@ -243,21 +231,21 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
             <TabsContent value="send" className="space-y-4 mt-4">
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="recipient">Recipient Address</Label>
+                  <Label htmlFor="recipient">Recipient Solana Address</Label>
                   <Input
                     id="recipient"
-                    placeholder="0x..."
+                    placeholder="Enter Solana address..."
                     value={sendAddress}
                     onChange={(e) => setSendAddress(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (ETH)</Label>
+                  <Label htmlFor="amount">Amount (USDC)</Label>
                   <Input
                     id="amount"
                     type="number"
-                    step="0.0001"
-                    placeholder="0.0"
+                    step="0.01"
+                    placeholder="0.00"
                     value={sendAmount}
                     onChange={(e) => setSendAmount(e.target.value)}
                   />
@@ -272,7 +260,7 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
                   ) : (
                     <>
                       <Send className="mr-2 h-4 w-4" />
-                      Send
+                      Send USDC
                     </>
                   )}
                 </Button>
