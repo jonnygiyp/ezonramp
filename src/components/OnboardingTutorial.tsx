@@ -254,7 +254,7 @@ function MockGlobalBuyButton() {
   return (
     <div 
       data-tutorial="mock-global-buy-button"
-      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
+      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
     >
       <div className="space-y-6">
         <div className="text-center space-y-2">
