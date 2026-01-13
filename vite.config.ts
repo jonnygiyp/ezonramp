@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import fs from "fs";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 // Note: vite-plugin-static-copy is installed but not needed since we use custom middleware
 
@@ -56,6 +57,20 @@ export default defineConfig(({ mode }) => ({
     topLevelAwait(),
     react(),
     mode === "development" && componentTagger(),
+    mode !== "development" &&
+      viteStaticCopy({
+        targets: [
+          {
+            // Particle thresh-sig WASM is fetched at runtime; ensure it exists in production.
+            src: "node_modules/@particle-network/thresh-sig/wasm/thresh_sig_wasm_bg.wasm",
+            dest: "",
+          },
+          {
+            src: "node_modules/@particle-network/thresh-sig/wasm/thresh_sig_wasm_bg.wasm",
+            dest: "wasm",
+          },
+        ],
+      }),
   ].filter(Boolean),
   define: {
     // Polyfill global and process for Particle Network SDK compatibility
