@@ -180,25 +180,32 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         <div className="space-y-4">
           <div className="space-y-2" data-tutorial="stripe-wallet-input">
-          <Label htmlFor="wallet-address">
+            <Label htmlFor="wallet-address">
               {defaultNetwork === 'solana' ? 'Wallet address to receive Solana USDC' : 'EVM Wallet Address'}
             </Label>
-            <Input
-              id="wallet-address"
-              type="text"
-              placeholder={defaultNetwork === 'solana' 
-                ? "Enter your Solana wallet address"
-                : "Enter your EVM wallet address (0x...)"}
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value)}
-              readOnly={connectedAddressValid}
-              disabled={connectedAddressValid}
-              className={connectedAddressValid ? "bg-muted cursor-not-allowed" : ""}
-            />
-            {connectedAddressValid && (
-              <p className="text-xs text-muted-foreground">
-                Connected wallet detected
-              </p>
+            {connectedAddressValid ? (
+              <>
+                <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                  <p className="font-mono text-sm truncate">{walletAddress}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Connected wallet detected
+                </p>
+              </>
+            ) : (
+              <>
+                <Input
+                  id="wallet-address"
+                  type="text"
+                  placeholder="Sign Up / Sign In To Populate Address"
+                  value=""
+                  disabled
+                  className="bg-muted/50 cursor-not-allowed text-muted-foreground"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sign in to automatically populate your wallet address
+                </p>
+              </>
             )}
           </div>
         </div>

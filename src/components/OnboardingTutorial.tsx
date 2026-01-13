@@ -40,7 +40,7 @@ const coinbaseUSSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='wallet-input']",
     title: "Wallet Address",
-    description: "If you're signed in, your wallet address will automatically populate here. Otherwise, paste your Solana USDC address here.",
+    description: "Sign in to automatically populate your wallet address. Your connected wallet address will appear here once you're logged in.",
     position: "top",
   },
   {
@@ -88,7 +88,7 @@ const coinbaseGlobalSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='global-wallet-input']",
     title: "Receiving Wallet Address",
-    description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own wallet, paste the address here.",
+    description: "Sign in to automatically populate your wallet address. Your connected wallet address will appear here once you're logged in.",
     position: "top",
   },
   {
@@ -117,7 +117,7 @@ const stripeSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='stripe-wallet-input']",
     title: "Receiving Wallet Address",
-    description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own Solana USDC wallet, paste the address here.",
+    description: "Sign in to automatically populate your wallet address. Your connected Solana wallet address will appear here once you're logged in.",
     position: "top",
   },
   {
@@ -145,7 +145,7 @@ const moonpaySteps: TutorialStep[] = [
   {
     target: "[data-tutorial='moonpay-wallet-input']",
     title: "Receiving Wallet Address",
-    description: "If you're signed in to Particle, your wallet address will automatically show here. If you have your own Solana USDC wallet, paste the address here.",
+    description: "Sign in to automatically populate your wallet address. Your connected Solana wallet address will appear here once you're logged in.",
     position: "top",
   },
   {

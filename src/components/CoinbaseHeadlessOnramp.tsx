@@ -488,32 +488,48 @@ export function CoinbaseHeadlessOnramp({
               </div>
             )}
 
-            {/* Wallet address - show if not connected OR if connected to wrong network */}
-            {(!isConnected || showNetworkMismatch) && (
-              <div className="space-y-2" data-tutorial="wallet-input">
-                <Label htmlFor="wallet">
-                  {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet address to receive {defaultAsset}
-                </Label>
-                <Input
-                  id="wallet"
-                  type="text"
-                  placeholder={defaultNetwork === 'solana' ? 'Paste your Solana wallet address' : 'Paste your EVM wallet address (0x...)'}
-                  value={manualAddress}
-                  onChange={(e) => setManualAddress(e.target.value)}
-                  className="font-mono"
-                />
-                <p className="text-[10px] text-muted-foreground/70">
-                  This wallet must support {defaultNetwork === 'solana' ? 'Solana' : 'the selected network'} {defaultAsset}. Transactions can't be reversed.
-                </p>
-              </div>
-            )}
-
-            {isConnected && address && connectedAddressValid && (
-              <div className="p-3 bg-muted/50 rounded-lg" data-tutorial="wallet-input">
-                <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
-                <p className="font-mono text-sm truncate">{address}</p>
-              </div>
-            )}
+            {/* Wallet address display */}
+            <div className="space-y-2" data-tutorial="wallet-input">
+              <Label htmlFor="wallet">
+                {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet address to receive {defaultAsset}
+              </Label>
+              {isConnected && address && connectedAddressValid ? (
+                <>
+                  <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                    <p className="font-mono text-sm truncate">{address}</p>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70">
+                    Connected wallet detected
+                  </p>
+                </>
+              ) : showNetworkMismatch ? (
+                <>
+                  <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                    <p className="text-xs text-destructive font-medium">
+                      Wrong wallet type connected
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Your connected wallet is not compatible with {defaultNetwork}. 
+                      Please sign in with a {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Input
+                    id="wallet"
+                    type="text"
+                    placeholder="Sign Up / Sign In To Populate Address"
+                    value=""
+                    disabled
+                    className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground"
+                  />
+                  <p className="text-[10px] text-muted-foreground/70">
+                    Sign in to automatically populate your wallet address
+                  </p>
+                </>
+              )}
+            </div>
 
             <Button
               onClick={sendVerificationCode}
