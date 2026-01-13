@@ -101,7 +101,6 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [loadingTime, setLoadingTime] = useState(0);
-  const [skipWallet, setSkipWallet] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -140,30 +139,20 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
     };
   }, [isLoaded]);
 
-  // Allow skipping wallet for development/testing
-  if (skipWallet) {
-    return <>{children}</>;
-  }
-
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-        <p className="text-destructive mb-2">Wallet connection unavailable</p>
-        <p className="text-sm text-muted-foreground mb-4">
-          {error.message || 'Failed to load wallet SDK'}
-        </p>
-        <div className="flex gap-2">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-background">
+        <div className="max-w-md space-y-4">
+          <div className="text-6xl">⚠️</div>
+          <h1 className="text-xl font-semibold text-foreground">Wallet Connection Failed</h1>
+          <p className="text-sm text-muted-foreground">
+            {error.message || 'Failed to load wallet SDK. Please try again.'}
+          </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
-            Reload Page
-          </button>
-          <button
-            onClick={() => setSkipWallet(true)}
-            className="px-4 py-2 bg-secondary text-secondary-foreground rounded"
-          >
-            Continue Without Wallet
+            Refresh Page
           </button>
         </div>
       </div>
@@ -172,33 +161,21 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
 
   if (!isLoaded || !ConnectKitProvider || !particleConfig) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-2">
-        <div className="animate-pulse text-muted-foreground">Loading wallet...</div>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-3 bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+        <div className="text-muted-foreground">Loading wallet...</div>
         {loadingTime > 3 && (
           <div className="text-xs text-muted-foreground">
             {loadingTime}s - This may take a moment on first load
           </div>
         )}
-        {loadingTime > 8 && (
-          <div className="flex flex-col items-center gap-2 mt-2">
-            <p className="text-xs text-muted-foreground">
-              Wallet SDK is taking longer than expected
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => window.location.reload()}
-                className="px-3 py-1 text-xs bg-secondary text-secondary-foreground rounded"
-              >
-                Refresh Page
-              </button>
-              <button
-                onClick={() => setSkipWallet(true)}
-                className="px-3 py-1 text-xs bg-muted text-muted-foreground rounded"
-              >
-                Skip Wallet (Dev Mode)
-              </button>
-            </div>
-          </div>
+        {loadingTime > 10 && (
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 px-4 py-2 text-sm bg-secondary text-secondary-foreground rounded hover:opacity-90"
+          >
+            Refresh Page
+          </button>
         )}
       </div>
     );
