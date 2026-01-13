@@ -46,7 +46,7 @@ const coinbaseUSSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='send-verification']",
     title: "Send Verification Code",
-    description: "Click \"Send Verification Code\" and proceed to the next step where you will enter the code you receive.",
+    description: "Click \"Continue securely\" and proceed to the next step where you will enter the verification code you receive.",
     position: "top",
   },
   {
