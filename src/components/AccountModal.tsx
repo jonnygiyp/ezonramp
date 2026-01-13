@@ -16,7 +16,8 @@ import { Connection, PublicKey } from '@solana/web3.js';
 
 // USDC mint address on Solana mainnet
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
+// Using a more reliable RPC endpoint - the public mainnet-beta often rate limits
+const SOLANA_RPC = 'https://solana-mainnet.rpc.extrnode.com';
 
 interface AccountModalProps {
   open: boolean;
