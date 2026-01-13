@@ -154,7 +154,6 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
       })
       .catch((err) => {
         console.error('[ParticleConnectkit] SDK load error:', err);
-        // Don't block the app - just log the error
       });
 
     return () => {
@@ -162,12 +161,15 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Render children immediately - don't block on SDK loading
-  if (isLoaded && ConnectKitProvider && particleConfig) {
-    return <ConnectKitProvider config={particleConfig}>{children}</ConnectKitProvider>;
+  // Must wait for provider to be ready - children use useAccount() hook
+  if (!isLoaded || !ConnectKitProvider || !particleConfig) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-3 bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
   }
 
-  // Render children without wallet provider while loading
-  // This allows the app to be usable while SDK loads in background
-  return <>{children}</>;
+  return <ConnectKitProvider config={particleConfig}>{children}</ConnectKitProvider>;
 };
