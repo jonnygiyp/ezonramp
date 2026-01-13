@@ -53,14 +53,14 @@ const coinbaseUSSteps: TutorialStep[] = [
     target: "[data-tutorial='mock-verification-code']",
     title: "Enter Verification Code",
     description: "After receiving your code via SMS or email, enter it here to verify your identity.",
-    position: "bottom",
+    position: "top",
     mock: 'verification-code',
   },
   {
     target: "[data-tutorial='mock-verified-state']",
     title: "Verified User Experience",
     description: "Once verified, you'll see your verification status and can proceed directly to purchasing. Your verification is valid for 60 days!",
-    position: "bottom",
+    position: "top",
     mock: 'verified-state',
   },
 ];
