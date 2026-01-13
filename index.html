@@ -43,6 +43,34 @@
 
   <body>
     <div id="root"></div>
+    <!-- CRITICAL: Error catching BEFORE any modules load -->
+    <script>
+      // Catch module-level errors that happen during import/evaluation
+      window.__earlyErrors = [];
+      window.onerror = function(msg, url, line, col, error) {
+        var entry = {
+          timestamp: new Date().toISOString(),
+          type: 'early-module-error',
+          message: String(msg),
+          filename: url,
+          lineno: line,
+          colno: col,
+          stack: error && error.stack ? error.stack : null,
+          errorName: error && error.name ? error.name : null
+        };
+        window.__earlyErrors.push(entry);
+        // Persist to localStorage immediately
+        try {
+          var existing = [];
+          try { existing = JSON.parse(localStorage.getItem('client_error_logs') || '[]'); } catch(e) {}
+          existing.unshift(entry);
+          if (existing.length > 50) existing = existing.slice(0, 50);
+          localStorage.setItem('client_error_logs', JSON.stringify(existing));
+        } catch(e) {}
+        console.error('[EARLY ERROR]', msg, url, line, error);
+        return false;
+      };
+    </script>
     <!-- Buffer polyfill MUST load before any module scripts for Particle SDK -->
     <script>
       // Pre-initialize globals that SDKs expect
@@ -62,12 +90,12 @@
           alloc: function(size) { return new Uint8Array(size); },
           allocUnsafe: function(size) { return new Uint8Array(size); },
           concat: function(list) {
-            const totalLength = list.reduce((acc, arr) => acc + arr.length, 0);
-            const result = new Uint8Array(totalLength);
-            let offset = 0;
-            for (const arr of list) {
-              result.set(arr, offset);
-              offset += arr.length;
+            var totalLength = list.reduce(function(acc, arr) { return acc + arr.length; }, 0);
+            var result = new Uint8Array(totalLength);
+            var offset = 0;
+            for (var i = 0; i < list.length; i++) {
+              result.set(list[i], offset);
+              offset += list[i].length;
             }
             return result;
           }
