@@ -94,7 +94,7 @@ const coinbaseGlobalSteps: TutorialStep[] = [
   {
     target: "[data-tutorial='mock-global-buy-button']",
     title: "Complete Purchase",
-    description: "Clicking this button will open Coinbase in a new window so you can complete your purchase. You may be required to verify your identity to purchase. Once complete, your funds will be available in the wallet you provided in the previous step.",
+    description: "Clicking this button will open Coinbase in a new window so you can complete your purchase. You may be required to verify your identity to purchase. Once you have successfully purchased, your funds will be available in your wallet.",
     position: "top",
     mock: 'global-buy-button',
   },
