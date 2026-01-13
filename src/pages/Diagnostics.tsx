@@ -22,6 +22,7 @@ interface ErrorLogEntry {
   componentStack?: string;
   filename?: string;
   lineno?: number;
+  rawError?: string;
 }
 
 const Diagnostics = () => {
@@ -526,8 +527,8 @@ const Diagnostics = () => {
                         </div>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <pre className="mt-1 p-3 bg-muted rounded-md text-xs overflow-auto max-h-48">
-                          {log.stack || log.componentStack || 'No stack trace available'}
+                        <pre className="mt-1 p-3 bg-muted rounded-md text-xs overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                          {log.stack || log.componentStack || log.rawError || (log.filename ? `File: ${log.filename}${log.lineno ? `:${log.lineno}` : ''}` : 'No stack trace available')}
                         </pre>
                       </CollapsibleContent>
                     </Collapsible>
