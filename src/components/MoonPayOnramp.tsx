@@ -105,20 +105,29 @@ export function MoonPayOnramp({
                 <Label htmlFor="moonpay-wallet-address">
                   {defaultNetwork === 'solana' ? 'Wallet address to receive Solana USDC' : 'Wallet Address'}
                 </Label>
-                <Input
-                  id="moonpay-wallet-address"
-                  type="text"
-                  placeholder={defaultNetwork === 'solana' ? 'Enter your Solana wallet address' : 'Enter your wallet address'}
-                  value={walletAddress}
-                  onChange={(e) => setWalletAddress(e.target.value)}
-                  readOnly={isConnected && !!particleAddress}
-                  disabled={isConnected && !!particleAddress}
-                  className={`font-mono text-sm ${isConnected && particleAddress ? "bg-muted cursor-not-allowed" : ""}`}
-                />
-                {isConnected && particleAddress && (
-                  <p className="text-xs text-muted-foreground">
-                    Connected wallet detected.
-                  </p>
+                {isConnected && particleAddress ? (
+                  <>
+                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                      <p className="font-mono text-sm truncate">{walletAddress}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Connected wallet detected
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      id="moonpay-wallet-address"
+                      type="text"
+                      placeholder="Sign Up / Sign In To Populate Address"
+                      value=""
+                      disabled
+                      className="font-mono text-sm bg-muted/50 cursor-not-allowed text-muted-foreground"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Sign in to automatically populate your wallet address
+                    </p>
+                  </>
                 )}
               </div>
 

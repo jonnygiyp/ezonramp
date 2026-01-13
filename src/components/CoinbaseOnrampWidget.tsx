@@ -167,29 +167,34 @@ export function CoinbaseOnrampWidget({
         </div>
 
         {/* Wallet Address */}
-        {!isConnected && (
-          <div className="space-y-2" data-tutorial="global-wallet-input">
-            <Label htmlFor="wallet-global">Wallet address to receive USDC</Label>
-            <Input
-              id="wallet-global"
-              type="text"
-              placeholder="Paste your USDC wallet address"
-              value={manualAddress}
-              onChange={(e) => setManualAddress(e.target.value)}
-              className="font-mono"
-            />
-            <p className="text-[10px] text-muted-foreground/70">
-              This wallet must support Solana USDC. Transactions can't be reversed.
-            </p>
-          </div>
-        )}
+        <div className="space-y-2" data-tutorial="global-wallet-input">
+          <Label htmlFor="wallet-global">Wallet address to receive USDC</Label>
+          {isConnected && address ? (
+            <>
+              <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                <p className="font-mono text-sm truncate">{address}</p>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70">
+                Connected wallet detected
+              </p>
+            </>
+          ) : (
+            <>
+              <Input
+                id="wallet-global"
+                type="text"
+                placeholder="Sign Up / Sign In To Populate Address"
+                value=""
+                disabled
+                className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground"
+              />
+              <p className="text-[10px] text-muted-foreground/70">
+                Sign in to automatically populate your wallet address
+              </p>
+            </>
+          )}
+        </div>
 
-        {isConnected && address && (
-          <div className="p-3 bg-muted/50 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
-            <p className="font-mono text-sm truncate">{address}</p>
-          </div>
-        )}
 
         {/* Buy Button */}
         <Button
