@@ -8,12 +8,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import AccountModal from './AccountModal';
 
 const CustomConnectButton = () => {
   const { isConnected, address, isConnecting } = useAccount();
   const { setOpen } = useModal();
   const { disconnect } = useDisconnect();
   const [isInitializing, setIsInitializing] = useState(true);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
 
   // Give Particle SDK time to check for existing session
   useEffect(() => {
@@ -39,25 +41,28 @@ const CustomConnectButton = () => {
 
   if (isConnected && address) {
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="flex items-center gap-1 md:gap-2 px-2 md:px-4">
-            <User className="h-3 w-3 md:h-4 md:w-4" />
-            <span className="text-xs md:text-sm">{truncateAddress(address)}</span>
-            <ChevronDown className="h-2 w-2 md:h-3 md:w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setOpen(true)}>
-            <User className="mr-2 h-4 w-4" />
-            Account
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => disconnect()}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Disconnect
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="flex items-center gap-1 md:gap-2 px-2 md:px-4">
+              <User className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="text-xs md:text-sm">{truncateAddress(address)}</span>
+              <ChevronDown className="h-2 w-2 md:h-3 md:w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setAccountModalOpen(true)}>
+              <User className="mr-2 h-4 w-4" />
+              Account
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => disconnect()}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Disconnect
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <AccountModal open={accountModalOpen} onOpenChange={setAccountModalOpen} />
+      </>
     );
   }
 
