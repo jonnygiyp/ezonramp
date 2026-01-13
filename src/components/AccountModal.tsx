@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useDisconnect, useWallets } from '@/hooks/useParticle';
-import { Copy, Send, ArrowDownLeft, LogOut, Wallet, Check, ExternalLink } from 'lucide-react';
+import { Copy, Send, ArrowDownLeft, LogOut, Wallet, Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -13,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Connection, PublicKey } from '@solana/web3.js';
+import SendConfirmationModal from './SendConfirmationModal';
 
 // USDC mint address on Solana mainnet
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
@@ -34,17 +36,18 @@ interface AccountModalProps {
 }
 
 const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
-  const { address, chain } = useAccount();
+  const { address } = useAccount();
   const { disconnect } = useDisconnect();
   const [wallets] = useWallets();
   const [copied, setCopied] = useState(false);
   const [balance, setBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Send form state
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
-  const [isSending, setIsSending] = useState(false);
+  const [showSendConfirmation, setShowSendConfirmation] = useState(false);
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -114,7 +117,7 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
     fetchBalance();
   }, [address, open]);
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!sendAddress || !sendAmount || !address) {
       toast({
         title: "Missing Information",
@@ -124,28 +127,70 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
       return;
     }
 
-    setIsSending(true);
+    // Validate Solana address format
     try {
-      // For now, show a message that this requires wallet signature
-      // Full SPL token transfer implementation would require more complex setup
+      new PublicKey(sendAddress);
+    } catch {
       toast({
-        title: "Send USDC",
-        description: "USDC transfer initiated. Please confirm in your wallet.",
-      });
-      
-      // TODO: Implement full SPL token transfer
-      // This would require creating an SPL token transfer instruction
-      // and sending it through the wallet provider
-      
-    } catch (error: any) {
-      console.error('Send failed:', error);
-      toast({
-        title: "Transaction Failed",
-        description: error.message || "Failed to send transaction",
+        title: "Invalid Address",
+        description: "Please enter a valid Solana address",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Validate amount
+    const amountNum = parseFloat(sendAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Open confirmation modal
+    setShowSendConfirmation(true);
+  };
+
+  const handleSendSuccess = () => {
+    // Clear form and refresh balance
+    setSendAddress('');
+    setSendAmount('');
+    setShowSendConfirmation(false);
+    fetchBalanceManual();
+  };
+
+  const fetchBalanceManual = async () => {
+    if (!address) return;
+    setIsRefreshing(true);
+    try {
+      const ownerPublicKey = new PublicKey(address);
+      for (const rpcUrl of SOLANA_RPCS) {
+        try {
+          const connection = new Connection(rpcUrl, 'confirmed');
+          const tokenAccounts = await connection.getParsedTokenAccountsByOwner(ownerPublicKey, {
+            mint: USDC_MINT,
+          });
+          const totalUiAmount = tokenAccounts.value.reduce((sum, ta) => {
+            const tokenAmount = (ta.account.data as any)?.parsed?.info?.tokenAmount;
+            const uiAmount =
+              typeof tokenAmount?.uiAmount === 'number'
+                ? tokenAmount.uiAmount
+                : parseFloat(tokenAmount?.uiAmountString ?? '0');
+            return sum + (Number.isFinite(uiAmount) ? uiAmount : 0);
+          }, 0);
+          setBalance(totalUiAmount.toFixed(2));
+          return;
+        } catch (rpcErr) {
+          console.warn('[USDC balance] RPC failed:', rpcUrl, rpcErr);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
     } finally {
-      setIsSending(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -207,9 +252,20 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
 
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">USDC Balance</span>
-              <span className="text-lg font-bold">
-                {isLoadingBalance ? '...' : `$${balance}`}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold">
+                  {isLoadingBalance || isRefreshing ? '...' : `$${balance}`}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={fetchBalanceManual}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -275,16 +331,10 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
                 <Button 
                   onClick={handleSend} 
                   className="w-full"
-                  disabled={isSending || !sendAddress || !sendAmount}
+                  disabled={!sendAddress || !sendAmount}
                 >
-                  {isSending ? (
-                    'Sending...'
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Send USDC
-                    </>
-                  )}
+                  <Send className="mr-2 h-4 w-4" />
+                  Send USDC
                 </Button>
               </div>
             </TabsContent>
@@ -301,6 +351,18 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
           </Button>
         </div>
       </DialogContent>
+
+      {/* Send Confirmation Modal */}
+      {address && (
+        <SendConfirmationModal
+          open={showSendConfirmation}
+          onOpenChange={setShowSendConfirmation}
+          recipientAddress={sendAddress}
+          amount={sendAmount}
+          senderAddress={address}
+          onSuccess={handleSendSuccess}
+        />
+      )}
     </Dialog>
   );
 };
