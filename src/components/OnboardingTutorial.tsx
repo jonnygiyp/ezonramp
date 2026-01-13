@@ -382,7 +382,8 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
 
     const padding = 16;
     const tooltipWidth = 320;
-    const tooltipHeight = 160;
+    // For "top" position, use auto positioning with bottom anchor instead of calculating top
+    // This ensures the tooltip appears above the element regardless of its height
 
     switch (currentTutorialStep.position) {
       case "bottom":
@@ -391,18 +392,21 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
           left: `${Math.max(padding, Math.min(targetRect.left + targetRect.width / 2 - tooltipWidth / 2, window.innerWidth - tooltipWidth - padding))}px`,
         };
       case "top":
+        // Position using bottom anchor - tooltip will appear above the target
         return {
-          top: `${targetRect.top - tooltipHeight - padding}px`,
+          bottom: `${window.innerHeight - targetRect.top + padding}px`,
           left: `${Math.max(padding, Math.min(targetRect.left + targetRect.width / 2 - tooltipWidth / 2, window.innerWidth - tooltipWidth - padding))}px`,
         };
       case "left":
         return {
-          top: `${targetRect.top + targetRect.height / 2 - tooltipHeight / 2}px`,
+          top: `${targetRect.top + targetRect.height / 2}px`,
+          transform: "translateY(-50%)",
           left: `${targetRect.left - tooltipWidth - padding}px`,
         };
       case "right":
         return {
-          top: `${targetRect.top + targetRect.height / 2 - tooltipHeight / 2}px`,
+          top: `${targetRect.top + targetRect.height / 2}px`,
+          transform: "translateY(-50%)",
           left: `${targetRect.right + padding}px`,
         };
       default:
@@ -426,11 +430,11 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
         };
       case "top":
         return {
-          bottom: `-${arrowSize}px`,
-          left: `${Math.min(Math.max(targetRect.left + targetRect.width / 2 - parseInt(getTooltipPosition().left) - arrowSize / 2, 20), 280)}px`,
-          borderLeft: `${arrowSize}px solid transparent`,
-          borderRight: `${arrowSize}px solid transparent`,
-          borderTop: `${arrowSize}px solid hsl(var(--card))`,
+          bottom: `-12px`,
+          left: `${Math.min(Math.max(targetRect.left + targetRect.width / 2 - parseInt(getTooltipPosition().left || "0") - 6, 20), 280)}px`,
+          borderLeft: `12px solid transparent`,
+          borderRight: `12px solid transparent`,
+          borderTop: `12px solid hsl(var(--card))`,
         };
       case "left":
         return {
