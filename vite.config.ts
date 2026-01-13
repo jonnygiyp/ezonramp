@@ -102,10 +102,10 @@ export default defineConfig(({ mode }) => ({
     // Disable minification to preserve class names for Particle SDK
     minify: false,
     commonjsOptions: {
-      include: [/node_modules/],
+      // FIX: Empty include array prevents CommonJS transformation from breaking
+      // ES module class inheritance chains in Particle SDK
+      include: [],
       transformMixedEsModules: true,
-      // IMPORTANT: esmExternals was causing "Class extends value undefined"
-      // by treating ES modules as external, breaking class inheritance chains
       requireReturnsDefault: 'auto',
     },
     rollupOptions: {
@@ -116,15 +116,9 @@ export default defineConfig(({ mode }) => ({
           }
           return 'assets/[name]-[hash][extname]';
         },
-        // Keep Particle SDK and its dependencies in a single chunk to preserve class inheritance
-        manualChunks(id) {
-          // Bundle all particle and its common dependencies together
-          if (id.includes('@particle-network') || 
-              id.includes('viem') || 
-              id.includes('@solana')) {
-            return 'particle-sdk';
-          }
-        },
+        // FIX: Disable manualChunks completely to prevent class inheritance breakage
+        // The "Class extends value undefined" error occurs when parent classes
+        // end up in different chunks than their subclasses
       },
       treeshake: {
         moduleSideEffects: true,
