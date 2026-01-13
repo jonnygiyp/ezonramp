@@ -3,7 +3,7 @@
 
 export type ErrorLog = {
   timestamp: string;
-  type: 'error' | 'unhandledrejection' | 'resourceerror';
+  type: 'error' | 'unhandledrejection' | 'resourceerror' | 'console';
   message: string;
   stack?: string;
   filename?: string;
@@ -19,6 +19,7 @@ declare global {
   interface Window {
     __earlyErrorLoggerInstalled?: boolean;
     __lovableWorkerPatchInstalled?: boolean;
+    __lovableConsolePatchInstalled?: boolean;
     __globalErrorLogsRuntime?: ErrorLog[];
     __persistClientErrorLog?: (log: ErrorLog) => void;
   }
@@ -32,7 +33,7 @@ function safeStringify(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'string') return value;
   if (value instanceof Error) {
-    return `${value.name}: ${value.message}`;
+    return `${value.name}: ${value.message}${value.stack ? `\n${value.stack}` : ''}`;
   }
   try {
     return JSON.stringify(value, null, 2);
@@ -183,6 +184,44 @@ function patchWorkersForLogging() {
   }
 }
 
+function patchConsoleForLogging() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (window.__lovableConsolePatchInstalled) return;
+    window.__lovableConsolePatchInstalled = true;
+
+    const originalError = console.error.bind(console);
+    const originalWarn = console.warn.bind(console);
+
+    const wrap = (level: 'error' | 'warn', original: (...args: any[]) => void) =>
+      (...args: any[]) => {
+        try {
+          const firstError = args.find((a) => a instanceof Error) as Error | undefined;
+          const message = args.map(safeStringify).join(' ');
+
+          persist({
+            timestamp: new Date().toISOString(),
+            type: 'console',
+            message: `[console.${level}] ${message}`,
+            stack: firstError?.stack,
+            url: typeof window !== 'undefined' ? window.location.href : undefined,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+          });
+        } catch {
+          // ignore
+        }
+
+        original(...args);
+      };
+
+    console.error = wrap('error', originalError) as any;
+    console.warn = wrap('warn', originalWarn) as any;
+  } catch {
+    // ignore
+  }
+}
+
 export function installEarlyErrorLogger() {
   if (typeof window === 'undefined') return;
 
@@ -195,6 +234,9 @@ export function installEarlyErrorLogger() {
 
   // Capture errors thrown inside WebWorkers (many crypto SDKs run in workers).
   patchWorkersForLogging();
+
+  // Capture SDK errors that are caught internally but still logged to the console.
+  patchConsoleForLogging();
 
   // Capture resource load errors (script 404s, blocked chunks, etc.)
   window.addEventListener(
