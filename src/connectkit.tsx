@@ -54,7 +54,7 @@ async function loadParticleSDK() {
       particleConfig = createConfig({
         projectId: 'e7041872-c6f2-4de1-826a-8c20f4d26e7f',
         clientKey: 'cQYG1BDRMOjRHHfoifZ10kiAXuHGbe5ypVetw2LV',
-        appId: '38f0e5f3-50dd-459c-9016-783a347c30aa',
+        appId: '63ee90ef-4426-44ad-9a67-d6984fc92706',
         initialChainId: {
           solana: 101,
         },
