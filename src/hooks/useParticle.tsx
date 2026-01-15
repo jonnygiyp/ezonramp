@@ -12,7 +12,6 @@ export {
   useModal,
   useDisconnect,
   useWallets,
-  useEmbeddedWallet,
 } from '@particle-network/connectkit';
 
 // Wallet type definition for useWallets

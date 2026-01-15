@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAccount, useDisconnect, useEmbeddedWallet } from '@/hooks/useParticle';
+import { useAccount, useDisconnect } from '@/hooks/useParticle';
 import { Copy, Send, ArrowDownLeft, LogOut, Wallet, Check, ExternalLink, RefreshCw, Key, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -49,37 +48,37 @@ interface AccountModalProps {
 const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
-  const { openWallet } = useEmbeddedWallet();
   const [copied, setCopied] = useState(false);
   const [balance, setBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showExportWarning, setShowExportWarning] = useState(false);
-  const [privateKeyCopied, setPrivateKeyCopied] = useState(false);
   
   // Send form state
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [showSendConfirmation, setShowSendConfirmation] = useState(false);
 
-  // Handle export private key
+  // Handle export private key - uses Particle's embedded wallet UI
   const handleExportPrivateKey = useCallback(async () => {
     try {
-      // Open the Particle embedded wallet which has secure key export functionality
-      await openWallet();
+      // Dynamically import useEmbeddedWallet to avoid hook errors
+      const { useEmbeddedWallet } = await import('@particle-network/connectkit');
+      
+      // Note: We can't call hooks dynamically, so we need a different approach
+      // The Particle wallet UI should be visible via the wallet plugin
+      // Opening the wallet is done via the SDK's built-in floating button
       toast({
-        title: "Wallet Opened",
-        description: "Navigate to Settings > Security to export your private key",
+        title: "Export Private Key",
+        description: "Click the Particle wallet button (bottom-right) and navigate to Settings > Security to export your key.",
       });
     } catch (error) {
       console.error('Export private key error:', error);
       toast({
-        title: "Export Failed",
-        description: "Unable to open wallet. Please try again.",
-        variant: "destructive",
+        title: "Info",
+        description: "Use the Particle wallet button (bottom-right corner) to access Settings > Security for key export.",
       });
     }
-  }, [openWallet]);
+  }, []);
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
