@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAccount, useDisconnect, useWallets } from '@/hooks/useParticle';
+import { useAccount, useDisconnect, useEmbeddedWallet } from '@/hooks/useParticle';
 import { Copy, Send, ArrowDownLeft, LogOut, Wallet, Check, ExternalLink, RefreshCw, Key, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,7 +49,7 @@ interface AccountModalProps {
 const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
-  const [wallets] = useWallets();
+  const { openWallet } = useEmbeddedWallet();
   const [copied, setCopied] = useState(false);
   const [balance, setBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
@@ -65,39 +65,21 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
   // Handle export private key
   const handleExportPrivateKey = useCallback(async () => {
     try {
-      // Get the connected wallet's connector
-      if (!wallets) {
-        toast({
-          title: "No Wallet Found",
-          description: "Unable to find connected wallet",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Try to access the Particle wallet's export functionality
-      const wallet = wallets;
-      
-      // Check if the wallet has an exportPrivateKey method (Particle auth wallets)
-      if (wallet && wallet.connector && typeof (wallet.connector as any).exportPrivateKey === 'function') {
-        await (wallet.connector as any).exportPrivateKey();
-      } else {
-        // Fallback: Open Particle dashboard for key management
-        window.open('https://wallet.particle.network/', '_blank');
-        toast({
-          title: "Opening Particle Wallet",
-          description: "You can export your private key from the Particle Wallet dashboard",
-        });
-      }
+      // Open the Particle embedded wallet which has secure key export functionality
+      await openWallet();
+      toast({
+        title: "Wallet Opened",
+        description: "Navigate to Settings > Security to export your private key",
+      });
     } catch (error) {
       console.error('Export private key error:', error);
       toast({
         title: "Export Failed",
-        description: "Unable to export private key. Please try again.",
+        description: "Unable to open wallet. Please try again.",
         variant: "destructive",
       });
     }
-  }, [wallets]);
+  }, [openWallet]);
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
