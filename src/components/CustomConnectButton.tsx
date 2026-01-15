@@ -1,5 +1,5 @@
 import { useAccount, useModal, useDisconnect } from '@/hooks/useParticle';
-import { Wallet, LogOut, ChevronDown, Loader2 } from 'lucide-react';
+import { User, Wallet, LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import {
@@ -45,7 +45,7 @@ const CustomConnectButton = () => {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="flex items-center gap-1 md:gap-2 px-2 md:px-4">
-              <Wallet className="h-3 w-3 md:h-4 md:w-4" />
+              <User className="h-3 w-3 md:h-4 md:w-4" />
               <span className="text-xs md:text-sm">My Account</span>
               <ChevronDown className="h-2 w-2 md:h-3 md:w-3" />
             </Button>
