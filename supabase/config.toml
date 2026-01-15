@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.moonpay-sign]
 verify_jwt = false
+
+[functions.stripe-onramp]
+verify_jwt = false
+
+[functions.stripe-config]
+verify_jwt = false
