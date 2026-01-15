@@ -407,17 +407,19 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
                   <AlertTriangle className="h-5 w-5" />
                   Security Warning
                 </AlertDialogTitle>
-                <AlertDialogDescription className="space-y-3">
-                  <p>
-                    <strong>Never share your private key or seed phrase with anyone.</strong>
-                  </p>
-                  <p>
-                    Anyone with access to your private key can steal all your funds. 
-                    EZOnRamp staff will never ask for your private key.
-                  </p>
-                  <p className="text-destructive font-medium">
-                    Only export your private key if you understand the risks.
-                  </p>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>
+                      <strong>Never share your private key or seed phrase with anyone.</strong>
+                    </p>
+                    <p>
+                      Anyone with access to your private key can steal all your funds. 
+                      EZOnRamp staff will never ask for your private key.
+                    </p>
+                    <p className="text-destructive font-medium">
+                      Only export your private key if you understand the risks.
+                    </p>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
