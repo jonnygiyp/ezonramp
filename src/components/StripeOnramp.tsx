@@ -43,18 +43,8 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
-    // Check if auth is still loading
-    if (authLoading) {
-      toast({
-        title: "Please Wait",
-        description: "Loading authentication state...",
-      });
-      return;
-    }
-    
     // Check authentication first
     if (!session) {
-      console.log('[StripeOnramp] Auth check failed - no session');
       toast({
         title: "Authentication Required",
         description: "Please sign in to use the Stripe onramp",
