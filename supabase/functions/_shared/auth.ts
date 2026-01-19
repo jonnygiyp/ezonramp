@@ -36,8 +36,19 @@ export function isOriginAllowed(origin: string | null): boolean {
   // Exact match for known domains
   if (ALLOWED_ORIGINS.includes(origin)) return true;
   
-  // Allow preview URLs for this specific project
+  // Allow Lovable preview URLs - multiple patterns
+  // Pattern 1: id-preview--{uuid}.lovable.app
+  if (origin.match(/^https:\/\/id-preview--[a-f0-9-]+\.lovable\.app$/)) {
+    return true;
+  }
+  
+  // Pattern 2: preview-{hash}--ezonramp.lovable.app  
   if (origin.match(/^https:\/\/preview-[a-f0-9]+--ezonramp\.lovable\.app$/)) {
+    return true;
+  }
+  
+  // Pattern 3: {hash}--ezonramp.lovable.app
+  if (origin.match(/^https:\/\/[a-f0-9]+--ezonramp\.lovable\.app$/)) {
     return true;
   }
   
@@ -59,9 +70,9 @@ export function getCorsHeaders(origin: string | null): Record<string, string> {
     // Strict origin - never use wildcard
     "Access-Control-Allow-Origin": allowedOrigin,
     // Only allow necessary headers
-    "Access-Control-Allow-Headers": "authorization, content-type, x-client-info",
+    "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
     // Restrict to required methods only
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     // Don't allow credentials unless explicitly needed
     "Access-Control-Allow-Credentials": "false",
     // Security headers
