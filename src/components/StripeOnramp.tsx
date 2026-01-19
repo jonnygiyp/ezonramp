@@ -24,9 +24,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   const { address, isConnected } = useAccount();
   const { session, loading: authLoading } = useAuth();
   
-  // Debug: Log session state
-  console.log('[StripeOnramp] Session state:', { hasSession: !!session, authLoading, sessionUserId: session?.user?.id?.slice(0, 8) });
-  
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showWidget, setShowWidget] = useState(false);
