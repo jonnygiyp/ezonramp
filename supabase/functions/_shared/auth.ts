@@ -52,6 +52,11 @@ export function isOriginAllowed(origin: string | null): boolean {
     return true;
   }
   
+  // Pattern 4: {uuid}.lovableproject.com (development preview)
+  if (origin.match(/^https:\/\/[a-f0-9-]+\.lovableproject\.com$/)) {
+    return true;
+  }
+  
   return false;
 }
 
