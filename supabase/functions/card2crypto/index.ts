@@ -1,64 +1,47 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  getCorsHeaders,
+  validateAuth,
+  unauthorizedResponse,
+  getClientId,
+  logSecurityEvent,
+  validateOrigin,
+} from "../_shared/auth.ts";
 
 // =============================================================================
 // STARTUP CONFIGURATION VALIDATION
-// Validates that all required secrets are configured before the function starts
 // =============================================================================
 const REQUIRED_SECRETS = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
   'PAYOUT_WALLET',
   'CALLBACK_SECRET',
-  'ALLOWED_ORIGINS'
 ] as const;
 
 const missingSecrets = REQUIRED_SECRETS.filter(name => !Deno.env.get(name));
 if (missingSecrets.length > 0) {
   console.error(`[CRITICAL] Missing required secrets: ${missingSecrets.join(', ')}`);
-  console.error('[CRITICAL] Edge function may not operate correctly. Please configure all required secrets.');
 }
 
-// Log configuration status on startup (without exposing secret values)
 console.log('[STARTUP] Configuration status:', {
   SUPABASE_URL: !!Deno.env.get('SUPABASE_URL'),
   SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
   PAYOUT_WALLET: !!Deno.env.get('PAYOUT_WALLET'),
   CALLBACK_SECRET: !!Deno.env.get('CALLBACK_SECRET'),
-  ALLOWED_ORIGINS: !!Deno.env.get('ALLOWED_ORIGINS'),
 });
-
-// Get allowed origins from environment or default to restrictive list
-const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
-
-const getCorsHeaders = (origin: string | null) => {
-  // Check if origin is allowed
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || '';
-  
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    // Security headers
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
-    'X-XSS-Protection': '1; mode=block',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
-  };
-};
 
 // Initialize Supabase client with service role for audit logging
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Allowed payment providers whitelist - must match frontend CARD2CRYPTO_PROVIDERS
+// Allowed payment providers whitelist
 const ALLOWED_PROVIDERS = ['moonpay', 'coinbase', 'transak', 'banxa', 'rampnetwork', 'stripe', 'mercuryo', 'simplex', 'revolut'];
 
-// Rate limiting map (in production, use Redis or similar)
+// Rate limiting
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_WINDOW_MS = 60000;
 const RATE_LIMIT_MAX_REQUESTS = 10;
 
 function checkRateLimit(clientId: string): boolean {
@@ -78,7 +61,7 @@ function checkRateLimit(clientId: string): boolean {
   return true;
 }
 
-// Input validation schemas
+// Input validation
 function validateEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email) && email.length <= 254;
@@ -131,7 +114,7 @@ async function verifyCallbackSignature(payload: string, signature: string): Prom
   }
 }
 
-// Hash function for PII (simple hash for audit purposes)
+// Hash function for PII
 async function hashForAudit(value: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(value + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.slice(0, 10));
@@ -218,12 +201,22 @@ serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
 
-  // Handle CORS preflight requests
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Only allow POST method for payment creation
+  // Validate origin for non-callback requests
+  const url = new URL(req.url);
+  const action = url.searchParams.get('action');
+  
+  // Callbacks from Card2Crypto don't have browser origin
+  if (action !== 'callback') {
+    const originError = validateOrigin(origin, corsHeaders);
+    if (originError) return originError;
+  }
+
+  // Only allow POST for payment creation, GET for callbacks
   if (req.method !== 'POST' && req.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -231,70 +224,56 @@ serve(async (req) => {
     });
   }
 
+  const clientId = getClientId(req);
+
   try {
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action');
-
-    // Get client identifier for rate limiting
-    const clientId = req.headers.get('x-forwarded-for') || 
-                     req.headers.get('cf-connecting-ip') || 
-                     'unknown';
-
-    // Check rate limit
+    // Rate limiting
     if (!checkRateLimit(clientId)) {
-      console.warn(`Rate limit exceeded for client: ${clientId.slice(0, 10)}***`);
+      logSecurityEvent('RATE_LIMIT_EXCEEDED', { clientId, function: 'card2crypto' });
       return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Handle callback from Card2Crypto (GET request)
+    // Handle callback from Card2Crypto (GET request with signature verification)
     if (action === 'callback') {
       const valueCoin = url.searchParams.get('value_coin');
       const orderId = url.searchParams.get('order_id');
       const requestId = url.searchParams.get('request_id');
       const signature = url.searchParams.get('signature') || req.headers.get('x-signature');
       
-      // Verify HMAC signature if CALLBACK_SECRET is configured
+      // Verify HMAC signature - REQUIRED
       const callbackSecret = Deno.env.get('CALLBACK_SECRET');
-      if (callbackSecret) {
-        if (!signature) {
-          console.warn('Callback missing signature');
-          return new Response(JSON.stringify({ error: 'Missing signature' }), {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        // Create payload from callback parameters for verification
-        const payload = `${requestId || ''}:${orderId || ''}:${valueCoin || ''}`;
-        const isValid = await verifyCallbackSignature(payload, signature);
-        
-        if (!isValid) {
-          console.warn('Invalid callback signature for request:', requestId?.slice(0, 8));
-          return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        console.log('Callback signature verified successfully');
-      } else {
+      if (!callbackSecret) {
         console.error('CALLBACK_SECRET not configured - rejecting callback');
         return new Response(JSON.stringify({ error: 'Callback verification not configured' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      if (!signature) {
+        logSecurityEvent('CALLBACK_MISSING_SIGNATURE', { clientId, requestId });
+        return new Response(JSON.stringify({ error: 'Missing signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       
-      // Log without sensitive data
-      console.log('Card2Crypto callback received:', { 
-        hasValueCoin: !!valueCoin, 
-        orderId: orderId ? `${orderId.slice(0, 8)}***` : null 
-      });
+      const payload = `${requestId || ''}:${orderId || ''}:${valueCoin || ''}`;
+      const isValid = await verifyCallbackSignature(payload, signature);
       
-      // Update transaction status if we have a request_id
+      if (!isValid) {
+        logSecurityEvent('CALLBACK_INVALID_SIGNATURE', { clientId, requestId: requestId?.slice(0, 8) });
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log('Callback signature verified successfully');
+      
       if (requestId) {
         await updateTransactionStatus(requestId, 'callback_received', {
           callback_data: { value_coin: valueCoin, order_id: orderId }
@@ -306,8 +285,22 @@ serve(async (req) => {
       });
     }
 
-    // Handle payment link generation (POST request)
+    // ========================================
+    // AUTHENTICATION CHECK - Payment creation requires auth
+    // ========================================
     if (req.method === 'POST') {
+      const authResult = await validateAuth(req);
+      
+      if (!authResult.authenticated) {
+        logSecurityEvent('AUTH_FAILED_CARD2CRYPTO', {
+          clientId,
+          error: authResult.error,
+        });
+        return unauthorizedResponse(corsHeaders, authResult.error);
+      }
+
+      console.log(`[AUTH] Card2Crypto request authorized for user ${authResult.userId?.slice(0, 8)}...`);
+
       const body = await req.json();
       const { amount, provider, email, currency, orderId } = body;
       const requestId = crypto.randomUUID();
@@ -342,7 +335,6 @@ serve(async (req) => {
         });
       }
 
-      // Get payout wallet from secrets
       const PAYOUT_WALLET = Deno.env.get('PAYOUT_WALLET');
       if (!PAYOUT_WALLET) {
         console.error('PAYOUT_WALLET not configured');
@@ -352,17 +344,15 @@ serve(async (req) => {
         });
       }
 
-      // Log without PII
       console.log('Generating payment link:', { 
         amount, 
         provider: provider.toLowerCase(), 
         currency: currency.toUpperCase(),
         email: redactEmail(email),
-        orderId: orderId ? `${String(orderId).slice(0, 8)}***` : 'auto-generated',
+        userId: authResult.userId?.slice(0, 8),
         requestId
       });
 
-      // Step 1: Create encrypted wallet address
       const safeOrderId = orderId || Date.now();
       const callbackUrl = `${supabaseUrl}/functions/v1/card2crypto?action=callback&order_id=${safeOrderId}&request_id=${requestId}`;
       const encodedCallback = encodeURIComponent(callbackUrl);
@@ -374,7 +364,6 @@ serve(async (req) => {
       if (!walletResponse.ok) {
         console.error('Failed to create wallet - status:', walletResponse.status);
         
-        // Log failed transaction
         await logTransaction({
           wallet_address: PAYOUT_WALLET,
           amount: Number(amount),
@@ -396,17 +385,14 @@ serve(async (req) => {
 
       const walletData = await walletResponse.json();
       
-      // Log wallet creation without exposing full addresses
       console.log('Wallet created:', { 
         hasAddressIn: !!walletData.address_in,
         addressPreview: walletData.address_in ? redactWallet(walletData.address_in) : null
       });
 
-      // Step 2: Generate payment URL
       const encodedEmail = encodeURIComponent(email);
       const paymentUrl = `https://pay.card2crypto.org/process-payment.php?address=${walletData.address_in}&amount=${amount}&provider=${provider.toLowerCase()}&email=${encodedEmail}&currency=${currency.toUpperCase()}`;
 
-      // Log successful transaction creation
       await logTransaction({
         wallet_address: walletData.address_in || PAYOUT_WALLET,
         amount: Number(amount),
@@ -435,7 +421,6 @@ serve(async (req) => {
     });
 
   } catch (error: unknown) {
-    // Log error without exposing internals
     console.error('Error in card2crypto function:', error instanceof Error ? error.message : 'Unknown error');
     return new Response(JSON.stringify({ error: 'An error occurred processing your request' }), {
       status: 500,
