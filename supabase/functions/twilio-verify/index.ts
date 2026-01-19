@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import {
   getCorsHeaders,
-  validateAuth,
-  unauthorizedResponse,
   getClientId,
   logSecurityEvent,
   validateOrigin,
@@ -60,7 +58,7 @@ serve(async (req) => {
   const clientId = getClientId(req);
 
   try {
-    // Rate limiting
+    // Rate limiting (strict - this is a public endpoint)
     if (!checkRateLimit(clientId)) {
       logSecurityEvent('RATE_LIMIT_EXCEEDED', { clientId, function: 'twilio-verify' });
       return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
@@ -70,19 +68,15 @@ serve(async (req) => {
     }
 
     // ========================================
-    // AUTHENTICATION CHECK - Verification requires auth
+    // NOTE: This endpoint is intentionally public (no JWT required)
+    // because it serves as the identity verification step for Coinbase US.
+    // Security is enforced through:
+    // 1. Strict CORS (only app domains allowed)
+    // 2. Rate limiting (5 requests per minute per IP)
+    // 3. Twilio's own verification security
+    // 4. Input validation
     // ========================================
-    const authResult = await validateAuth(req);
-    
-    if (!authResult.authenticated) {
-      logSecurityEvent('AUTH_FAILED_TWILIO_VERIFY', {
-        clientId,
-        error: authResult.error,
-      });
-      return unauthorizedResponse(corsHeaders, authResult.error);
-    }
-
-    console.log(`[AUTH] Twilio verify request authorized for user ${authResult.userId?.slice(0, 8)}...`);
+    console.log(`[VERIFY] Twilio verify request from client ${clientId.slice(0, 10)}...`);
 
     // ========================================
     // TWILIO VERIFICATION
@@ -146,7 +140,7 @@ serve(async (req) => {
     const baseUrl = `https://verify.twilio.com/v2/Services/${serviceSid}`;
 
     if (action === 'send') {
-      console.log(`[VERIFY] Sending ${channel} verification to: ${to.slice(0, 5)}*** for user ${authResult.userId?.slice(0, 8)}...`);
+      console.log(`[VERIFY] Sending ${channel} verification to: ${to.slice(0, 5)}*** for client ${clientId.slice(0, 10)}...`);
 
       const response = await fetch(`${baseUrl}/Verifications`, {
         method: 'POST',
@@ -198,7 +192,7 @@ serve(async (req) => {
         });
       }
 
-      console.log(`[VERIFY] Checking ${channel} verification for: ${to.slice(0, 5)}*** for user ${authResult.userId?.slice(0, 8)}...`);
+      console.log(`[VERIFY] Checking ${channel} verification for: ${to.slice(0, 5)}*** for client ${clientId.slice(0, 10)}...`);
 
       const response = await fetch(`${baseUrl}/VerificationCheck`, {
         method: 'POST',
