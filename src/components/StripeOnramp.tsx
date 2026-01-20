@@ -22,7 +22,7 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -43,8 +43,18 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
+    // Check if auth is still loading
+    if (authLoading) {
+      toast({
+        title: "Please Wait",
+        description: "Loading authentication state...",
+      });
+      return;
+    }
+    
     // Check authentication first
     if (!session) {
+      console.log('[StripeOnramp] Auth check failed - no session');
       toast({
         title: "Authentication Required",
         description: "Please sign in to use the Stripe onramp",
@@ -150,7 +160,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, session]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading]);
 
   // Show embedded widget
   if (showWidget) {
