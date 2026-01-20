@@ -4,7 +4,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogIn } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
 import { useAuth } from "@/hooks/useAuth";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
@@ -22,7 +22,7 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session, loading: authLoading, syncWalletAuth } = useAuth();
+  const { session, loading: authLoading, syncWalletAuth, walletVerified, isVerifyingWallet } = useAuth();
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -53,29 +53,50 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       return;
     }
     
-    // If wallet connected but no Supabase session, attempt to sync
+    // If currently verifying wallet signature, wait
+    if (isVerifyingWallet) {
+      toast({
+        title: "Verifying Wallet",
+        description: "Please complete the wallet signature request...",
+      });
+      return;
+    }
+    
+    // If wallet connected but no Supabase session, perform signature verification and sync
     if (isConnected && address && !session) {
-      console.log('[StripeOnramp] Wallet connected but no session, attempting sync...');
+      console.log('[StripeOnramp] Wallet connected but no session, initiating signature verification...');
       setIsSyncingAuth(true);
       
       try {
+        toast({
+          title: "Wallet Verification",
+          description: "Please sign the message in your wallet to verify ownership",
+        });
+        
         const syncSuccess = await syncWalletAuth(address);
         if (!syncSuccess) {
           toast({
-            title: "Authentication Failed",
-            description: "Could not authenticate your wallet. Please try reconnecting.",
+            title: "Verification Failed",
+            description: "Could not verify your wallet ownership. Please approve the signature request and try again.",
             variant: "destructive",
           });
           setIsSyncingAuth(false);
           return;
         }
+        
+        toast({
+          title: "Wallet Verified",
+          description: "Your wallet ownership has been cryptographically verified",
+        });
+        
         // Session will be updated via auth state change, wait a moment
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err) {
         console.error('[StripeOnramp] Auth sync error:', err);
+        const errorMessage = err instanceof Error ? err.message : "An error occurred during verification";
         toast({
-          title: "Authentication Error",
-          description: "An error occurred during authentication. Please try again.",
+          title: "Verification Error",
+          description: errorMessage,
           variant: "destructive",
         });
         setIsSyncingAuth(false);
@@ -93,7 +114,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       console.log('[StripeOnramp] Auth check failed - no session after sync');
       toast({
         title: "Authentication Required",
-        description: "Please connect your wallet to use the Stripe onramp",
+        description: "Please connect your wallet and approve the signature to verify ownership",
         variant: "destructive",
       });
       return;
@@ -196,7 +217,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading, isConnected, address, syncWalletAuth]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading, isConnected, address, syncWalletAuth, isVerifyingWallet]);
 
   // Show embedded widget
   if (showWidget) {
@@ -243,11 +264,21 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
             </Label>
             {connectedAddressValid ? (
               <>
-                <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                <div className="p-3 bg-muted/50 rounded-lg border border-border flex items-center gap-2">
+                  {walletVerified && (
+                    <ShieldCheck className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  )}
                   <p className="font-mono text-sm truncate">{walletAddress}</p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Connected wallet detected
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  {walletVerified ? (
+                    <>
+                      <ShieldCheck className="h-3 w-3 text-green-500" />
+                      Wallet ownership verified
+                    </>
+                  ) : (
+                    'Connected wallet detected - verification required'
+                  )}
                 </p>
               </>
             ) : (
@@ -272,13 +303,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           onClick={handleStartOnramp}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
-          disabled={isLoading || isSyncingAuth || !walletAddress}
+          disabled={isLoading || isSyncingAuth || isVerifyingWallet || !walletAddress}
           data-tutorial="stripe-buy-button"
         >
-          {isLoading || isSyncingAuth ? (
+          {isLoading || isSyncingAuth || isVerifyingWallet ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              {isSyncingAuth ? 'Authenticating...' : 'Initializing...'}
+              {isVerifyingWallet ? 'Sign message in wallet...' : isSyncingAuth ? 'Verifying wallet...' : 'Initializing...'}
             </>
           ) : (
             "Buy Crypto with Stripe"
