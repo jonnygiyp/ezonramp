@@ -6,7 +6,6 @@ import {
   unauthorizedResponse,
   getClientId,
   logSecurityEvent,
-  validateOrigin,
 } from "../_shared/auth.ts";
 
 const CDP_API_BASE = 'https://api.developer.coinbase.com';
@@ -188,11 +187,11 @@ async function callCDPApi(
   return fetch(`${CDP_API_BASE}${path}`, options);
 }
 
-// ALL session token minting actions require authentication
-const PROTECTED_ACTIONS = ['getSessionToken', 'generateBuyUrl', 'createUser', 'getQuote'];
+// Actions that require authentication (session token minting)
+const PROTECTED_ACTIONS = ['getSessionToken', 'generateBuyUrl', 'createUser'];
 
-// Only truly public config info (no tokens)
-const PUBLIC_ACTIONS = ['getCountries'];
+// Actions that are public (config/quote info)
+const PUBLIC_ACTIONS = ['getCountries', 'getQuote', 'getTransaction'];
 
 serve(async (req) => {
   const origin = req.headers.get('origin');
@@ -202,10 +201,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
-  // Validate origin for all requests
-  const originError = validateOrigin(origin, corsHeaders);
-  if (originError) return originError;
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -237,16 +232,7 @@ serve(async (req) => {
       });
     }
 
-    // Validate action is known
-    if (!PROTECTED_ACTIONS.includes(action) && !PUBLIC_ACTIONS.includes(action)) {
-      logSecurityEvent('UNKNOWN_ACTION', { clientId, action });
-      return new Response(JSON.stringify({ error: 'Unknown action' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Check if action requires authentication (all except getCountries)
+    // Check if action requires authentication
     if (PROTECTED_ACTIONS.includes(action)) {
       const authResult = await validateAuth(req);
       
@@ -264,6 +250,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'getCountries': {
+        // Get supported countries and payment methods
         const response = await callCDPApi('GET', '/onramp/v1/buy/config');
         const data = await response.json();
         
@@ -281,6 +268,7 @@ serve(async (req) => {
       }
 
       case 'getQuote': {
+        // Get buy quote
         const { 
           purchaseCurrency, 
           purchaseNetwork, 
@@ -333,6 +321,7 @@ serve(async (req) => {
       }
 
       case 'createUser': {
+        // Create or get user for headless onramp (PROTECTED)
         const { email, phone } = body;
 
         if (!email && !phone) {
@@ -368,6 +357,7 @@ serve(async (req) => {
       }
 
       case 'getSessionToken': {
+        // Get session token to generate onramp URL (PROTECTED)
         const { 
           destinationAddress,
           destinationNetwork,
@@ -382,6 +372,7 @@ serve(async (req) => {
           });
         }
 
+        // Map network names to Coinbase blockchain identifiers
         const networkMap: Record<string, string> = {
           'solana': 'solana',
           'ethereum': 'ethereum',
@@ -421,6 +412,7 @@ serve(async (req) => {
           });
         }
 
+        // Return session token and construct the buy URL
         const sessionToken = data.token || data.session_token;
         
         return new Response(JSON.stringify({
@@ -432,6 +424,7 @@ serve(async (req) => {
       }
 
       case 'generateBuyUrl': {
+        // Generate an Onramp URL using session token approach (PROTECTED)
         const { 
           purchaseCurrency, 
           purchaseNetwork, 
@@ -448,6 +441,7 @@ serve(async (req) => {
           });
         }
 
+        // Map network names to Coinbase blockchain identifiers
         const networkMap: Record<string, string> = {
           'solana': 'solana',
           'ethereum': 'ethereum',
@@ -461,6 +455,7 @@ serve(async (req) => {
 
         console.log('Generating session token for:', destinationAddress.slice(0, 10) + '...');
 
+        // Step 1: Get session token
         const sessionBody = {
           addresses: [{
             address: destinationAddress,
@@ -496,28 +491,24 @@ serve(async (req) => {
 
         console.log('Session token obtained, building URL');
 
+        // Step 2: Build the Coinbase Pay URL with parameters
         const appId = Deno.env.get('COINBASE_ONRAMP_APP_ID') || '';
         
         const urlParams = new URLSearchParams({
           sessionToken: sessionToken,
           defaultAsset: purchaseCurrency,
           defaultNetwork: blockchain,
+          presetFiatAmount: paymentAmount,
+          fiatCurrency: paymentCurrency || 'USD',
         });
 
         if (appId) {
           urlParams.set('appId', appId);
         }
-        if (paymentAmount) {
-          urlParams.set('presetFiatAmount', paymentAmount.toString());
-        }
-        if (paymentCurrency) {
-          urlParams.set('fiatCurrency', paymentCurrency);
-        }
-        if (country) {
-          urlParams.set('defaultCountry', country);
-        }
 
-        const buyUrl = `https://pay.coinbase.com/buy/select-asset?${urlParams.toString()}`;
+        const buyUrl = `https://pay.coinbase.com/buy?${urlParams.toString()}`;
+
+        console.log('Generated buy URL successfully');
 
         return new Response(JSON.stringify({
           buyUrl,
@@ -527,18 +518,46 @@ serve(async (req) => {
         });
       }
 
+      case 'getTransaction': {
+        // Get transaction status
+        const { transactionId } = body;
+
+        if (!transactionId) {
+          return new Response(JSON.stringify({ error: 'Transaction ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const response = await callCDPApi('GET', `/onramp/v1/buy/transaction/${transactionId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error('CDP transaction error:', data);
+          return new Response(JSON.stringify({ 
+            error: data.message || 'Failed to get transaction',
+          }), {
+            status: response.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify(data), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       default:
-        return new Response(JSON.stringify({ error: 'Unknown action' }), {
+        return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
 
-  } catch (error) {
-    console.error('Coinbase headless error:', error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
-    }), {
+  } catch (error: unknown) {
+    console.error('Headless onramp error:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
