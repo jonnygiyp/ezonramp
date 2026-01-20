@@ -120,6 +120,27 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       return;
     }
 
+    // If we have a session but wallet ownership is not yet verified, perform verification now.
+    if (isConnected && address && !walletVerified) {
+      console.log('[StripeOnramp] Session present but wallet not verified, requesting signature verification...');
+      setIsSyncingAuth(true);
+      try {
+        const ok = await syncWalletAuth(address);
+        if (!ok) {
+          toast({
+            title: "Verification Failed",
+            description: "Could not verify your wallet ownership. Please approve the signature request and try again.",
+            variant: "destructive",
+          });
+          setIsSyncingAuth(false);
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } finally {
+        setIsSyncingAuth(false);
+      }
+    }
+
     if (!walletAddress.trim()) {
       toast({
         title: "Wallet Required",
