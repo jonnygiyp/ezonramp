@@ -4,10 +4,10 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogIn } from "lucide-react";
-import { useAccount } from '@/hooks/useParticle';
-import { useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
+import { useAccount } from "@/hooks/useParticle";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
+
 
 // Validate Solana address
 const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
@@ -22,8 +22,7 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session, loading: authLoading } = useAuth();
-  
+
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showWidget, setShowWidget] = useState(false);
@@ -43,16 +42,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
-    // Check authentication first
-    if (!session) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to use the Stripe onramp",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!walletAddress.trim()) {
       toast({
         title: "Wallet Required",
@@ -63,16 +52,18 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     }
 
     // Validate address format
-    const isValid = defaultNetwork === 'solana' 
-      ? isSolanaAddress(walletAddress.trim())
-      : isEvmAddress(walletAddress.trim());
-    
+    const isValid =
+      defaultNetwork === "solana"
+        ? isSolanaAddress(walletAddress.trim())
+        : isEvmAddress(walletAddress.trim());
+
     if (!isValid) {
       toast({
         title: "Invalid Address",
-        description: defaultNetwork === 'solana' 
-          ? "Please enter a valid Solana wallet address"
-          : "Please enter a valid EVM wallet address",
+        description:
+          defaultNetwork === "solana"
+            ? "Please enter a valid Solana wallet address"
+            : "Please enter a valid EVM wallet address",
         variant: "destructive",
       });
       return;
@@ -82,13 +73,16 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
 
     try {
       // Get client secret from edge function
-      const { data, error: fnError } = await supabase.functions.invoke('stripe-onramp', {
-        body: {
-          walletAddress: walletAddress.trim(),
-          destinationCurrency: defaultAsset.toLowerCase(),
-          destinationNetwork: defaultNetwork.toLowerCase(),
-        },
-      });
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "stripe-onramp",
+        {
+          body: {
+            walletAddress: walletAddress.trim(),
+            destinationCurrency: defaultAsset.toLowerCase(),
+            destinationNetwork: defaultNetwork.toLowerCase(),
+          },
+        }
+      );
 
       if (fnError) throw fnError;
       if (data.error) throw new Error(data.error);
@@ -97,24 +91,34 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       if (!clientSecret) throw new Error("No client secret received");
 
       // Get publishable key from config
-      const { data: configData, error: configError } = await supabase.functions.invoke('stripe-config');
+      const { data: configData, error: configError } =
+        await supabase.functions.invoke("stripe-config");
       if (configError) throw configError;
-      
+
       const publishableKey = configData?.publishableKey;
       if (!publishableKey) throw new Error("Stripe publishable key not configured");
 
       // Load Stripe Onramp
-      console.log("Loading Stripe Onramp with key:", publishableKey.substring(0, 20) + "...");
+      console.log(
+        "Loading Stripe Onramp with key:",
+        publishableKey.substring(0, 20) + "..."
+      );
       let stripeOnramp;
       try {
         stripeOnramp = await loadStripeOnramp(publishableKey);
       } catch (loadError) {
         console.error("Stripe Onramp load error:", loadError);
-        throw new Error(`Failed to load Stripe Onramp SDK: ${loadError instanceof Error ? loadError.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to load Stripe Onramp SDK: ${
+            loadError instanceof Error ? loadError.message : "Unknown error"
+          }`
+        );
       }
-      
+
       if (!stripeOnramp) {
-        throw new Error("Stripe Onramp SDK returned null - check if crypto onramp is enabled for your Stripe account");
+        throw new Error(
+          "Stripe Onramp SDK returned null - check if crypto onramp is enabled for your Stripe account"
+        );
       }
 
       onrampInstanceRef.current = stripeOnramp;
@@ -124,10 +128,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       setTimeout(() => {
         if (onrampContainerRef.current && stripeOnramp) {
           const onrampSession = stripeOnramp.createSession({ clientSecret });
-          
-          onrampSession.addEventListener('onramp_session_updated', (event) => {
-            console.log('Onramp session updated:', event.payload);
-            if (event.payload.session.status === 'fulfillment_complete') {
+
+          onrampSession.addEventListener("onramp_session_updated", (event) => {
+            console.log("Onramp session updated:", event.payload);
+            if (event.payload.session.status === "fulfillment_complete") {
               toast({
                 title: "Success!",
                 description: "Your crypto purchase was successful.",
@@ -138,19 +142,20 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           onrampSession.mount(onrampContainerRef.current);
         }
       }, 100);
-
     } catch (err) {
       console.error("Onramp error:", err);
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "Failed to start onramp session",
+        description:
+          err instanceof Error ? err.message : "Failed to start onramp session",
         variant: "destructive",
       });
       setShowWidget(false);
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast]);
+
 
   // Show embedded widget
   if (showWidget) {
@@ -209,16 +214,20 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
                 <Input
                   id="wallet-address"
                   type="text"
-                  placeholder="Sign Up / Sign In To Populate Address"
-                  value=""
-                  disabled
-                  className="bg-muted/50 cursor-not-allowed text-muted-foreground"
+                  placeholder={
+                    defaultNetwork === "solana"
+                      ? "Paste Solana wallet address"
+                      : "Paste EVM wallet address (0x...)"
+                  }
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Sign in to automatically populate your wallet address
+                  Connect a wallet to auto-fill, or paste an address manually.
                 </p>
               </>
             )}
+
           </div>
         </div>
 
