@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { decode as decodeBase58 } from "https://deno.land/std@0.177.0/encoding/base58.ts";
+import bs58 from "https://esm.sh/bs58@6.0.0";
 import nacl from "https://esm.sh/tweetnacl@1.0.3";
 import {
   getCorsHeaders,
@@ -21,88 +21,122 @@ const SIGNATURE_TIMESTAMP_WINDOW = 5 * 60 * 1000;
 function checkRateLimit(clientId: string): boolean {
   const now = Date.now();
   const record = rateLimitMap.get(clientId);
-  
+
   if (!record || now > record.resetTime) {
     rateLimitMap.set(clientId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
     return true;
   }
-  
+
   if (record.count >= RATE_LIMIT) {
     return false;
   }
-  
+
   record.count++;
   return true;
 }
 
 /**
- * Verify an Ed25519 signature from a Solana wallet
- * The message must match the expected format and contain the correct wallet address
+ * Verify an Ed25519 signature from a Solana wallet.
+ *
+ * Particle Network (Solana) message signing format:
+ * - Signs the UTF-8 encoded message string bytes (no hashing)
+ * - Returns a base58-encoded Ed25519 detached signature
+ *
+ * We must verify the exact same message string byte-for-byte.
  */
 async function verifySolanaSignature(
   walletAddress: string,
   signature: string,
   message: string,
-  timestamp: number
+  timestamp: number,
 ): Promise<{ valid: boolean; error?: string }> {
   try {
-    // Check if using cached verification (already verified in this session)
-    if (signature === 'cached' && message === 'cached') {
-      // For cached verifications, we trust the client cache
-      // but still validate the wallet address format
-      console.log('[WALLET_AUTH] Using cached verification for:', walletAddress.slice(0, 8));
+    // Cached verification shortcut (client-side cache, server still validates wallet format)
+    if (signature === "cached" && message === "cached") {
+      console.log(
+        "[WALLET_AUTH] Using cached verification for:",
+        walletAddress.slice(0, 8),
+      );
       return { valid: true };
     }
-    
+
     // Validate timestamp is within acceptable window
     const now = Date.now();
-    if (Math.abs(now - timestamp) > SIGNATURE_TIMESTAMP_WINDOW) {
-      return { valid: false, error: 'Signature timestamp expired. Please sign again.' };
+    if (Number.isFinite(timestamp) && Math.abs(now - timestamp) > SIGNATURE_TIMESTAMP_WINDOW) {
+      return {
+        valid: false,
+        error: "Signature timestamp expired. Please sign again.",
+      };
     }
-    
-    // Verify the message contains the expected wallet address
+
+    // Basic message format checks (do not mutate message)
     if (!message.includes(`Wallet: ${walletAddress}`)) {
-      return { valid: false, error: 'Message does not match wallet address' };
+      return { valid: false, error: "Message does not match wallet address" };
     }
-    
-    // Verify the message contains the expected timestamp
-    if (!message.includes(`Timestamp: ${timestamp}`)) {
-      return { valid: false, error: 'Message timestamp mismatch' };
+
+    if (Number.isFinite(timestamp) && !message.includes(`Timestamp: ${timestamp}`)) {
+      return { valid: false, error: "Message timestamp mismatch" };
     }
-    
-    // Verify the message is our expected verification message
-    if (!message.includes('EzOnramp Wallet Verification')) {
-      return { valid: false, error: 'Invalid verification message format' };
+
+    if (!message.includes("EzOnramp Wallet Verification")) {
+      return { valid: false, error: "Invalid verification message format" };
     }
-    
-    // Decode the wallet address (public key) from base58
-    const publicKeyBytes = decodeBase58(walletAddress);
-    if (publicKeyBytes.length !== 32) {
-      return { valid: false, error: 'Invalid Solana wallet address' };
+
+    // IMPORTANT: Solana public key and Particle signature are base58 strings
+    // Decode both using the same base58 library as the client.
+    let publicKeyBytes: Uint8Array;
+    let signatureBytes: Uint8Array;
+
+    try {
+      publicKeyBytes = bs58.decode(walletAddress);
+    } catch {
+      return { valid: false, error: "Invalid Solana wallet address" };
     }
-    
-    // Decode the signature from base58
-    const signatureBytes = decodeBase58(signature);
-    if (signatureBytes.length !== 64) {
-      return { valid: false, error: 'Invalid signature length' };
+
+    try {
+      signatureBytes = bs58.decode(signature);
+    } catch {
+      return { valid: false, error: "Invalid signature encoding" };
     }
-    
-    // Encode the message as bytes
+
+    // Particle signs the UTF-8 message bytes directly.
     const messageBytes = new TextEncoder().encode(message);
-    
-    // Verify the Ed25519 signature using tweetnacl
-    const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, publicKeyBytes);
-    
-    if (!isValid) {
-      return { valid: false, error: 'Signature verification failed' };
+
+    // Diagnostics to confirm correct decoding/encoding
+    console.log("[WALLET_AUTH] Verify lengths", {
+      messageChars: message.length,
+      messageBytes: messageBytes.length,
+      signatureBytes: signatureBytes.length,
+      publicKeyBytes: publicKeyBytes.length,
+    });
+
+    if (publicKeyBytes.length !== 32) {
+      return { valid: false, error: "Invalid Solana wallet address" };
     }
-    
-    console.log('[WALLET_AUTH] Signature verified successfully for:', walletAddress.slice(0, 8));
+
+    if (signatureBytes.length !== 64) {
+      return { valid: false, error: "Invalid signature length" };
+    }
+
+    // Verify the Ed25519 detached signature WITHOUT hashing or transforming the message.
+    const isValid = nacl.sign.detached.verify(
+      messageBytes,
+      signatureBytes,
+      publicKeyBytes,
+    );
+
+    if (!isValid) {
+      return { valid: false, error: "Signature verification failed" };
+    }
+
+    console.log(
+      "[WALLET_AUTH] Signature verified successfully for:",
+      walletAddress.slice(0, 8),
+    );
     return { valid: true };
-    
   } catch (error) {
-    console.error('[WALLET_AUTH] Signature verification error:', error);
-    return { valid: false, error: 'Signature verification failed' };
+    console.error("[WALLET_AUTH] Signature verification error:", error);
+    return { valid: false, error: "Signature verification failed" };
   }
 }
 
