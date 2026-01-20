@@ -2,12 +2,11 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import {
   getCorsHeaders,
-  validateAuth,
-  unauthorizedResponse,
   getClientId,
   logSecurityEvent,
   validateOrigin,
 } from "../_shared/auth.ts";
+
 
 // Rate limiting
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -65,19 +64,14 @@ serve(async (req) => {
     }
 
     // ========================================
-    // AUTHENTICATION CHECK - Session tokens require auth
+    // PUBLIC ENDPOINT (NO USER AUTH)
+    // We intentionally do not require an end-user JWT for onramp session creation.
+    // Protection relies on strict CORS + rate limiting + input validation.
     // ========================================
-    const authResult = await validateAuth(req);
-    
-    if (!authResult.authenticated) {
-      logSecurityEvent("AUTH_FAILED_STRIPE_ONRAMP", {
-        clientId,
-        error: authResult.error,
-      });
-      return unauthorizedResponse(corsHeaders, authResult.error);
-    }
 
-    console.log(`[AUTH] Stripe onramp request authorized for user ${authResult.userId?.slice(0, 8)}...`);
+    console.log(
+      `[STRIPE] Stripe onramp request accepted for client ${clientId.slice(0, 10)}...`
+    );
 
     // ========================================
     // STRIPE SESSION CREATION
@@ -129,7 +123,10 @@ serve(async (req) => {
       walletAddresses[networkMapping[network]] = walletAddress;
     }
 
-    console.log(`[STRIPE] Creating onramp session for user ${authResult.userId?.slice(0, 8)}... wallet ${walletAddress.slice(0, 10)}...`);
+    console.log(
+      `[STRIPE] Creating onramp session for client ${clientId.slice(0, 10)}... wallet ${walletAddress.slice(0, 10)}...`
+    );
+
 
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
@@ -158,11 +155,12 @@ serve(async (req) => {
     }
 
     const session = await response.json();
-    console.log("[STRIPE] Onramp session created:", { 
-      id: session.id, 
-      status: session.status, 
-      userId: authResult.userId?.slice(0, 8) 
+    console.log("[STRIPE] Onramp session created:", {
+      id: session.id,
+      status: session.status,
+      clientId: clientId.slice(0, 10),
     });
+
 
     return new Response(
       JSON.stringify({ 
