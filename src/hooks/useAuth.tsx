@@ -1,15 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useWalletSignature } from './useWalletSignature';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
   loading: boolean;
-  walletVerified: boolean;
-  isVerifyingWallet: boolean;
   syncWalletAuth: (walletAddress: string, walletType?: string, particleUserId?: string) => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -25,15 +22,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const walletSyncInProgress = useRef(false);
   const lastSyncedWallet = useRef<string | null>(null);
-  
-  // Use the wallet signature hook for cryptographic verification
-  const {
-    verificationState,
-    requestSignature,
-    markVerified,
-    resetVerification,
-    isWalletVerified: checkWalletVerified,
-  } = useWalletSignature();
 
   useEffect(() => {
     // Set up auth state listener first
@@ -83,11 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   /**
-   * Sync wallet authentication with Supabase using cryptographic signature verification.
-   * 1. Request user to sign a challenge message
-   * 2. Send signature to backend for verification
-   * 3. Creates or retrieves a Supabase user for the verified wallet
-   * 4. Establishes an authenticated session
+   * Sync wallet authentication with Supabase (simplified - no signature required).
+   * Creates or retrieves a Supabase user for the wallet address.
    */
   const syncWalletAuth = useCallback(async (
     walletAddress: string,
@@ -101,37 +86,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     // Skip if already synced for this wallet AND session exists
-    if (lastSyncedWallet.current === walletAddress && session && checkWalletVerified(walletAddress)) {
-      console.log('[useAuth] Wallet already verified and synced:', walletAddress.slice(0, 8));
+    if (lastSyncedWallet.current === walletAddress && session) {
+      console.log('[useAuth] Wallet already synced:', walletAddress.slice(0, 8));
       return true;
     }
     
     walletSyncInProgress.current = true;
-    console.log('[useAuth] Starting wallet auth sync with signature verification for:', walletAddress.slice(0, 8));
+    console.log('[useAuth] Starting wallet auth sync for:', walletAddress.slice(0, 8));
     
     try {
-      // Step 1: Request cryptographic signature from wallet
-      console.log('[useAuth] Requesting wallet signature...');
-      const signatureResult = await requestSignature(walletAddress);
-      
-      if (!signatureResult) {
-        console.error('[useAuth] Failed to get wallet signature');
-        return false;
-      }
-      
-      console.log('[useAuth] Signature obtained, sending to backend for verification...');
-      
-      // Step 2: Call the wallet-auth backend function with the signature + original message
+      // Call the wallet-auth backend function (no signature required)
       const { data, error } = await supabase.functions.invoke('wallet-auth', {
         body: {
           walletAddress,
           walletType: walletType || 'particle',
           particleUserId,
-          signature: signatureResult.signature,
-          signatureEncoding: signatureResult.signatureEncoding,
-          message: signatureResult.message,
-          timestamp: signatureResult.timestamp,
-          challengeToken: signatureResult.challengeToken,
         },
       });
       
@@ -145,14 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
       
-      if (!data?.walletVerified) {
-        console.error('[useAuth] Wallet verification failed on server');
-        return false;
-      }
+      console.log('[useAuth] Wallet auth successful, establishing session...');
       
-      console.log('[useAuth] Wallet verified by backend, establishing session...');
-      
-      // Step 3: Use the magic link token to establish session
+      // Use the magic link token to establish session
       const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
         email: data.email,
         token: data.token,
@@ -165,9 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       if (sessionData?.session) {
-        console.log('[useAuth] Wallet auth session established with verified wallet:', sessionData.user?.id?.slice(0, 8));
+        console.log('[useAuth] Wallet auth session established:', sessionData.user?.id?.slice(0, 8));
         lastSyncedWallet.current = walletAddress;
-        markVerified(walletAddress);
         return true;
       }
       
@@ -178,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       walletSyncInProgress.current = false;
     }
-  }, [session, requestSignature, checkWalletVerified]);
+  }, [session]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -199,10 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setIsAdmin(false);
     lastSyncedWallet.current = null;
-    resetVerification();
   };
-
-  const sessionIndicatesVerified = Boolean((session?.user as any)?.user_metadata?.wallet_verified);
 
   return (
     <AuthContext.Provider value={{ 
@@ -210,8 +170,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session, 
       isAdmin, 
       loading, 
-      walletVerified: verificationState.isVerified || sessionIndicatesVerified,
-      isVerifyingWallet: verificationState.isVerifying,
       syncWalletAuth, 
       signIn, 
       signUp, 

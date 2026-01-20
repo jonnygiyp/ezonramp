@@ -4,7 +4,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
 import { useAuth } from "@/hooks/useAuth";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
@@ -22,12 +22,11 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session, loading: authLoading, syncWalletAuth, walletVerified, isVerifyingWallet } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showWidget, setShowWidget] = useState(false);
-  const [isSyncingAuth, setIsSyncingAuth] = useState(false);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
   const onrampInstanceRef = useRef<StripeOnrampType | null>(null);
 
@@ -53,92 +52,14 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       return;
     }
     
-    // If currently verifying wallet signature, wait
-    if (isVerifyingWallet) {
-      toast({
-        title: "Verifying Wallet",
-        description: "Please complete the wallet signature request...",
-      });
-      return;
-    }
-    
-    // If wallet connected but no Supabase session, perform signature verification and sync
-    if (isConnected && address && !session) {
-      console.log('[StripeOnramp] Wallet connected but no session, initiating signature verification...');
-      setIsSyncingAuth(true);
-      
-      try {
-        toast({
-          title: "Wallet Verification",
-          description: "Please sign the message in your wallet to verify ownership",
-        });
-        
-        const syncSuccess = await syncWalletAuth(address);
-        if (!syncSuccess) {
-          toast({
-            title: "Verification Failed",
-            description: "Could not verify your wallet ownership. Please approve the signature request and try again.",
-            variant: "destructive",
-          });
-          setIsSyncingAuth(false);
-          return;
-        }
-        
-        toast({
-          title: "Wallet Verified",
-          description: "Your wallet ownership has been cryptographically verified",
-        });
-        
-        // Session will be updated via auth state change, wait a moment
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (err) {
-        console.error('[StripeOnramp] Auth sync error:', err);
-        const errorMessage = err instanceof Error ? err.message : "An error occurred during verification";
-        toast({
-          title: "Verification Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        setIsSyncingAuth(false);
-        return;
-      }
-      setIsSyncingAuth(false);
-    }
-    
-    // Re-check authentication after potential sync
-    const currentSession = await import('@/integrations/supabase/client').then(m => 
-      m.supabase.auth.getSession().then(r => r.data.session)
-    );
-    
-    if (!currentSession) {
-      console.log('[StripeOnramp] Auth check failed - no session after sync');
+    // Check for valid Supabase session
+    if (!session) {
       toast({
         title: "Authentication Required",
-        description: "Please connect your wallet and approve the signature to verify ownership",
+        description: "Please connect your wallet to continue",
         variant: "destructive",
       });
       return;
-    }
-
-    // If we have a session but wallet ownership is not yet verified, perform verification now.
-    if (isConnected && address && !walletVerified) {
-      console.log('[StripeOnramp] Session present but wallet not verified, requesting signature verification...');
-      setIsSyncingAuth(true);
-      try {
-        const ok = await syncWalletAuth(address);
-        if (!ok) {
-          toast({
-            title: "Verification Failed",
-            description: "Could not verify your wallet ownership. Please approve the signature request and try again.",
-            variant: "destructive",
-          });
-          setIsSyncingAuth(false);
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 300));
-      } finally {
-        setIsSyncingAuth(false);
-      }
     }
 
     if (!walletAddress.trim()) {
@@ -169,7 +90,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     setIsLoading(true);
 
     try {
-      // Get client secret from edge function
+      // Get client secret from edge function (requires valid JWT)
       const { data, error: fnError } = await supabase.functions.invoke('stripe-onramp', {
         body: {
           walletAddress: walletAddress.trim(),
@@ -238,7 +159,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading, isConnected, address, syncWalletAuth, isVerifyingWallet]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading]);
 
   // Show embedded widget
   if (showWidget) {
@@ -286,20 +207,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
             {connectedAddressValid ? (
               <>
                 <div className="p-3 bg-muted/50 rounded-lg border border-border flex items-center gap-2">
-                  {walletVerified && (
-                    <ShieldCheck className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  )}
                   <p className="font-mono text-sm truncate">{walletAddress}</p>
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  {walletVerified ? (
-                    <>
-                      <ShieldCheck className="h-3 w-3 text-green-500" />
-                      Wallet ownership verified
-                    </>
-                  ) : (
-                    'Connected wallet detected - verification required'
-                  )}
+                <p className="text-xs text-muted-foreground">
+                  Connected wallet detected
                 </p>
               </>
             ) : (
@@ -324,13 +235,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           onClick={handleStartOnramp}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
-          disabled={isLoading || isSyncingAuth || isVerifyingWallet || !walletAddress}
+          disabled={isLoading || !walletAddress}
           data-tutorial="stripe-buy-button"
         >
-          {isLoading || isSyncingAuth || isVerifyingWallet ? (
+          {isLoading ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              {isVerifyingWallet ? 'Sign message in wallet...' : isSyncingAuth ? 'Verifying wallet...' : 'Initializing...'}
+              Initializing...
             </>
           ) : (
             "Buy Crypto with Stripe"
