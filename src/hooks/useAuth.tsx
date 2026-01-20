@@ -27,11 +27,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastSyncedWallet = useRef<string | null>(null);
   
   // Use the wallet signature hook for cryptographic verification
-  const { 
-    verificationState, 
-    requestSignature, 
+  const {
+    verificationState,
+    requestSignature,
+    markVerified,
     resetVerification,
-    isWalletVerified: checkWalletVerified 
+    isWalletVerified: checkWalletVerified,
   } = useWalletSignature();
 
   useEffect(() => {
@@ -120,15 +121,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log('[useAuth] Signature obtained, sending to backend for verification...');
       
-      // Step 2: Call the wallet-auth edge function with the signature
+      // Step 2: Call the wallet-auth backend function with the signature + original message
       const { data, error } = await supabase.functions.invoke('wallet-auth', {
         body: {
           walletAddress,
           walletType: walletType || 'particle',
           particleUserId,
           signature: signatureResult.signature,
+          signatureEncoding: signatureResult.signatureEncoding,
           message: signatureResult.message,
           timestamp: signatureResult.timestamp,
+          challengeToken: signatureResult.challengeToken,
         },
       });
       
@@ -164,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sessionData?.session) {
         console.log('[useAuth] Wallet auth session established with verified wallet:', sessionData.user?.id?.slice(0, 8));
         lastSyncedWallet.current = walletAddress;
+        markVerified(walletAddress);
         return true;
       }
       
@@ -198,13 +202,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetVerification();
   };
 
+  const sessionIndicatesVerified = Boolean((session?.user as any)?.user_metadata?.wallet_verified);
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       session, 
       isAdmin, 
       loading, 
-      walletVerified: verificationState.isVerified,
+      walletVerified: verificationState.isVerified || sessionIndicatesVerified,
       isVerifyingWallet: verificationState.isVerifying,
       syncWalletAuth, 
       signIn, 

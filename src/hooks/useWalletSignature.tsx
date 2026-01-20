@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
-import bs58 from 'bs58';
+import { useState, useCallback, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface WalletVerificationState {
   isVerified: boolean;
@@ -8,9 +8,22 @@ interface WalletVerificationState {
   verifiedAt: number | null;
 }
 
+type SignatureEncoding = "base64" | "base58" | "bytes";
+
+type SignaturePayload = string | number[]; // string for base64/base58; number[] for JSON-safe bytes
+
+export interface WalletSignatureResult {
+  signature: SignaturePayload;
+  signatureEncoding: SignatureEncoding;
+  message: string;
+  timestamp: number;
+  challengeToken: string;
+}
+
 interface UseWalletSignatureReturn {
   verificationState: WalletVerificationState;
-  requestSignature: (walletAddress: string) => Promise<{ signature: string; message: string; timestamp: number } | null>;
+  requestSignature: (walletAddress: string) => Promise<WalletSignatureResult>;
+  markVerified: (walletAddress: string) => void;
   resetVerification: () => void;
   isWalletVerified: (walletAddress: string) => boolean;
 }
@@ -18,9 +31,100 @@ interface UseWalletSignatureReturn {
 // Cache verification for 30 minutes to avoid repeated signing prompts
 const VERIFICATION_CACHE_TTL = 30 * 60 * 1000;
 
+function uint8ToBase64(bytes: Uint8Array): string {
+  // signatures are small (64 bytes), safe to spread
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function normalizeSignature(output: unknown): {
+  signature: SignaturePayload;
+  signatureEncoding: SignatureEncoding;
+  byteLength?: number;
+  detectedFormat: string;
+} {
+  // Direct Uint8Array
+  if (output instanceof Uint8Array) {
+    return {
+      signature: uint8ToBase64(output),
+      signatureEncoding: "base64",
+      byteLength: output.length,
+      detectedFormat: "Uint8Array",
+    };
+  }
+
+  // JSON-safe byte array
+  if (Array.isArray(output) && output.every((v) => typeof v === "number")) {
+    const bytes = Uint8Array.from(output);
+    return {
+      signature: uint8ToBase64(bytes),
+      signatureEncoding: "base64",
+      byteLength: bytes.length,
+      detectedFormat: "number[]",
+    };
+  }
+
+  // Common wrappers
+  if (output && typeof output === "object") {
+    const anyOut = output as any;
+
+    if (anyOut.signature != null) {
+      const inner = normalizeSignature(anyOut.signature);
+      return { ...inner, detectedFormat: `object.signature -> ${inner.detectedFormat}` };
+    }
+
+    // Buffer-like { type: 'Buffer', data: number[] }
+    if (anyOut.type === "Buffer" && Array.isArray(anyOut.data)) {
+      const inner = normalizeSignature(anyOut.data);
+      return { ...inner, detectedFormat: `Buffer.data -> ${inner.detectedFormat}` };
+    }
+
+    // { data: number[] }
+    if (Array.isArray(anyOut.data)) {
+      const inner = normalizeSignature(anyOut.data);
+      return { ...inner, detectedFormat: `object.data -> ${inner.detectedFormat}` };
+    }
+  }
+
+  // String signatures
+  if (typeof output === "string") {
+    const trimmed = output.trim();
+
+    if (trimmed.startsWith("base64:")) {
+      const sig = trimmed.slice("base64:".length);
+      return {
+        signature: sig,
+        signatureEncoding: "base64",
+        detectedFormat: "string(base64:) ",
+      };
+    }
+
+    if (trimmed.startsWith("base58:")) {
+      const sig = trimmed.slice("base58:".length);
+      return {
+        signature: sig,
+        signatureEncoding: "base58",
+        detectedFormat: "string(base58:) ",
+      };
+    }
+
+    // Minimal heuristic on the client (backend requires explicit encoding)
+    const looksBase64 = /[+/=]/.test(trimmed);
+    return {
+      signature: trimmed,
+      signatureEncoding: looksBase64 ? "base64" : "base58",
+      detectedFormat: looksBase64 ? "string(heuristic base64)" : "string(heuristic base58)",
+    };
+  }
+
+  throw new Error("Unexpected signature format from wallet");
+}
+
 /**
  * Hook for cryptographic wallet signature verification.
- * Requests user to sign a challenge message to prove wallet ownership.
+ * - Challenge is generated ONLY on the backend and returned verbatim.
+ * - Client signs that exact string and sends it back for server-side verification.
  */
 export function useWalletSignature(): UseWalletSignatureReturn {
   const [verificationState, setVerificationState] = useState<WalletVerificationState>({
@@ -29,150 +133,129 @@ export function useWalletSignature(): UseWalletSignatureReturn {
     walletAddress: null,
     verifiedAt: null,
   });
-  
-  // Store verified wallets in a ref to persist across re-renders
+
   const verifiedWalletsRef = useRef<Map<string, number>>(new Map());
-  
-  /**
-   * Check if a wallet is already verified and cache is still valid
-   */
+
   const isWalletVerified = useCallback((walletAddress: string): boolean => {
     const verifiedAt = verifiedWalletsRef.current.get(walletAddress.toLowerCase());
     if (!verifiedAt) return false;
-    
+
     const now = Date.now();
     if (now - verifiedAt > VERIFICATION_CACHE_TTL) {
-      // Cache expired, remove it
       verifiedWalletsRef.current.delete(walletAddress.toLowerCase());
       return false;
     }
-    
+
     return true;
   }, []);
-  
-  /**
-   * Request the user to sign a challenge message using their wallet.
-   * Returns the signature, message, and timestamp if successful.
-   */
-  const requestSignature = useCallback(async (
-    walletAddress: string
-  ): Promise<{ signature: string; message: string; timestamp: number } | null> => {
-    // Check if already verified
-    if (isWalletVerified(walletAddress)) {
-      console.log('[WalletSignature] Wallet already verified, using cached verification');
-      const verifiedAt = verifiedWalletsRef.current.get(walletAddress.toLowerCase());
-      setVerificationState({
-        isVerified: true,
-        isVerifying: false,
-        walletAddress,
-        verifiedAt: verifiedAt || Date.now(),
-      });
-      // Return a cached indicator
-      return { signature: 'cached', message: 'cached', timestamp: verifiedAt || Date.now() };
-    }
-    
+
+  const markVerified = useCallback((walletAddress: string) => {
+    const verifiedAt = Date.now();
+    verifiedWalletsRef.current.set(walletAddress.toLowerCase(), verifiedAt);
+    setVerificationState({
+      isVerified: true,
+      isVerifying: false,
+      walletAddress,
+      verifiedAt,
+    });
+  }, []);
+
+  const requestSignature = useCallback(async (walletAddress: string): Promise<WalletSignatureResult> => {
     setVerificationState({
       isVerified: false,
       isVerifying: true,
       walletAddress,
       verifiedAt: null,
     });
-    
+
     try {
-      // Get the Solana provider from Particle Network
-      const solanaProvider = (window as any).particle?.solana || (window as any).solana;
-      
-      if (!solanaProvider) {
-        console.error('[WalletSignature] No Solana provider found');
-        throw new Error('Wallet provider not available. Please ensure your wallet is connected.');
+      // 1) Get server-generated challenge (verbatim)
+      const { data, error } = await supabase.functions.invoke("wallet-auth", {
+        body: {
+          action: "challenge",
+          walletAddress,
+        },
+      });
+
+      if (error) throw error;
+
+      const challenge = data?.challenge;
+      if (!challenge?.message || !challenge?.timestamp || !challenge?.token) {
+        throw new Error("Failed to get wallet challenge from server");
       }
-      
-      // Generate a challenge message with timestamp for freshness
-      const timestamp = Date.now();
-      const nonce = crypto.randomUUID();
-      const message = `EzOnramp Wallet Verification\n\nI am signing this message to verify ownership of my wallet for secure crypto purchases.\n\nWallet: ${walletAddress}\nTimestamp: ${timestamp}\nNonce: ${nonce}\n\nThis signature will not trigger any blockchain transaction or cost any gas fees.`;
-      
-      console.log('[WalletSignature] Requesting signature for wallet:', walletAddress.slice(0, 8));
-      
-      // Encode message for signing
-      const encodedMessage = new TextEncoder().encode(message);
-      
-      let signatureBytes: Uint8Array;
-      
-      // Try different signing methods based on provider capabilities
-      if (solanaProvider.signMessage) {
-        // Standard signMessage method
-        signatureBytes = await solanaProvider.signMessage(encodedMessage, 'utf8');
-      } else if (solanaProvider.request) {
-        // Use provider.request method (Particle style)
-        const result = await solanaProvider.request({
-          method: 'signMessage',
+
+      const message: string = challenge.message;
+      const timestamp: number = challenge.timestamp;
+      const challengeToken: string = challenge.token;
+
+      console.log("[WalletSignature] Challenge received", {
+        messageChars: message.length,
+        timestamp,
+      });
+
+      // 2) Get Solana provider from Particle Network
+      const solanaProvider = (window as any).particle?.solana || (window as any).solana;
+      if (!solanaProvider) {
+        throw new Error("Wallet provider not available. Please ensure your wallet is connected.");
+      }
+
+      // 3) Sign UTF-8 bytes of the exact challenge string
+      const messageBytes = new TextEncoder().encode(message);
+
+      let signResult: unknown;
+      if (typeof solanaProvider.signMessage === "function") {
+        signResult = await solanaProvider.signMessage(messageBytes, "utf8");
+      } else if (typeof solanaProvider.request === "function") {
+        signResult = await solanaProvider.request({
+          method: "signMessage",
           params: {
-            message: bs58.encode(encodedMessage),
-            display: 'utf8',
+            // IMPORTANT: send the original message string, not a base58-encoded payload
+            message,
+            display: "utf8",
           },
         });
-        
-        // Result can be different formats depending on provider
-        if (typeof result === 'string') {
-          signatureBytes = bs58.decode(result);
-        } else if (result.signature) {
-          signatureBytes = typeof result.signature === 'string' 
-            ? bs58.decode(result.signature) 
-            : new Uint8Array(result.signature);
-        } else {
-          throw new Error('Unexpected signature format from wallet');
-        }
       } else {
-        throw new Error('Wallet does not support message signing');
+        throw new Error("Wallet does not support message signing");
       }
-      
-      // Encode signature as base58
-      const signatureBase58 = bs58.encode(signatureBytes);
-      
-      console.log('[WalletSignature] Signature obtained:', signatureBase58.slice(0, 20) + '...');
-      
-      // Cache the verification
-      const verifiedAt = Date.now();
-      verifiedWalletsRef.current.set(walletAddress.toLowerCase(), verifiedAt);
-      
-      setVerificationState({
-        isVerified: true,
-        isVerifying: false,
-        walletAddress,
-        verifiedAt,
+
+      const normalized = normalizeSignature(signResult);
+
+      console.log("[WalletSignature] Signature captured", {
+        detectedFormat: normalized.detectedFormat,
+        signatureEncoding: normalized.signatureEncoding,
+        signatureByteLength: normalized.byteLength,
       });
-      
+
+      setVerificationState((prev) => ({ ...prev, isVerifying: false }));
+
       return {
-        signature: signatureBase58,
+        signature: normalized.signature,
+        signatureEncoding: normalized.signatureEncoding,
         message,
         timestamp,
+        challengeToken,
       };
-      
     } catch (error) {
-      console.error('[WalletSignature] Signing failed:', error);
-      
+      console.error("[WalletSignature] Signing failed:", error);
+
       setVerificationState({
         isVerified: false,
         isVerifying: false,
         walletAddress,
         verifiedAt: null,
       });
-      
-      // Re-throw with user-friendly message
+
       if (error instanceof Error) {
-        if (error.message.includes('User rejected') || error.message.includes('cancelled')) {
-          throw new Error('Signature request was cancelled. Please approve the signature to continue.');
+        if (error.message.includes("User rejected") || error.message.includes("cancelled")) {
+          throw new Error("Signature request was cancelled. Please approve the signature to continue.");
         }
         throw error;
       }
-      throw new Error('Failed to sign verification message');
+
+      throw new Error("Failed to sign verification message");
     }
-  }, [isWalletVerified]);
-  
-  /**
-   * Reset verification state (e.g., when wallet disconnects)
-   */
+  }, []);
+
   const resetVerification = useCallback(() => {
     setVerificationState({
       isVerified: false,
@@ -182,10 +265,11 @@ export function useWalletSignature(): UseWalletSignatureReturn {
     });
     verifiedWalletsRef.current.clear();
   }, []);
-  
+
   return {
     verificationState,
     requestSignature,
+    markVerified,
     resetVerification,
     isWalletVerified,
   };
