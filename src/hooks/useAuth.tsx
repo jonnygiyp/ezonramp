@@ -1,12 +1,15 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useWalletSignature } from './useWalletSignature';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
   loading: boolean;
+  walletVerified: boolean;
+  isVerifyingWallet: boolean;
   syncWalletAuth: (walletAddress: string, walletType?: string, particleUserId?: string) => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -22,6 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const walletSyncInProgress = useRef(false);
   const lastSyncedWallet = useRef<string | null>(null);
+  
+  // Use the wallet signature hook for cryptographic verification
+  const { 
+    verificationState, 
+    requestSignature, 
+    resetVerification,
+    isWalletVerified: checkWalletVerified 
+  } = useWalletSignature();
 
   useEffect(() => {
     // Set up auth state listener first
@@ -71,9 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   /**
-   * Sync wallet authentication with Supabase
-   * Creates or retrieves a Supabase user for the wallet address
-   * and establishes an authenticated session
+   * Sync wallet authentication with Supabase using cryptographic signature verification.
+   * 1. Request user to sign a challenge message
+   * 2. Send signature to backend for verification
+   * 3. Creates or retrieves a Supabase user for the verified wallet
+   * 4. Establishes an authenticated session
    */
   const syncWalletAuth = useCallback(async (
     walletAddress: string,
@@ -86,22 +99,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
     
-    // Skip if already synced for this wallet
-    if (lastSyncedWallet.current === walletAddress && session) {
-      console.log('[useAuth] Wallet already synced:', walletAddress.slice(0, 8));
+    // Skip if already synced for this wallet AND session exists
+    if (lastSyncedWallet.current === walletAddress && session && checkWalletVerified(walletAddress)) {
+      console.log('[useAuth] Wallet already verified and synced:', walletAddress.slice(0, 8));
       return true;
     }
     
     walletSyncInProgress.current = true;
-    console.log('[useAuth] Starting wallet auth sync for:', walletAddress.slice(0, 8));
+    console.log('[useAuth] Starting wallet auth sync with signature verification for:', walletAddress.slice(0, 8));
     
     try {
-      // Call the wallet-auth edge function to get/create Supabase user
+      // Step 1: Request cryptographic signature from wallet
+      console.log('[useAuth] Requesting wallet signature...');
+      const signatureResult = await requestSignature(walletAddress);
+      
+      if (!signatureResult) {
+        console.error('[useAuth] Failed to get wallet signature');
+        return false;
+      }
+      
+      console.log('[useAuth] Signature obtained, sending to backend for verification...');
+      
+      // Step 2: Call the wallet-auth edge function with the signature
       const { data, error } = await supabase.functions.invoke('wallet-auth', {
         body: {
           walletAddress,
           walletType: walletType || 'particle',
           particleUserId,
+          signature: signatureResult.signature,
+          message: signatureResult.message,
+          timestamp: signatureResult.timestamp,
         },
       });
       
@@ -115,9 +142,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
       
-      console.log('[useAuth] Got wallet auth token, verifying OTP...');
+      if (!data?.walletVerified) {
+        console.error('[useAuth] Wallet verification failed on server');
+        return false;
+      }
       
-      // Use the magic link token to establish session
+      console.log('[useAuth] Wallet verified by backend, establishing session...');
+      
+      // Step 3: Use the magic link token to establish session
       const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
         email: data.email,
         token: data.token,
@@ -130,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       if (sessionData?.session) {
-        console.log('[useAuth] Wallet auth session established:', sessionData.user?.id?.slice(0, 8));
+        console.log('[useAuth] Wallet auth session established with verified wallet:', sessionData.user?.id?.slice(0, 8));
         lastSyncedWallet.current = walletAddress;
         return true;
       }
@@ -142,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       walletSyncInProgress.current = false;
     }
-  }, [session]);
+  }, [session, requestSignature, checkWalletVerified]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -163,10 +195,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setIsAdmin(false);
     lastSyncedWallet.current = null;
+    resetVerification();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, syncWalletAuth, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      isAdmin, 
+      loading, 
+      walletVerified: verificationState.isVerified,
+      isVerifyingWallet: verificationState.isVerifying,
+      syncWalletAuth, 
+      signIn, 
+      signUp, 
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );
