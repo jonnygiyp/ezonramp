@@ -22,11 +22,12 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session, loading: authLoading } = useAuth();
+  const { session, loading: authLoading, syncWalletAuth } = useAuth();
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showWidget, setShowWidget] = useState(false);
+  const [isSyncingAuth, setIsSyncingAuth] = useState(false);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
   const onrampInstanceRef = useRef<StripeOnrampType | null>(null);
 
@@ -52,12 +53,47 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       return;
     }
     
-    // Check authentication first
-    if (!session) {
-      console.log('[StripeOnramp] Auth check failed - no session');
+    // If wallet connected but no Supabase session, attempt to sync
+    if (isConnected && address && !session) {
+      console.log('[StripeOnramp] Wallet connected but no session, attempting sync...');
+      setIsSyncingAuth(true);
+      
+      try {
+        const syncSuccess = await syncWalletAuth(address);
+        if (!syncSuccess) {
+          toast({
+            title: "Authentication Failed",
+            description: "Could not authenticate your wallet. Please try reconnecting.",
+            variant: "destructive",
+          });
+          setIsSyncingAuth(false);
+          return;
+        }
+        // Session will be updated via auth state change, wait a moment
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (err) {
+        console.error('[StripeOnramp] Auth sync error:', err);
+        toast({
+          title: "Authentication Error",
+          description: "An error occurred during authentication. Please try again.",
+          variant: "destructive",
+        });
+        setIsSyncingAuth(false);
+        return;
+      }
+      setIsSyncingAuth(false);
+    }
+    
+    // Re-check authentication after potential sync
+    const currentSession = await import('@/integrations/supabase/client').then(m => 
+      m.supabase.auth.getSession().then(r => r.data.session)
+    );
+    
+    if (!currentSession) {
+      console.log('[StripeOnramp] Auth check failed - no session after sync');
       toast({
         title: "Authentication Required",
-        description: "Please sign in to use the Stripe onramp",
+        description: "Please connect your wallet to use the Stripe onramp",
         variant: "destructive",
       });
       return;
@@ -160,7 +196,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast, session, authLoading, isConnected, address, syncWalletAuth]);
 
   // Show embedded widget
   if (showWidget) {
@@ -236,13 +272,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           onClick={handleStartOnramp}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
-          disabled={isLoading || !walletAddress}
+          disabled={isLoading || isSyncingAuth || !walletAddress}
           data-tutorial="stripe-buy-button"
         >
-          {isLoading ? (
+          {isLoading || isSyncingAuth ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Initializing...
+              {isSyncingAuth ? 'Authenticating...' : 'Initializing...'}
             </>
           ) : (
             "Buy Crypto with Stripe"
