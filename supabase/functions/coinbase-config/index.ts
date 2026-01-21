@@ -26,14 +26,31 @@ serve(async (req) => {
   }
 
   try {
-    // Return the public Coinbase Onramp App ID
-    // This is a publishable key meant for client-side use
-    const appId = Deno.env.get("COINBASE_ONRAMP_APP_ID");
+    // Parse request body to determine which App ID to return
+    let variant = "us"; // default to US
+    
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        if (body.variant === "global") {
+          variant = "global";
+        }
+      } catch {
+        // If body parsing fails, default to US
+      }
+    }
+
+    // Return the appropriate Coinbase Onramp App ID based on variant
+    const appId = variant === "global" 
+      ? Deno.env.get("COINBASE_GLOBAL_APP_ID")
+      : Deno.env.get("COINBASE_ONRAMP_APP_ID");
+
+    const variantLabel = variant === "global" ? "Global" : "US";
 
     if (!appId) {
-      console.error("COINBASE_ONRAMP_APP_ID not configured");
+      console.error(`COINBASE_${variant === "global" ? "GLOBAL" : "ONRAMP"}_APP_ID not configured`);
       return new Response(
-        JSON.stringify({ error: "Coinbase Onramp not configured" }),
+        JSON.stringify({ error: `Coinbase Onramp (${variantLabel}) not configured` }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -41,9 +58,9 @@ serve(async (req) => {
       );
     }
 
-    console.log("[COINBASE-CONFIG] Returning Coinbase Onramp App ID");
+    console.log(`[COINBASE-CONFIG] Returning Coinbase Onramp App ID for ${variantLabel}`);
 
-    return new Response(JSON.stringify({ appId }), {
+    return new Response(JSON.stringify({ appId, variant }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
