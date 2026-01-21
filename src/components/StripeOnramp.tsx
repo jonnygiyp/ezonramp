@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, ExternalLink } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
-import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
 // Validate Solana address
 const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
@@ -24,9 +23,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showWidget, setShowWidget] = useState(false);
-  const onrampContainerRef = useRef<HTMLDivElement>(null);
-  const onrampInstanceRef = useRef<StripeOnrampType | null>(null);
 
   // Validate wallet address matches the target network
   const connectedAddressValid = isConnected && address && (
@@ -91,41 +87,24 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       const publishableKey = configData?.publishableKey;
       if (!publishableKey) throw new Error("Stripe publishable key not configured");
 
-      // Load Stripe Onramp
-      console.log("Loading Stripe Onramp with key:", publishableKey.substring(0, 20) + "...");
-      let stripeOnramp;
-      try {
-        stripeOnramp = await loadStripeOnramp(publishableKey);
-      } catch (loadError) {
-        console.error("Stripe Onramp load error:", loadError);
-        throw new Error(`Failed to load Stripe Onramp SDK: ${loadError instanceof Error ? loadError.message : 'Unknown error'}`);
-      }
+      // Open onramp in new window (required - Stripe Crypto Onramp cannot run in iframes)
+      const onrampUrl = `/stripe-onramp?client_secret=${encodeURIComponent(clientSecret)}&pk=${encodeURIComponent(publishableKey)}`;
       
-      if (!stripeOnramp) {
-        throw new Error("Stripe Onramp SDK returned null - check if crypto onramp is enabled for your Stripe account");
+      const newWindow = window.open(onrampUrl, '_blank', 'noopener,noreferrer');
+      
+      if (!newWindow) {
+        // Fallback: redirect current page if popup blocked
+        toast({
+          title: "Opening Stripe Onramp",
+          description: "If a new window didn't open, please allow popups for this site.",
+        });
+        window.location.href = onrampUrl;
+      } else {
+        toast({
+          title: "Stripe Onramp Opened",
+          description: "Complete your purchase in the new window.",
+        });
       }
-
-      onrampInstanceRef.current = stripeOnramp;
-      setShowWidget(true);
-
-      // Mount the onramp widget
-      setTimeout(() => {
-        if (onrampContainerRef.current && stripeOnramp) {
-          const onrampSession = stripeOnramp.createSession({ clientSecret });
-          
-          onrampSession.addEventListener('onramp_session_updated', (event) => {
-            console.log('Onramp session updated:', event.payload);
-            if (event.payload.session.status === 'fulfillment_complete') {
-              toast({
-                title: "Success!",
-                description: "Your crypto purchase was successful.",
-              });
-            }
-          });
-
-          onrampSession.mount(onrampContainerRef.current);
-        }
-      }, 100);
 
     } catch (err) {
       console.error("Onramp error:", err);
@@ -134,38 +113,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
         description: err instanceof Error ? err.message : "Failed to start onramp session",
         variant: "destructive",
       });
-      setShowWidget(false);
     } finally {
       setIsLoading(false);
     }
   }, [walletAddress, defaultAsset, defaultNetwork, toast]);
-
-  // Show embedded widget
-  if (showWidget) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight">Complete Your Purchase</h2>
-          <p className="text-muted-foreground">
-            Follow the steps below to buy crypto
-          </p>
-        </div>
-        
-        <div 
-          ref={onrampContainerRef} 
-          className="min-h-[500px] rounded-xl overflow-hidden border border-border"
-        />
-        
-        <Button
-          variant="ghost"
-          className="w-full"
-          onClick={() => setShowWidget(false)}
-        >
-          Cancel
-        </Button>
-      </div>
-    );
-  }
 
   // Show setup form
   return (
@@ -223,9 +174,16 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
               Initializing...
             </>
           ) : (
-            "Buy Crypto with Stripe"
+            <>
+              <ExternalLink className="mr-2 h-5 w-5" />
+              Buy Crypto with Stripe
+            </>
           )}
         </Button>
+        
+        <p className="text-xs text-center text-muted-foreground">
+          Opens in a new window for security
+        </p>
       </div>
 
       <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">
