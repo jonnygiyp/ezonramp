@@ -52,11 +52,11 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       return;
     }
     
-    // Check for valid Supabase session
+    // Check for valid Supabase session (no wallet verification required)
     if (!session) {
       toast({
         title: "Authentication Required",
-        description: "Please connect your wallet to continue",
+        description: "Please sign in to continue",
         variant: "destructive",
       });
       return;
