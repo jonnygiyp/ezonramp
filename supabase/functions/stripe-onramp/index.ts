@@ -1,12 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import {
-  getCorsHeaders,
-  validateAuth,
-  unauthorizedResponse,
-  getClientId,
-  logSecurityEvent,
-} from "../_shared/auth.ts";
+import { getCorsHeaders } from "../_shared/auth.ts";
 
 serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -17,26 +11,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const clientId = getClientId(req);
-
   try {
     // ========================================
-    // AUTHENTICATION CHECK - Session tokens require auth
-    // ========================================
-    const authResult = await validateAuth(req);
-    
-    if (!authResult.authenticated) {
-      logSecurityEvent("AUTH_FAILED_STRIPE_ONRAMP", {
-        clientId,
-        error: authResult.error,
-      });
-      return unauthorizedResponse(corsHeaders, authResult.error);
-    }
-
-    console.log(`[AUTH] Stripe onramp request authorized for user ${authResult.userId?.slice(0, 8)}...`);
-
-    // ========================================
-    // STRIPE SESSION CREATION
+    // STRIPE SESSION CREATION (Public endpoint)
     // ========================================
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
@@ -97,7 +74,7 @@ serve(async (req) => {
     }
 
     const session = await response.json();
-    console.log("Onramp session created:", { id: session.id, status: session.status, userId: authResult.userId?.slice(0, 8) });
+    console.log("Onramp session created:", { id: session.id, status: session.status });
 
     return new Response(
       JSON.stringify({ 
