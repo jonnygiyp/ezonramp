@@ -4,22 +4,13 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
 // Validate Solana address
 const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
 const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
-
-// Check if running inside an iframe
-const isInIframe = () => {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
-};
 
 // Main StripeOnramp component
 interface StripeOnrampProps {
@@ -172,41 +163,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
         >
           Cancel
         </Button>
-      </div>
-    );
-  }
-
-  // Show iframe warning in development
-  if (isInIframe()) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="text-center space-y-2">
-          <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy Crypto with Stripe</h1>
-          <p className="text-xs md:text-sm text-muted-foreground">
-            Secure fiat-to-crypto purchases powered by Stripe
-          </p>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-          <div className="text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-              <ExternalLink className="w-6 h-6 text-primary" />
-            </div>
-            <h3 className="font-semibold">Open in New Tab Required</h3>
-            <p className="text-sm text-muted-foreground">
-              Stripe Onramp requires a full browser window and cannot run in the preview iframe.
-            </p>
-          </div>
-          
-          <Button
-            onClick={() => window.open(window.location.href, '_blank')}
-            size="lg"
-            className="w-full text-lg py-6"
-          >
-            <ExternalLink className="mr-2 h-5 w-5" />
-            Open in New Tab
-          </Button>
-        </div>
       </div>
     );
   }
