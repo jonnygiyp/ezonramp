@@ -1,21 +1,94 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import {
+  getCorsHeaders,
+  validateAuth,
+  unauthorizedResponse,
+  getClientId,
+  logSecurityEvent,
+  validateOrigin,
+} from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Rate limiting
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW_MS = 60000;
+const RATE_LIMIT_MAX_REQUESTS = 10;
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now();
+  const clientData = rateLimitMap.get(clientId);
+  
+  if (!clientData || now > clientData.resetTime) {
+    rateLimitMap.set(clientId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (clientData.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  
+  clientData.count++;
+  return true;
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Validate origin
+  const originError = validateOrigin(origin, corsHeaders);
+  if (originError) return originError;
+
+  // Only allow POST
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const clientId = getClientId(req);
+
   try {
+    // Rate limiting
+    if (!checkRateLimit(clientId)) {
+      logSecurityEvent('RATE_LIMIT_EXCEEDED', { clientId, function: 'stripe-onramp' });
+      return new Response(JSON.stringify({ error: 'Too many requests' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ========================================
+    // AUTHENTICATION CHECK - Session tokens require auth
+    // ========================================
+    const authResult = await validateAuth(req);
+    
+    if (!authResult.authenticated) {
+      logSecurityEvent("AUTH_FAILED_STRIPE_ONRAMP", {
+        clientId,
+        error: authResult.error,
+      });
+      return unauthorizedResponse(corsHeaders, authResult.error);
+    }
+
+    console.log(`[AUTH] Stripe onramp request authorized for user ${authResult.userId?.slice(0, 8)}...`);
+
+    // ========================================
+    // STRIPE SESSION CREATION
+    // ========================================
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
-      throw new Error("STRIPE_SECRET_KEY is not configured");
+      console.error('STRIPE_SECRET_KEY not configured');
+      return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const stripe = new Stripe(stripeKey, {
@@ -24,15 +97,24 @@ serve(async (req) => {
 
     const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount } = await req.json();
 
-    if (!walletAddress) {
-      throw new Error("Wallet address is required");
+    if (!walletAddress || typeof walletAddress !== 'string') {
+      return new Response(JSON.stringify({ error: 'Wallet address is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Build wallet addresses object based on network
+    // Validate wallet address format (basic validation)
+    if (walletAddress.length < 20 || walletAddress.length > 100) {
+      return new Response(JSON.stringify({ error: 'Invalid wallet address format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const walletAddresses: Record<string, string> = {};
     const network = destinationNetwork || "solana";
     
-    // Map network to wallet address key
     const networkMapping: Record<string, string> = {
       solana: "solana",
       ethereum: "ethereum",
@@ -47,9 +129,8 @@ serve(async (req) => {
       walletAddresses[networkMapping[network]] = walletAddress;
     }
 
-    // Create crypto onramp session using direct API call
-    // Note: The Stripe SDK may not have built-in support for crypto onramp,
-    // so we make a direct API request
+    console.log(`[STRIPE] Creating onramp session for user ${authResult.userId?.slice(0, 8)}... wallet ${walletAddress.slice(0, 10)}...`);
+
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
       headers: {
@@ -70,11 +151,18 @@ serve(async (req) => {
     if (!response.ok) {
       const errorData = await response.json();
       console.error("Stripe API error:", errorData);
-      throw new Error(errorData.error?.message || "Failed to create onramp session");
+      return new Response(JSON.stringify({ error: 'Failed to create onramp session' }), {
+        status: response.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const session = await response.json();
-    console.log("Onramp session created:", { id: session.id, status: session.status });
+    console.log("[STRIPE] Onramp session created:", { 
+      id: session.id, 
+      status: session.status, 
+      userId: authResult.userId?.slice(0, 8) 
+    });
 
     return new Response(
       JSON.stringify({ 
@@ -89,7 +177,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error creating onramp session:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: 'Failed to create onramp session' }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,

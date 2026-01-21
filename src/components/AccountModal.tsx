@@ -1,14 +1,24 @@
-import { useState, useEffect } from 'react';
-import { useAccount, useDisconnect, useWallets } from '@/hooks/useParticle';
-import { Copy, Send, ArrowDownLeft, LogOut, Wallet, Check, ExternalLink, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useAccount, useDisconnect } from '@/hooks/useParticle';
+import { Copy, Send, ArrowDownLeft, LogOut, Wallet, Check, ExternalLink, RefreshCw, Key, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,7 +48,6 @@ interface AccountModalProps {
 const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
-  const [wallets] = useWallets();
   const [copied, setCopied] = useState(false);
   const [balance, setBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
@@ -48,6 +57,28 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [showSendConfirmation, setShowSendConfirmation] = useState(false);
+
+  // Handle export private key - uses Particle's embedded wallet UI
+  const handleExportPrivateKey = useCallback(async () => {
+    try {
+      // Dynamically import useEmbeddedWallet to avoid hook errors
+      const { useEmbeddedWallet } = await import('@particle-network/connectkit');
+      
+      // Note: We can't call hooks dynamically, so we need a different approach
+      // The Particle wallet UI should be visible via the wallet plugin
+      // Opening the wallet is done via the SDK's built-in floating button
+      toast({
+        title: "Export Private Key",
+        description: "Click the Particle wallet button (bottom-right) and navigate to Settings > Security to export your key.",
+      });
+    } catch (error) {
+      console.error('Export private key error:', error);
+      toast({
+        title: "Info",
+        description: "Use the Particle wallet button (bottom-right corner) to access Settings > Security for key export.",
+      });
+    }
+  }, []);
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -339,6 +370,47 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
               </div>
             </TabsContent>
           </Tabs>
+
+          {/* Export Private Key Button */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full"
+              >
+                <Key className="mr-2 h-4 w-4" />
+                Export Private Key
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  Security Warning
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>
+                      <strong>Never share your private key or seed phrase with anyone.</strong>
+                    </p>
+                    <p>
+                      Anyone with access to your private key can steal all your funds. 
+                      EZOnRamp staff will never ask for your private key.
+                    </p>
+                    <p className="text-destructive font-medium">
+                      Only export your private key if you understand the risks.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleExportPrivateKey} className="bg-destructive hover:bg-destructive/90">
+                  I Understand, Continue
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Disconnect Button */}
           <Button

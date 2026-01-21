@@ -127,6 +127,27 @@ const SendConfirmationModal = ({
         ASSOCIATED_TOKEN_PROGRAM_ID
       );
 
+      // Pre-flight check: Verify sender has a USDC account with sufficient balance
+      const senderAtaInfo = await connection.getAccountInfo(senderAta);
+      if (!senderAtaInfo) {
+        throw new Error('You do not have a USDC token account. Please receive some USDC first.');
+      }
+
+      // Parse sender's token balance
+      const senderTokenAccounts = await connection.getParsedTokenAccountsByOwner(senderPubkey, {
+        mint: USDC_MINT,
+      });
+
+      let senderBalance = 0;
+      for (const ta of senderTokenAccounts.value) {
+        const tokenAmount = (ta.account.data as any)?.parsed?.info?.tokenAmount;
+        senderBalance += tokenAmount?.uiAmount ?? 0;
+      }
+
+      if (senderBalance < amountNum) {
+        throw new Error(`Insufficient USDC balance. You have ${senderBalance.toFixed(2)} USDC but are trying to send ${amountNum} USDC.`);
+      }
+
       // Check if recipient has USDC account, if not we need to create it
       const recipientAtaInfo = await connection.getAccountInfo(recipientAta);
       const instructions = [];
