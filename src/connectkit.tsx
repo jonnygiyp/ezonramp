@@ -116,7 +116,7 @@ async function loadParticleSDK(): Promise<void> {
         ],
         plugins: [
           wallet({
-            visible: true,
+            visible: false,
             entryPosition: EntryPosition.BR,
           }),
         ],
