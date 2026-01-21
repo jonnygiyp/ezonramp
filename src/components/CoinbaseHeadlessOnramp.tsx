@@ -5,6 +5,7 @@ import { Label } from "./ui/label";
 import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@/hooks/useParticle";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
@@ -70,6 +71,7 @@ export function CoinbaseHeadlessOnramp({
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
+  const { session } = useAuth();
 
   // Check for existing verification on mount
   const storedVerification = getStoredVerification();
@@ -240,6 +242,15 @@ export function CoinbaseHeadlessOnramp({
 
   // Get quote and generate buy URL
   const getQuote = async () => {
+    if (!session) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to use Coinbase onramp",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!amount || parseFloat(amount) < 1) {
       toast({
         title: "Invalid Amount",
