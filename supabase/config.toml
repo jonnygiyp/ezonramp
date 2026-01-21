@@ -20,6 +20,3 @@ verify_jwt = false
 
 [functions.stripe-config]
 verify_jwt = false
-
-[functions.wallet-auth]
-verify_jwt = false

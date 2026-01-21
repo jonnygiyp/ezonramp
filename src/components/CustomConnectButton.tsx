@@ -25,10 +25,6 @@ const CustomConnectButton = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleDisconnect = () => {
-    disconnect();
-  };
-
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
@@ -59,7 +55,7 @@ const CustomConnectButton = () => {
               <Wallet className="mr-2 h-4 w-4" />
               Wallet
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDisconnect}>
+            <DropdownMenuItem onClick={() => disconnect()}>
               <LogOut className="mr-2 h-4 w-4" />
               Disconnect
             </DropdownMenuItem>

@@ -6,64 +6,20 @@ import {
   unauthorizedResponse,
   getClientId,
   logSecurityEvent,
-  validateOrigin,
 } from "../_shared/auth.ts";
-
-// Rate limiting
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW_MS = 60000;
-const RATE_LIMIT_MAX_REQUESTS = 10;
-
-function checkRateLimit(clientId: string): boolean {
-  const now = Date.now();
-  const clientData = rateLimitMap.get(clientId);
-  
-  if (!clientData || now > clientData.resetTime) {
-    rateLimitMap.set(clientId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  
-  if (clientData.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-  
-  clientData.count++;
-  return true;
-}
 
 serve(async (req) => {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
 
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
-  }
-
-  // Validate origin
-  const originError = validateOrigin(origin, corsHeaders);
-  if (originError) return originError;
-
-  // Only allow POST
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
   }
 
   const clientId = getClientId(req);
 
   try {
-    // Rate limiting
-    if (!checkRateLimit(clientId)) {
-      logSecurityEvent('RATE_LIMIT_EXCEEDED', { clientId, function: 'stripe-onramp' });
-      return new Response(JSON.stringify({ error: 'Too many requests' }), {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     // ========================================
     // AUTHENTICATION CHECK - Session tokens require auth
     // ========================================
@@ -84,11 +40,7 @@ serve(async (req) => {
     // ========================================
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
-      console.error('STRIPE_SECRET_KEY not configured');
-      return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error("STRIPE_SECRET_KEY is not configured");
     }
 
     const stripe = new Stripe(stripeKey, {
@@ -97,24 +49,15 @@ serve(async (req) => {
 
     const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount } = await req.json();
 
-    if (!walletAddress || typeof walletAddress !== 'string') {
-      return new Response(JSON.stringify({ error: 'Wallet address is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!walletAddress) {
+      throw new Error("Wallet address is required");
     }
 
-    // Validate wallet address format (basic validation)
-    if (walletAddress.length < 20 || walletAddress.length > 100) {
-      return new Response(JSON.stringify({ error: 'Invalid wallet address format' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
+    // Build wallet addresses object based on network
     const walletAddresses: Record<string, string> = {};
     const network = destinationNetwork || "solana";
     
+    // Map network to wallet address key
     const networkMapping: Record<string, string> = {
       solana: "solana",
       ethereum: "ethereum",
@@ -129,8 +72,7 @@ serve(async (req) => {
       walletAddresses[networkMapping[network]] = walletAddress;
     }
 
-    console.log(`[STRIPE] Creating onramp session for user ${authResult.userId?.slice(0, 8)}... wallet ${walletAddress.slice(0, 10)}...`);
-
+    // Create crypto onramp session using direct API call
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
       headers: {
@@ -151,18 +93,11 @@ serve(async (req) => {
     if (!response.ok) {
       const errorData = await response.json();
       console.error("Stripe API error:", errorData);
-      return new Response(JSON.stringify({ error: 'Failed to create onramp session' }), {
-        status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error(errorData.error?.message || "Failed to create onramp session");
     }
 
     const session = await response.json();
-    console.log("[STRIPE] Onramp session created:", { 
-      id: session.id, 
-      status: session.status, 
-      userId: authResult.userId?.slice(0, 8) 
-    });
+    console.log("Onramp session created:", { id: session.id, status: session.status, userId: authResult.userId?.slice(0, 8) });
 
     return new Response(
       JSON.stringify({ 
@@ -177,7 +112,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error creating onramp session:", error);
     return new Response(
-      JSON.stringify({ error: 'Failed to create onramp session' }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,

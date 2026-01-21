@@ -4,7 +4,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
 import { useAuth } from "@/hooks/useAuth";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
@@ -22,7 +22,7 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session, loading: authLoading } = useAuth();
+  const { session } = useAuth();
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -43,31 +43,11 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
-    // Check if auth is still loading
-    if (authLoading) {
-      toast({
-        title: "Please Wait",
-        description: "Loading authentication state...",
-      });
-      return;
-    }
-    
-    // Check for valid Supabase session (no wallet verification required)
+    // Check authentication first
     if (!session) {
       toast({
         title: "Authentication Required",
-        description: "Please sign in to continue",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Explicitly retrieve the access token from the session
-    const accessToken = session.access_token;
-    if (!accessToken) {
-      toast({
-        title: "Authentication Error",
-        description: "Session token not available. Please sign in again.",
+        description: "Please sign in to use the Stripe onramp",
         variant: "destructive",
       });
       return;
@@ -101,12 +81,8 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     setIsLoading(true);
 
     try {
-      // Get client secret from edge function with explicit JWT in Authorization header
-      console.log("[StripeOnramp] Invoking stripe-onramp with explicit JWT auth");
+      // Get client secret from edge function
       const { data, error: fnError } = await supabase.functions.invoke('stripe-onramp', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
         body: {
           walletAddress: walletAddress.trim(),
           destinationCurrency: defaultAsset.toLowerCase(),
@@ -120,13 +96,8 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       const { clientSecret } = data;
       if (!clientSecret) throw new Error("No client secret received");
 
-      // Get publishable key from config with explicit JWT
-      console.log("[StripeOnramp] Invoking stripe-config with explicit JWT auth");
-      const { data: configData, error: configError } = await supabase.functions.invoke('stripe-config', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      // Get publishable key from config
+      const { data: configData, error: configError } = await supabase.functions.invoke('stripe-config');
       if (configError) throw configError;
       
       const publishableKey = configData?.publishableKey;
@@ -169,102 +140,126 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       }, 100);
 
     } catch (err) {
-      console.error("Stripe onramp error:", err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start onramp';
-      
-      // Check for auth-related errors
-      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('expired')) {
-        toast({
-          title: "Session Expired",
-          description: "Please sign in again to continue.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      console.error("Onramp error:", err);
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to start onramp session",
+        variant: "destructive",
+      });
+      setShowWidget(false);
     } finally {
       setIsLoading(false);
     }
-  }, [authLoading, session, walletAddress, defaultNetwork, defaultAsset, toast]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast, session]);
 
-  const handleCloseWidget = useCallback(() => {
-    setShowWidget(false);
-    onrampInstanceRef.current = null;
-  }, []);
-
-  // Determine if user can interact with the form
-  const isAuthenticated = !!session;
-  const isReady = !authLoading && isAuthenticated;
-
+  // Show embedded widget
   if (showWidget) {
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-foreground">Complete Your Purchase</h3>
-          <Button variant="outline" onClick={handleCloseWidget}>
-            Cancel
-          </Button>
+      <div className="space-y-6 animate-fade-in">
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight">Complete Your Purchase</h2>
+          <p className="text-muted-foreground">
+            Follow the steps below to buy crypto
+          </p>
         </div>
+        
         <div 
           ref={onrampContainerRef} 
-          className="min-h-[500px] border border-border rounded-lg bg-card"
+          className="min-h-[500px] rounded-xl overflow-hidden border border-border"
         />
+        
+        <Button
+          variant="ghost"
+          className="w-full"
+          onClick={() => setShowWidget(false)}
+        >
+          Cancel
+        </Button>
       </div>
     );
   }
 
+  // Show setup form
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="wallet-address" className="text-foreground">
-          Receive Address ({defaultNetwork === 'solana' ? 'Solana' : 'EVM'})
-        </Label>
-        <Input
-          id="wallet-address"
-          type="text"
-          placeholder={isReady ? `Enter your ${defaultNetwork} wallet address` : "Sign in to enter address"}
-          value={walletAddress}
-          onChange={(e) => setWalletAddress(e.target.value)}
-          disabled={!isReady}
-          className="font-mono text-sm"
-        />
-        {connectedAddressValid && address && (
-          <p className="text-xs text-muted-foreground">
-            Using connected wallet: {address.slice(0, 8)}...{address.slice(-6)}
-          </p>
-        )}
+    <div className="space-y-6 animate-fade-in">
+      <div className="text-center space-y-2">
+        <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy Crypto with Stripe</h1>
+        <p className="text-xs md:text-sm text-muted-foreground">
+          Secure fiat-to-crypto purchases powered by Stripe
+        </p>
       </div>
 
-      <Button
-        onClick={handleStartOnramp}
-        disabled={isLoading || !isReady || !walletAddress.trim()}
-        className="w-full"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Starting...
-          </>
-        ) : authLoading ? (
-          "Loading..."
-        ) : !isAuthenticated ? (
-          "Sign in to Buy"
-        ) : (
-          "Buy Crypto"
-        )}
-      </Button>
+      <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+        <div className="space-y-4">
+          <div className="space-y-2" data-tutorial="stripe-wallet-input">
+            <Label htmlFor="wallet-address">
+              {defaultNetwork === 'solana' ? 'Wallet address to receive Solana USDC' : 'EVM Wallet Address'}
+            </Label>
+            {connectedAddressValid ? (
+              <>
+                <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                  <p className="font-mono text-sm truncate">{walletAddress}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Connected wallet detected
+                </p>
+              </>
+            ) : (
+              <>
+                <Input
+                  id="wallet-address"
+                  type="text"
+                  placeholder="Sign Up / Sign In To Populate Address"
+                  value=""
+                  disabled
+                  className="bg-muted/50 cursor-not-allowed text-muted-foreground"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sign in to automatically populate your wallet address
+                </p>
+              </>
+            )}
+          </div>
+        </div>
 
-      {!isAuthenticated && !authLoading && (
-        <p className="text-sm text-muted-foreground text-center">
-          Please sign in to purchase crypto
-        </p>
-      )}
+        <Button
+          onClick={handleStartOnramp}
+          size="lg"
+          className="w-full text-lg py-6 hover-scale"
+          disabled={isLoading || !walletAddress}
+          data-tutorial="stripe-buy-button"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Initializing...
+            </>
+          ) : (
+            "Buy Crypto with Stripe"
+          )}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">🔒</span>
+          </div>
+          <p className="font-medium text-xs md:text-sm">Secure Payments</p>
+        </div>
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">⚡</span>
+          </div>
+          <p className="font-medium text-xs md:text-sm">Instant Delivery</p>
+        </div>
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-base md:text-2xl">🇺🇸</span>
+          </div>
+          <p className="font-medium text-xs md:text-sm">USA Supported</p>
+        </div>
+      </div>
     </div>
   );
 }
-
-export default StripeOnramp;

@@ -1,52 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import {
-  getCorsHeaders,
-  getClientId,
-  logSecurityEvent,
-  validateOrigin,
-} from "../_shared/auth.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 interface VerifyRequest {
   action: 'send' | 'check';
   channel: 'sms' | 'email';
-  to: string;
-  code?: string;
-}
-
-// Rate limiting
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW_MS = 60000;
-const RATE_LIMIT_MAX_REQUESTS = 5; // Stricter limit for verification codes
-
-function checkRateLimit(clientId: string): boolean {
-  const now = Date.now();
-  const clientData = rateLimitMap.get(clientId);
-  
-  if (!clientData || now > clientData.resetTime) {
-    rateLimitMap.set(clientId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  
-  if (clientData.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-  
-  clientData.count++;
-  return true;
+  to: string; // phone number or email
+  code?: string; // only for 'check' action
 }
 
 serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
-  // Validate origin
-  const originError = validateOrigin(origin, corsHeaders);
-  if (originError) return originError;
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -55,32 +25,7 @@ serve(async (req) => {
     });
   }
 
-  const clientId = getClientId(req);
-
   try {
-    // Rate limiting (strict - this is a public endpoint)
-    if (!checkRateLimit(clientId)) {
-      logSecurityEvent('RATE_LIMIT_EXCEEDED', { clientId, function: 'twilio-verify' });
-      return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // ========================================
-    // NOTE: This endpoint is intentionally public (no JWT required)
-    // because it serves as the identity verification step for Coinbase US.
-    // Security is enforced through:
-    // 1. Strict CORS (only app domains allowed)
-    // 2. Rate limiting (5 requests per minute per IP)
-    // 3. Twilio's own verification security
-    // 4. Input validation
-    // ========================================
-    console.log(`[VERIFY] Twilio verify request from client ${clientId.slice(0, 10)}...`);
-
-    // ========================================
-    // TWILIO VERIFICATION
-    // ========================================
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const serviceSid = Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
@@ -127,6 +72,7 @@ serve(async (req) => {
         });
       }
     } else if (channel === 'sms') {
+      // Basic phone validation - should start with + and contain only digits
       const phoneRegex = /^\+[1-9]\d{6,14}$/;
       if (!phoneRegex.test(to)) {
         return new Response(JSON.stringify({ error: 'Invalid phone format. Use E.164 format (e.g., +14155551234)' }), {
@@ -140,7 +86,8 @@ serve(async (req) => {
     const baseUrl = `https://verify.twilio.com/v2/Services/${serviceSid}`;
 
     if (action === 'send') {
-      console.log(`[VERIFY] Sending ${channel} verification to: ${to.slice(0, 5)}*** for client ${clientId.slice(0, 10)}...`);
+      // Send verification code
+      console.log(`Sending ${channel} verification to:`, to.slice(0, 5) + '***');
 
       const response = await fetch(`${baseUrl}/Verifications`, {
         method: 'POST',
@@ -167,7 +114,7 @@ serve(async (req) => {
         });
       }
 
-      console.log('[VERIFY] Verification sent successfully, status:', data.status);
+      console.log('Verification sent successfully, status:', data.status);
 
       return new Response(JSON.stringify({ 
         success: true,
@@ -178,6 +125,7 @@ serve(async (req) => {
       });
 
     } else if (action === 'check') {
+      // Check verification code
       if (!code) {
         return new Response(JSON.stringify({ error: 'Code is required for check action' }), {
           status: 400,
@@ -185,6 +133,7 @@ serve(async (req) => {
         });
       }
 
+      // Validate code format (typically 4-8 digits)
       if (!/^\d{4,8}$/.test(code)) {
         return new Response(JSON.stringify({ error: 'Invalid code format' }), {
           status: 400,
@@ -192,7 +141,7 @@ serve(async (req) => {
         });
       }
 
-      console.log(`[VERIFY] Checking ${channel} verification for: ${to.slice(0, 5)}*** for client ${clientId.slice(0, 10)}...`);
+      console.log(`Checking ${channel} verification for:`, to.slice(0, 5) + '***');
 
       const response = await fetch(`${baseUrl}/VerificationCheck`, {
         method: 'POST',
@@ -220,7 +169,7 @@ serve(async (req) => {
       }
 
       const verified = data.status === 'approved';
-      console.log('[VERIFY] Verification check result:', data.status);
+      console.log('Verification check result:', data.status);
 
       return new Response(JSON.stringify({ 
         success: true,

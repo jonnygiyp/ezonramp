@@ -1,32 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, validateOrigin } from "../_shared/auth.ts";
+import { getCorsHeaders } from "../_shared/auth.ts";
 
 // Note: This endpoint returns only the public App ID, which is safe to expose.
 // No authentication required for publishable/public keys.
-// However, strict CORS is enforced.
 
 serve(async (req) => {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
 
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Validate origin - only allow requests from approved domains
-  const originError = validateOrigin(origin, corsHeaders);
-  if (originError) return originError;
-
-  // Only allow GET for config retrieval
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   try {
+    // Return the public Coinbase Onramp App ID
+    // This is a publishable key meant for client-side use
     const appId = Deno.env.get('COINBASE_ONRAMP_APP_ID');
 
     if (!appId) {
@@ -40,7 +29,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('[CONFIG] Returning Coinbase Onramp App ID to origin:', origin);
+    console.log('Returning Coinbase Onramp App ID');
     
     return new Response(
       JSON.stringify({ appId }),
