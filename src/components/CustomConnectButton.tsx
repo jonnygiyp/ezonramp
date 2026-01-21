@@ -1,4 +1,5 @@
 import { useAccount, useModal, useDisconnect } from '@/hooks/useParticle';
+import { useWalletSync } from '@/hooks/useWalletSync';
 import { User, Wallet, LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -16,6 +17,9 @@ const CustomConnectButton = () => {
   const { disconnect } = useDisconnect();
   const [isInitializing, setIsInitializing] = useState(true);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  
+  // Sync wallet address to user profile for backend verification
+  useWalletSync();
 
   // Give Particle SDK time to check for existing session
   useEffect(() => {
