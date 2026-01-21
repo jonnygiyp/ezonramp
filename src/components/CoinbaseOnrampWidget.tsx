@@ -30,17 +30,19 @@ export function CoinbaseOnrampWidget({
   
   const destinationAddress = isConnected && address ? address : manualAddress;
 
-  // Fetch the App ID from the edge function
+  // Fetch the Global App ID from the edge function
   useEffect(() => {
     const fetchAppId = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("coinbase-config");
+        const { data, error } = await supabase.functions.invoke("coinbase-config", {
+          body: { variant: "global" },
+        });
         if (error) throw error;
         if (data?.appId) {
           setAppId(data.appId);
         }
       } catch (err) {
-        console.error("Failed to fetch Coinbase config:", err);
+        console.error("Failed to fetch Coinbase Global config:", err);
       } finally {
         setIsLoadingConfig(false);
       }
