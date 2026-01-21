@@ -4,9 +4,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogIn } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
-import { useAuth } from "@/hooks/useAuth";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
 // Validate Solana address
@@ -22,7 +21,6 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session } = useAuth();
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -43,15 +41,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
-    // Check authentication first
-    if (!session) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to use the Stripe onramp",
-        variant: "destructive",
-      });
-      return;
-    }
 
     if (!walletAddress.trim()) {
       toast({
@@ -150,7 +139,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, session]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast]);
 
   // Show embedded widget
   if (showWidget) {
