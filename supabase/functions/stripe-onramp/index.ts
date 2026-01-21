@@ -1,18 +1,43 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import {
+  getCorsHeaders,
+  validateAuth,
+  unauthorizedResponse,
+  getClientId,
+  logSecurityEvent,
+} from "../_shared/auth.ts";
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const clientId = getClientId(req);
+
   try {
+    // ========================================
+    // AUTHENTICATION CHECK - Session tokens require auth
+    // ========================================
+    const authResult = await validateAuth(req);
+    
+    if (!authResult.authenticated) {
+      logSecurityEvent("AUTH_FAILED_STRIPE_ONRAMP", {
+        clientId,
+        error: authResult.error,
+      });
+      return unauthorizedResponse(corsHeaders, authResult.error);
+    }
+
+    console.log(`[AUTH] Stripe onramp request authorized for user ${authResult.userId?.slice(0, 8)}...`);
+
+    // ========================================
+    // STRIPE SESSION CREATION
+    // ========================================
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       throw new Error("STRIPE_SECRET_KEY is not configured");
@@ -48,8 +73,6 @@ serve(async (req) => {
     }
 
     // Create crypto onramp session using direct API call
-    // Note: The Stripe SDK may not have built-in support for crypto onramp,
-    // so we make a direct API request
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
       headers: {
@@ -74,7 +97,7 @@ serve(async (req) => {
     }
 
     const session = await response.json();
-    console.log("Onramp session created:", { id: session.id, status: session.status });
+    console.log("Onramp session created:", { id: session.id, status: session.status, userId: authResult.userId?.slice(0, 8) });
 
     return new Response(
       JSON.stringify({ 
