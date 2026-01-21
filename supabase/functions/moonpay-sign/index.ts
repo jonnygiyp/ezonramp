@@ -1,43 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createHmac } from "node:crypto";
-import {
-  getCorsHeaders,
-  validateAuth,
-  unauthorizedResponse,
-  getClientId,
-  logSecurityEvent,
-} from "../_shared/auth.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
-
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const clientId = getClientId(req);
-
   try {
-    // ========================================
-    // AUTHENTICATION CHECK - Signing requires auth
-    // ========================================
-    const authResult = await validateAuth(req);
-    
-    if (!authResult.authenticated) {
-      logSecurityEvent("AUTH_FAILED_MOONPAY_SIGN", {
-        clientId,
-        error: authResult.error,
-      });
-      return unauthorizedResponse(corsHeaders, authResult.error);
-    }
-
-    console.log(`[AUTH] MoonPay sign request authorized for user ${authResult.userId?.slice(0, 8)}...`);
-
-    // ========================================
-    // URL SIGNING
-    // ========================================
     const secretKey = Deno.env.get('MOONPAY_SECRET_KEY');
     
     if (!secretKey) {
@@ -58,8 +33,6 @@ serve(async (req) => {
     const signature = createHmac('sha256', secretKey)
       .update(queryString)
       .digest('base64');
-
-    console.log(`[SIGN] MoonPay URL signed for user ${authResult.userId?.slice(0, 8)}...`);
 
     return new Response(
       JSON.stringify({ signature }),

@@ -1,28 +1,18 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 
-function getPublicCorsHeaders(origin: string | null): Record<string, string> {
-  return {
-    "Access-Control-Allow-Origin": origin ?? "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Vary": "Origin",
-  };
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getPublicCorsHeaders(origin);
-
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // ========================================
-    // STRIPE SESSION CREATION (Public endpoint)
-    // ========================================
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       throw new Error("STRIPE_SECRET_KEY is not configured");
@@ -58,6 +48,8 @@ serve(async (req) => {
     }
 
     // Create crypto onramp session using direct API call
+    // Note: The Stripe SDK may not have built-in support for crypto onramp,
+    // so we make a direct API request
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
       headers: {

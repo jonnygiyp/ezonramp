@@ -22,26 +22,11 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   
-  const [isEmbeddedPreview, setIsEmbeddedPreview] = useState(false);
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showWidget, setShowWidget] = useState(false);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
   const onrampInstanceRef = useRef<StripeOnrampType | null>(null);
-
-  // Stripe Crypto Onramp cannot run inside an iframe. The Lovable preview is embedded.
-  useEffect(() => {
-    try {
-      setIsEmbeddedPreview(window.self !== window.top);
-    } catch {
-      setIsEmbeddedPreview(true);
-    }
-  }, []);
-
-  const openInNewTab = useCallback(() => {
-    // Open the current app URL in a top-level tab (not embedded) so Stripe can run.
-    window.open(window.location.href, "_blank", "noopener,noreferrer");
-  }, []);
 
   // Validate wallet address matches the target network
   const connectedAddressValid = isConnected && address && (
@@ -56,16 +41,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
-
-    if (isEmbeddedPreview) {
-      toast({
-        title: "Open in new tab",
-        description: "Stripe Crypto Onramp can’t run inside the embedded preview. Opening a new tab to continue.",
-      });
-      openInNewTab();
-      return;
-    }
-
     if (!walletAddress.trim()) {
       toast({
         title: "Wallet Required",
@@ -163,7 +138,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, isEmbeddedPreview, openInNewTab]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast]);
 
   // Show embedded widget
   if (showWidget) {
@@ -202,12 +177,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
         </p>
       </div>
 
-      {isEmbeddedPreview && (
-        <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-          Stripe Crypto Onramp can’t render inside the embedded preview window. Open this page in a new tab to continue.
-        </div>
-      )}
-
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         <div className="space-y-4">
           <div className="space-y-2" data-tutorial="stripe-wallet-input">
@@ -242,7 +211,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
         </div>
 
         <Button
-          onClick={isEmbeddedPreview ? openInNewTab : handleStartOnramp}
+          onClick={handleStartOnramp}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
           disabled={isLoading || !walletAddress}
@@ -254,7 +223,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
               Initializing...
             </>
           ) : (
-            isEmbeddedPreview ? "Open Stripe Onramp in New Tab" : "Buy Crypto with Stripe"
+            "Buy Crypto with Stripe"
           )}
         </Button>
       </div>

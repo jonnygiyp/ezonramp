@@ -6,7 +6,6 @@ import { Label } from "./ui/label";
 import { Loader2, ExternalLink, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@/hooks/useParticle";
-import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CoinbaseOnrampWidgetProps {
@@ -20,7 +19,6 @@ export function CoinbaseOnrampWidget({
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
   const [manualAddress, setManualAddress] = useState("");
@@ -50,15 +48,6 @@ export function CoinbaseOnrampWidget({
 
   // Handle the buy action - get session token and open URL
   const handleBuy = useCallback(async () => {
-    if (!session) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to use Coinbase onramp",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!destinationAddress) {
       toast({
         title: "Wallet Required",
@@ -126,7 +115,7 @@ export function CoinbaseOnrampWidget({
     } finally {
       setIsLoading(false);
     }
-  }, [destinationAddress, defaultNetwork, defaultAsset, amount, toast, session]);
+  }, [destinationAddress, defaultNetwork, defaultAsset, amount, toast]);
 
   if (isLoadingConfig) {
     return (

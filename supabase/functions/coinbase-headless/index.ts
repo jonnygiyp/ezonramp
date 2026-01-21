@@ -1,12 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { SignJWT, importPKCS8, importJWK } from "https://deno.land/x/jose@v5.2.0/index.ts";
-import {
-  getCorsHeaders,
-  validateAuth,
-  unauthorizedResponse,
-  getClientId,
-  logSecurityEvent,
-} from "../_shared/auth.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 const CDP_API_BASE = 'https://api.developer.coinbase.com';
 
@@ -187,17 +186,7 @@ async function callCDPApi(
   return fetch(`${CDP_API_BASE}${path}`, options);
 }
 
-// Actions that require authentication (session token minting)
-const PROTECTED_ACTIONS = ['getSessionToken', 'generateBuyUrl', 'createUser'];
-
-// Actions that are public (config/quote info)
-const PUBLIC_ACTIONS = ['getCountries', 'getQuote', 'getTransaction'];
-
 serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -209,12 +198,12 @@ serve(async (req) => {
     });
   }
 
-  const clientId = getClientId(req);
-
   try {
-    // Rate limiting
+    const clientId = req.headers.get('x-forwarded-for') || 
+                     req.headers.get('cf-connecting-ip') || 
+                     'unknown';
+
     if (!checkRateLimit(clientId)) {
-      logSecurityEvent('RATE_LIMIT_EXCEEDED', { clientId, function: 'coinbase-headless' });
       return new Response(JSON.stringify({ error: 'Too many requests' }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -223,30 +212,6 @@ serve(async (req) => {
 
     const body = await req.json();
     const { action } = body;
-
-    // Validate action
-    if (!action || typeof action !== 'string') {
-      return new Response(JSON.stringify({ error: 'Action required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Check if action requires authentication
-    if (PROTECTED_ACTIONS.includes(action)) {
-      const authResult = await validateAuth(req);
-      
-      if (!authResult.authenticated) {
-        logSecurityEvent('AUTH_FAILED_PROTECTED_ACTION', {
-          clientId,
-          action,
-          error: authResult.error,
-        });
-        return unauthorizedResponse(corsHeaders, authResult.error);
-      }
-
-      console.log(`[AUTH] Protected action '${action}' authorized for user ${authResult.userId?.slice(0, 8)}...`);
-    }
 
     switch (action) {
       case 'getCountries': {
@@ -321,7 +286,7 @@ serve(async (req) => {
       }
 
       case 'createUser': {
-        // Create or get user for headless onramp (PROTECTED)
+        // Create or get user for headless onramp
         const { email, phone } = body;
 
         if (!email && !phone) {
@@ -357,7 +322,7 @@ serve(async (req) => {
       }
 
       case 'getSessionToken': {
-        // Get session token to generate onramp URL (PROTECTED)
+        // Get session token to generate onramp URL
         const { 
           destinationAddress,
           destinationNetwork,
@@ -424,7 +389,7 @@ serve(async (req) => {
       }
 
       case 'generateBuyUrl': {
-        // Generate an Onramp URL using session token approach (PROTECTED)
+        // Generate an Onramp URL using session token approach
         const { 
           purchaseCurrency, 
           purchaseNetwork, 

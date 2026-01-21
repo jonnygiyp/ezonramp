@@ -1,21 +1,11 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
-function getPublicCorsHeaders(origin: string | null): Record<string, string> {
-  return {
-    "Access-Control-Allow-Origin": origin ?? "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Vary": "Origin",
-  };
-}
-
-// Note: This endpoint returns only the publishable key, which is safe to expose.
-// No authentication required for publishable keys.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getPublicCorsHeaders(origin);
-
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
