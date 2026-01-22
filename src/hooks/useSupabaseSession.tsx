@@ -59,21 +59,59 @@ export function useSupabaseSession() {
     }
   }, [isConnected, address]);
 
-  // Sync wallet address to user metadata (for auditing, non-blocking)
+  // Sync wallet address to user metadata (for auditing, non-blocking, idempotent)
+  // Runs at most once per session - checks DB first to avoid conflicts
   const syncWalletToUser = useCallback(async (currentSession: Session, walletAddress: string) => {
-    // Skip if already synced or if we've already shown conflict warning
+    // Skip if already attempted for this wallet (success or conflict)
     if (lastSyncedWallet.current === walletAddress) {
       return;
     }
+
+    // Mark as attempted immediately to prevent concurrent/repeated calls
+    lastSyncedWallet.current = walletAddress;
 
     try {
       const isEvmAddress = /^0x[a-fA-F0-9]{40}$/.test(walletAddress);
       const walletNetwork = isEvmAddress ? 'ethereum' : 'solana';
 
-      console.log('[SupabaseSession] Syncing wallet to profile:', walletAddress.slice(0, 10));
+      // Step 1: Check if this wallet is already linked to ANY user (including current user)
+      const { data: existingProfile, error: queryError } = await supabase
+        .from('profiles')
+        .select('id, wallet_address')
+        .eq('wallet_address', walletAddress)
+        .maybeSingle();
 
-      // Update profiles table (upsert to handle both new and existing profiles)
-      const { error: profileError } = await supabase
+      if (queryError) {
+        // Query failed - log and exit gracefully (non-blocking)
+        console.warn('[SupabaseSession] Could not check wallet ownership:', queryError.message);
+        return;
+      }
+
+      // Step 2: If wallet is already linked to current user, we're done
+      if (existingProfile?.id === currentSession.user.id) {
+        console.log('[SupabaseSession] Wallet already linked to current user');
+        return;
+      }
+
+      // Step 3: If wallet is linked to a DIFFERENT user, show warning once and exit
+      if (existingProfile && existingProfile.id !== currentSession.user.id) {
+        console.log('[SupabaseSession] Wallet linked to different user - skipping PATCH');
+        
+        if (!hasShownWalletConflictWarning.current) {
+          hasShownWalletConflictWarning.current = true;
+          toast({
+            title: "Wallet Already Linked",
+            description: "This wallet is linked to a different account. You can still use Stripe Onramp.",
+            variant: "default",
+          });
+        }
+        return;
+      }
+
+      // Step 4: Wallet is not linked anywhere - safe to update current user's profile
+      console.log('[SupabaseSession] Linking wallet to profile:', walletAddress.slice(0, 10));
+
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({
           wallet_address: walletAddress,
@@ -82,13 +120,11 @@ export function useSupabaseSession() {
         })
         .eq('id', currentSession.user.id);
 
-      if (profileError) {
-        // If unique constraint violation (23505) or conflict (409), wallet is linked to another user
-        // Stop retrying and show a non-blocking warning toast once
-        if (profileError.code === '23505' || profileError.message?.includes('already linked')) {
-          console.warn('[SupabaseSession] Wallet already linked to another account - not blocking Stripe');
+      if (updateError) {
+        // Handle race condition: another request may have linked this wallet
+        if (updateError.code === '23505' || updateError.message?.includes('duplicate')) {
+          console.log('[SupabaseSession] Wallet linked by another user (race condition) - expected');
           
-          // Show warning toast only once per session
           if (!hasShownWalletConflictWarning.current) {
             hasShownWalletConflictWarning.current = true;
             toast({
@@ -97,19 +133,16 @@ export function useSupabaseSession() {
               variant: "default",
             });
           }
-          
-          // Mark as "synced" to prevent further retries
-          lastSyncedWallet.current = walletAddress;
           return;
         }
         
-        // For other errors, just log (non-blocking)
-        console.warn('[SupabaseSession] Profile update failed:', profileError.message);
+        // Other errors - log quietly
+        console.warn('[SupabaseSession] Profile update failed:', updateError.message);
       } else {
-        lastSyncedWallet.current = walletAddress;
-        console.log('[SupabaseSession] Wallet synced to profile successfully');
+        console.log('[SupabaseSession] Wallet linked successfully');
       }
     } catch (err) {
+      // Catch-all for unexpected errors - never block onramp flows
       console.warn('[SupabaseSession] Wallet sync error (non-blocking):', err);
     }
   }, []);
