@@ -1,20 +1,57 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import {
-  getCorsHeaders,
   validateAuth,
   unauthorizedResponse,
   getClientId,
   logSecurityEvent,
 } from "../_shared/auth.ts";
 
+// Allowed origins for Stripe Onramp
+const ALLOWED_ORIGINS = [
+  "https://ezonramp.com",
+  "https://www.ezonramp.com",
+  "https://ezonramp.lovable.app",
+  "https://id-preview--7b38c753-20a4-4c8b-8302-f8796fd8f46e.lovable.app",
+];
+
+// Include localhost for development if needed
+if (Deno.env.get("DEVELOPMENT_MODE") === "true") {
+  ALLOWED_ORIGINS.push("http://localhost:5173", "http://localhost:3000");
+}
+
+/**
+ * Get CORS headers for Stripe Onramp - only sets Access-Control-Allow-Origin
+ * when the origin is in the allowlist
+ */
+function getStripeCorsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Credentials": "true",
+    "Vary": "Origin",
+    // Security headers
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+  };
+
+  // Only set Access-Control-Allow-Origin if origin is in allowlist
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+
+  return headers;
+}
+
 serve(async (req) => {
   const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
+  const corsHeaders = getStripeCorsHeaders(origin);
 
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   const clientId = getClientId(req);
