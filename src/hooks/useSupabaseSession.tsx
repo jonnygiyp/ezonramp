@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAccount } from '@/hooks/useParticle';
+import { toast } from '@/hooks/use-toast';
 
 /**
  * Unified hook that ensures a Supabase session exists when a Particle wallet is connected.
@@ -15,6 +16,7 @@ export function useSupabaseSession() {
   const [error, setError] = useState<Error | null>(null);
   const hasAttemptedAnonSignIn = useRef(false);
   const lastSyncedWallet = useRef<string | null>(null);
+  const hasShownWalletConflictWarning = useRef(false);
 
   // Ensure Supabase session exists - create anonymous if needed
   const ensureSession = useCallback(async (): Promise<Session | null> => {
@@ -59,8 +61,9 @@ export function useSupabaseSession() {
 
   // Sync wallet address to user metadata (for auditing, non-blocking)
   const syncWalletToUser = useCallback(async (currentSession: Session, walletAddress: string) => {
+    // Skip if already synced or if we've already shown conflict warning
     if (lastSyncedWallet.current === walletAddress) {
-      return; // Already synced
+      return;
     }
 
     try {
@@ -80,12 +83,28 @@ export function useSupabaseSession() {
         .eq('id', currentSession.user.id);
 
       if (profileError) {
-        // If unique constraint violation, wallet is linked to another user
-        if (profileError.code === '23505') {
-          console.warn('[SupabaseSession] Wallet already linked to another account');
-        } else {
-          console.warn('[SupabaseSession] Profile update failed:', profileError.message);
+        // If unique constraint violation (23505) or conflict (409), wallet is linked to another user
+        // Stop retrying and show a non-blocking warning toast once
+        if (profileError.code === '23505' || profileError.message?.includes('already linked')) {
+          console.warn('[SupabaseSession] Wallet already linked to another account - not blocking Stripe');
+          
+          // Show warning toast only once per session
+          if (!hasShownWalletConflictWarning.current) {
+            hasShownWalletConflictWarning.current = true;
+            toast({
+              title: "Wallet Already Linked",
+              description: "This wallet is linked to a different account. You can still use Stripe Onramp.",
+              variant: "default",
+            });
+          }
+          
+          // Mark as "synced" to prevent further retries
+          lastSyncedWallet.current = walletAddress;
+          return;
         }
+        
+        // For other errors, just log (non-blocking)
+        console.warn('[SupabaseSession] Profile update failed:', profileError.message);
       } else {
         lastSyncedWallet.current = walletAddress;
         console.log('[SupabaseSession] Wallet synced to profile successfully');
