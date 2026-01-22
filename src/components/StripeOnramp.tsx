@@ -4,9 +4,9 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogIn } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
 // Validate Solana address
@@ -22,7 +22,7 @@ interface StripeOnrampProps {
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { session } = useAuth();
+  const { session, getAccessToken, isLoading: isSessionLoading } = useSupabaseSession();
   
   const [walletAddress, setWalletAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -43,22 +43,20 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
-    // Get fresh session at the moment of the click
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    // Get fresh access token at the moment of the click
+    const accessToken = await getAccessToken();
     
-    if (sessionError || !sessionData?.session) {
+    // Temporary logging to verify access token exists
+    console.log(`[StripeOnramp] Access token exists: ${!!accessToken}, length: ${accessToken?.length || 0}`);
+    
+    if (!accessToken) {
       toast({
-        title: "Please Sign In",
-        description: "You must be signed in to use the Stripe onramp. Please sign in and try again.",
+        title: "Session Required",
+        description: "Unable to establish a session. Please refresh the page and try again.",
         variant: "destructive",
       });
       return;
     }
-
-    const accessToken = sessionData.session.access_token;
-    
-    // Temporary logging to verify access token exists
-    console.log(`[StripeOnramp] Access token exists: ${!!accessToken}, length: ${accessToken?.length || 0}`);
 
     if (!walletAddress.trim()) {
       toast({
@@ -160,7 +158,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, session]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast, getAccessToken]);
 
   // Show embedded widget
   if (showWidget) {
@@ -236,7 +234,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           onClick={handleStartOnramp}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
-          disabled={isLoading || !walletAddress}
+          disabled={isLoading || isSessionLoading || !walletAddress}
           data-tutorial="stripe-buy-button"
         >
           {isLoading ? (
