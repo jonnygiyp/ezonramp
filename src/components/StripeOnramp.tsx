@@ -56,6 +56,9 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     }
 
     const accessToken = sessionData.session.access_token;
+    
+    // Temporary logging to verify access token exists
+    console.log(`[StripeOnramp] Access token exists: ${!!accessToken}, length: ${accessToken?.length || 0}`);
 
     if (!walletAddress.trim()) {
       toast({
@@ -85,7 +88,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     setIsLoading(true);
 
     try {
-      // Call edge function with explicit Authorization header
+      // Call edge function with explicit authorization header (lowercase for consistency)
       const { data, error: fnError } = await supabase.functions.invoke('stripe-onramp', {
         body: {
           walletAddress: walletAddress.trim(),
@@ -93,7 +96,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           destinationNetwork: defaultNetwork.toLowerCase(),
         },
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          authorization: `Bearer ${accessToken}`,
         },
       });
 

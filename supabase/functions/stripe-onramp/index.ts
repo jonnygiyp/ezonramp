@@ -61,7 +61,9 @@ serve(async (req) => {
   }
 
   const clientId = getClientId(req);
-  const authHeader = req.headers.get("Authorization");
+  
+  // Read authorization header defensively (check both cases)
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
 
   // ========================================
   // DEBUG LOGGING (temporary)
@@ -108,7 +110,7 @@ serve(async (req) => {
 
   try {
     // ========================================
-    // VALIDATE JWT USING SUPABASE
+    // VALIDATE JWT USING SUPABASE getUser()
     // ========================================
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -124,16 +126,18 @@ serve(async (req) => {
       );
     }
 
+    // Create Supabase client with Authorization header in global.headers
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader },
       },
     });
 
-    const { data, error: claimsError } = await supabase.auth.getClaims(token);
+    // Validate JWT using getUser() - the stable edge function pattern
+    const { data: userData, error: userError } = await supabase.auth.getUser();
 
-    if (claimsError || !data?.claims) {
-      console.warn(`[AUTH] Invalid token from client ${clientId.slice(0, 10)}...: ${claimsError?.message || "No claims returned"}`);
+    if (userError || !userData?.user) {
+      console.warn(`[AUTH] Invalid token from client ${clientId.slice(0, 10)}...: ${userError?.message || "No user returned"}`);
       return new Response(
         JSON.stringify({ error: "Invalid or expired token. Please sign in again." }),
         {
@@ -143,22 +147,7 @@ serve(async (req) => {
       );
     }
 
-    const claims = data.claims;
-    const userId = claims.sub as string;
-
-    // Check token expiration
-    const exp = claims.exp as number | undefined;
-    if (exp && exp < Math.floor(Date.now() / 1000)) {
-      console.warn(`[AUTH] Expired token for user ${userId.slice(0, 8)}...`);
-      return new Response(
-        JSON.stringify({ error: "Token has expired. Please sign in again." }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
+    const userId = userData.user.id;
     console.log(`[AUTH] Stripe onramp request authorized for user ${userId.slice(0, 8)}...`);
 
     // ========================================
