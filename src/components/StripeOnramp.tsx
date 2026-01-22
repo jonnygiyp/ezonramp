@@ -43,15 +43,19 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
-    // Check authentication first
-    if (!session) {
+    // Get fresh session at the moment of the click
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !sessionData?.session) {
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to use the Stripe onramp",
+        title: "Please Sign In",
+        description: "You must be signed in to use the Stripe onramp. Please sign in and try again.",
         variant: "destructive",
       });
       return;
     }
+
+    const accessToken = sessionData.session.access_token;
 
     if (!walletAddress.trim()) {
       toast({
@@ -81,12 +85,15 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     setIsLoading(true);
 
     try {
-      // Get client secret from edge function
+      // Call edge function with explicit Authorization header
       const { data, error: fnError } = await supabase.functions.invoke('stripe-onramp', {
         body: {
           walletAddress: walletAddress.trim(),
           destinationCurrency: defaultAsset.toLowerCase(),
           destinationNetwork: defaultNetwork.toLowerCase(),
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
