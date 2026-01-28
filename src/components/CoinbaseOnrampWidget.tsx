@@ -76,12 +76,15 @@ export function CoinbaseOnrampWidget({
       console.log("Fetching session token for:", destinationAddress.slice(0, 10) + "...");
       
       // Get session token from the backend
+      // Pass connectedWalletAddress to verify the destination matches the user's connected wallet
       const { data, error } = await supabase.functions.invoke("coinbase-headless", {
         body: {
           action: "getSessionToken",
           destinationAddress,
           destinationNetwork: defaultNetwork,
           assets: [defaultAsset],
+          // Pass the currently connected Particle wallet address for session verification
+          connectedWalletAddress: isConnected && address ? address : undefined,
         },
       });
 

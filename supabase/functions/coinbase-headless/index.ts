@@ -201,6 +201,39 @@ const NETWORK_MAP: Record<string, string> = {
   optimism: "optimism",
 };
 
+// Wallet address validation patterns
+const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const EVM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+
+/**
+ * Validate wallet address format for a given network
+ */
+function isValidAddressForNetwork(address: string, network: string): boolean {
+  const normalizedNetwork = network.toLowerCase();
+  
+  if (normalizedNetwork === "solana") {
+    return SOLANA_ADDRESS_REGEX.test(address);
+  }
+  
+  // All other networks are EVM-compatible
+  return EVM_ADDRESS_REGEX.test(address);
+}
+
+/**
+ * Compare wallet addresses (case-insensitive for EVM, case-sensitive for Solana)
+ */
+function addressesMatch(addr1: string, addr2: string, network: string): boolean {
+  const normalizedNetwork = network.toLowerCase();
+  
+  if (normalizedNetwork === "solana") {
+    // Solana addresses are case-sensitive (base58)
+    return addr1 === addr2;
+  }
+  
+  // EVM addresses are case-insensitive
+  return addr1.toLowerCase() === addr2.toLowerCase();
+}
+
 serve(async (req) => {
   const origin = req.headers.get("origin");
   const clientId = getClientId(req);
@@ -236,7 +269,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, destinationAddress: clientDestinationAddress } = body;
+    const { action, destinationAddress: clientDestinationAddress, connectedWalletAddress } = body;
 
     // Validate action
     if (!action || typeof action !== "string") {
@@ -259,42 +292,112 @@ serve(async (req) => {
         return coinbaseUnauthorizedResponse(corsHeaders, authResult.error);
       }
 
-      // Wallet binding check: use user's linked wallet, not arbitrary client input
+      // Determine destination address with precedence logic:
+      // 1. If client provides connectedWalletAddress (current session's Particle wallet), use it as authoritative
+      // 2. If client provides destinationAddress, validate it matches connectedWalletAddress
+      // 3. Fall back to authResult.walletAddress (from profile) if available
+      
       let destinationAddress: string;
       const destinationNetwork = body.destinationNetwork || body.purchaseNetwork || "solana";
 
-      if (!authResult.walletAddress) {
-        // No wallet linked yet - reject the request
-        logCoinbaseSecurityEvent("NO_LINKED_WALLET", {
+      // The connectedWalletAddress is the user's current Particle wallet in this session
+      // This is the authoritative source for what wallet the user has connected right now
+      const sessionWallet = connectedWalletAddress;
+
+      if (clientDestinationAddress) {
+        // Client provided a specific destination - validate it
+        
+        // First, validate address format for the network
+        if (!isValidAddressForNetwork(clientDestinationAddress, destinationNetwork)) {
+          logCoinbaseSecurityEvent("INVALID_ADDRESS_FORMAT", {
+            clientId,
+            userId: authResult.userId,
+            action,
+            address: clientDestinationAddress.slice(0, 10) + "...",
+            network: destinationNetwork,
+          });
+          return coinbaseForbiddenResponse(
+            corsHeaders,
+            `Invalid wallet address format for ${destinationNetwork} network`
+          );
+        }
+
+        // If we have a session wallet, the destination MUST match it
+        if (sessionWallet) {
+          if (!addressesMatch(clientDestinationAddress, sessionWallet, destinationNetwork)) {
+            logCoinbaseSecurityEvent("WALLET_MISMATCH_SESSION", {
+              clientId,
+              userId: authResult.userId,
+              action,
+              clientAddress: clientDestinationAddress.slice(0, 10) + "...",
+              sessionWallet: sessionWallet.slice(0, 10) + "...",
+            });
+            return coinbaseForbiddenResponse(
+              corsHeaders,
+              "Destination wallet does not match your connected wallet"
+            );
+          }
+          destinationAddress = clientDestinationAddress;
+        } else if (authResult.walletAddress) {
+          // No session wallet provided, but profile has a linked wallet - validate against that
+          if (!addressesMatch(clientDestinationAddress, authResult.walletAddress, destinationNetwork)) {
+            logCoinbaseSecurityEvent("WALLET_MISMATCH_PROFILE", {
+              clientId,
+              userId: authResult.userId,
+              action,
+              clientAddress: clientDestinationAddress.slice(0, 10) + "...",
+              linkedAddress: authResult.walletAddress.slice(0, 10) + "...",
+            });
+            return coinbaseForbiddenResponse(
+              corsHeaders,
+              "Destination wallet does not match your linked wallet"
+            );
+          }
+          destinationAddress = clientDestinationAddress;
+        } else {
+          // No way to verify the destination address matches user's wallet - reject
+          logCoinbaseSecurityEvent("UNVERIFIABLE_DESTINATION", {
+            clientId,
+            userId: authResult.userId,
+            action,
+            clientAddress: clientDestinationAddress.slice(0, 10) + "...",
+          });
+          return coinbaseForbiddenResponse(
+            corsHeaders,
+            "Cannot verify destination wallet. Please ensure your wallet is connected."
+          );
+        }
+      } else if (sessionWallet) {
+        // No client destination provided, use the session wallet (current Particle wallet)
+        if (!isValidAddressForNetwork(sessionWallet, destinationNetwork)) {
+          logCoinbaseSecurityEvent("INVALID_SESSION_WALLET_FORMAT", {
+            clientId,
+            userId: authResult.userId,
+            action,
+            sessionWallet: sessionWallet.slice(0, 10) + "...",
+            network: destinationNetwork,
+          });
+          return coinbaseForbiddenResponse(
+            corsHeaders,
+            `Connected wallet address format is invalid for ${destinationNetwork} network`
+          );
+        }
+        destinationAddress = sessionWallet;
+      } else if (authResult.walletAddress) {
+        // Fall back to profile's linked wallet
+        destinationAddress = authResult.walletAddress;
+      } else {
+        // No wallet available from any source
+        logCoinbaseSecurityEvent("NO_WALLET_AVAILABLE", {
           clientId,
           userId: authResult.userId,
           action,
         });
         return coinbaseForbiddenResponse(
           corsHeaders,
-          "No wallet linked to your account. Please connect your wallet first."
+          "No wallet available. Please connect your wallet first."
         );
       }
-
-      // If client provides a destination address, it MUST match the linked wallet
-      if (clientDestinationAddress) {
-        if (clientDestinationAddress.toLowerCase() !== authResult.walletAddress.toLowerCase()) {
-          logCoinbaseSecurityEvent("WALLET_MISMATCH", {
-            clientId,
-            userId: authResult.userId,
-            action,
-            clientAddress: clientDestinationAddress.slice(0, 10) + "...",
-            linkedAddress: authResult.walletAddress.slice(0, 10) + "...",
-          });
-          return coinbaseForbiddenResponse(
-            corsHeaders,
-            "Destination address does not match your linked wallet"
-          );
-        }
-      }
-
-      // Use the verified linked wallet address
-      destinationAddress = authResult.walletAddress;
 
       console.log(
         `[COINBASE-AUTH] Protected action '${action}' authorized for user ${authResult.userId?.slice(0, 8)}... with wallet ${destinationAddress.slice(0, 10)}...`
