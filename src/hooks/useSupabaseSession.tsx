@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAccount } from '@/hooks/useParticle';
-import { toast } from '@/hooks/use-toast';
 
 /**
  * Unified hook that ensures a Supabase session exists when a Particle wallet is connected.
@@ -16,7 +15,6 @@ export function useSupabaseSession() {
   const [error, setError] = useState<Error | null>(null);
   const hasAttemptedAnonSignIn = useRef(false);
   const lastSyncedWallet = useRef<string | null>(null);
-  const hasShownWalletConflictWarning = useRef(false);
 
   // Ensure Supabase session exists - create anonymous if needed
   const ensureSession = useCallback(async (): Promise<Session | null> => {
@@ -93,18 +91,9 @@ export function useSupabaseSession() {
         return;
       }
 
-      // Step 3: If wallet is linked to a DIFFERENT user, show warning once and exit
+      // Step 3: If wallet is linked to a DIFFERENT user, skip silently
       if (existingProfile && existingProfile.id !== currentSession.user.id) {
         console.log('[SupabaseSession] Wallet linked to different user - skipping PATCH');
-        
-        if (!hasShownWalletConflictWarning.current) {
-          hasShownWalletConflictWarning.current = true;
-          toast({
-            title: "Wallet Already Linked",
-            description: "This wallet is linked to a different account. You can still use Stripe Onramp.",
-            variant: "default",
-          });
-        }
         return;
       }
 
@@ -121,18 +110,9 @@ export function useSupabaseSession() {
         .eq('id', currentSession.user.id);
 
       if (updateError) {
-        // Handle race condition: another request may have linked this wallet
+        // Handle race condition: another request may have linked this wallet - skip silently
         if (updateError.code === '23505' || updateError.message?.includes('duplicate')) {
           console.log('[SupabaseSession] Wallet linked by another user (race condition) - expected');
-          
-          if (!hasShownWalletConflictWarning.current) {
-            hasShownWalletConflictWarning.current = true;
-            toast({
-              title: "Wallet Already Linked",
-              description: "This wallet is linked to a different account. You can still use Stripe Onramp.",
-              variant: "default",
-            });
-          }
           return;
         }
         
