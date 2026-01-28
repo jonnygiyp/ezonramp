@@ -283,6 +283,7 @@ export function CoinbaseHeadlessOnramp({
     setIsLoadingQuote(true);
     try {
       // Use generateBuyUrl action which includes destination_address to get one-click-buy URL
+      // Pass connectedWalletAddress to verify the destination matches the user's connected wallet
       const { data, error } = await supabase.functions.invoke("coinbase-headless", {
         body: {
           action: 'generateBuyUrl',
@@ -293,6 +294,8 @@ export function CoinbaseHeadlessOnramp({
           paymentMethod: 'CARD',
           country: 'US',
           destinationAddress,
+          // Pass the currently connected Particle wallet address for session verification
+          connectedWalletAddress: isConnected && address ? address : undefined,
         },
       });
 

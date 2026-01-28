@@ -19,6 +19,8 @@ export interface CoinbaseAuthResult {
   walletAddress?: string;
   walletNetwork?: string;
   error?: string;
+  /** True if the wallet address failed to link due to unique constraint (already linked elsewhere) */
+  walletLinkConflict?: boolean;
 }
 
 /**
@@ -188,8 +190,15 @@ export async function validateCoinbaseAuth(req: Request): Promise<CoinbaseAuthRe
       .eq("id", userId)
       .single();
 
+    let walletLinkConflict = false;
+
     if (profileError) {
-      console.error("[COINBASE-AUTH] Failed to fetch profile:", profileError.message);
+      // Check if this is a "no rows" error (user has no profile yet) or something else
+      if (profileError.code === "PGRST116") {
+        console.log("[COINBASE-AUTH] No profile found for user - profile not yet created");
+      } else {
+        console.warn("[COINBASE-AUTH] Failed to fetch profile:", profileError.message);
+      }
       // Don't fail auth, just return without wallet info
     }
 
@@ -201,6 +210,7 @@ export async function validateCoinbaseAuth(req: Request): Promise<CoinbaseAuthRe
       email,
       walletAddress: profile?.wallet_address || undefined,
       walletNetwork: profile?.wallet_network || undefined,
+      walletLinkConflict,
     };
   } catch (error) {
     logCoinbaseSecurityEvent("AUTH_VALIDATION_ERROR", {
