@@ -63,11 +63,13 @@ function clearStoredVerification(): void {
 interface CoinbaseHeadlessOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
+  onAuthRequired?: () => void;
 }
 
 export function CoinbaseHeadlessOnramp({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
+  onAuthRequired,
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -242,6 +244,14 @@ export function CoinbaseHeadlessOnramp({
 
   // Get quote and generate buy URL
   const getQuote = async () => {
+    // Check if user is connected first - if not, trigger auth modal
+    if (!isConnected || !address) {
+      if (onAuthRequired) {
+        onAuthRequired();
+        return;
+      }
+    }
+    
     if (!session) {
       toast({
         title: "Authentication Required",

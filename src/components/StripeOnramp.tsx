@@ -17,9 +17,10 @@ const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 interface StripeOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
+  onAuthRequired?: () => void;
 }
 
-export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
+export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", onAuthRequired }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { session, getAccessToken, isLoading: isSessionLoading } = useSupabaseSession();
@@ -43,6 +44,14 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [connectedAddressValid, address, walletAddress]);
 
   const handleStartOnramp = useCallback(async () => {
+    // Check if user is connected first - if not, trigger auth modal
+    if (!isConnected || !address) {
+      if (onAuthRequired) {
+        onAuthRequired();
+        return;
+      }
+    }
+    
     // Get fresh access token at the moment of the click
     const accessToken = await getAccessToken();
     
@@ -158,7 +167,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     } finally {
       setIsLoading(false);
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, getAccessToken]);
+  }, [walletAddress, defaultAsset, defaultNetwork, toast, getAccessToken, isConnected, address, onAuthRequired]);
 
   // Show embedded widget
   if (showWidget) {
