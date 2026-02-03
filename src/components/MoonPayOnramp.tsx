@@ -10,11 +10,13 @@ import { supabase } from "@/integrations/supabase/client";
 interface MoonPayOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
+  onAuthRequired?: () => void;
 }
 
 export function MoonPayOnramp({ 
   defaultAsset = "usdc_sol", 
-  defaultNetwork = "solana" 
+  defaultNetwork = "solana",
+  onAuthRequired,
 }: MoonPayOnrampProps) {
   const { address: particleAddress, isConnected } = useAccount();
   const [walletAddress, setWalletAddress] = useState(particleAddress || "");
@@ -46,6 +48,14 @@ export function MoonPayOnramp({
   }, []);
 
   const handleBuyClick = () => {
+    // Check if user is connected first - if not, trigger auth modal
+    if (!isConnected || !particleAddress) {
+      if (onAuthRequired) {
+        onAuthRequired();
+        return;
+      }
+    }
+    
     if (!walletAddress) {
       return;
     }

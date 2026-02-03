@@ -12,6 +12,8 @@ import { StripeOnramp } from "./StripeOnramp";
 import { MoonPayOnramp } from "./MoonPayOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
+import { useRequireAuthGate } from "@/hooks/useRequireAuthGate";
+import { RequireAuthModal } from "./RequireAuthModal";
 
 // Input validation schemas
 const emailSchema = z.string().trim().email("Invalid email address").max(254);
@@ -64,6 +66,9 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   const { toast } = useToast();
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
   const [activeTab, setActiveTab] = useState<string>('');
+  
+  // Auth gate for unauthenticated users
+  const { isModalOpen, closeModal, openModal } = useRequireAuthGate();
   
   // Card2Crypto state
   const [amount, setAmount] = useState('');
@@ -214,11 +219,11 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
       {/* Content Area */}
       <div className="w-full max-w-2xl mx-auto">
         {activeTab === 'coinbase' && (
-          <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" onAuthRequired={openModal} />
         )}
 
         {activeTab === 'coinbase_global' && (
-          <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" />
+          <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" onAuthRequired={openModal} />
         )}
 
         {activeTab === 'card2crypto' && (
@@ -316,13 +321,16 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
         )}
 
         {activeTab === 'stripe' && (
-          <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" onAuthRequired={openModal} />
         )}
 
         {activeTab === 'moonpay' && (
-          <MoonPayOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <MoonPayOnramp defaultAsset="USDC" defaultNetwork="solana" onAuthRequired={openModal} />
         )}
       </div>
+      
+      {/* Auth gate modal for unauthenticated users */}
+      <RequireAuthModal open={isModalOpen} onOpenChange={closeModal} />
     </div>
   );
 };
