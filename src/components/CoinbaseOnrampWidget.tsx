@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthGatedButton } from "./AuthGatedButton";
 
 interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
@@ -213,7 +214,7 @@ export function CoinbaseOnrampWidget({
 
 
         {/* Buy Button */}
-        <Button
+        <AuthGatedButton
           onClick={handleBuy}
           size="lg"
           className="w-full"
@@ -232,7 +233,7 @@ export function CoinbaseOnrampWidget({
               <ExternalLink className="ml-2 h-4 w-4" />
             </>
           )}
-        </Button>
+        </AuthGatedButton>
 
         <p className="text-xs text-center text-muted-foreground">
           A Coinbase window will open to complete your purchase. <br />

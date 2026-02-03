@@ -12,6 +12,7 @@ import { StripeOnramp } from "./StripeOnramp";
 import { MoonPayOnramp } from "./MoonPayOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
+import { AuthGatedButton } from "./AuthGatedButton";
 
 // Input validation schemas
 const emailSchema = z.string().trim().email("Invalid email address").max(254);
@@ -278,14 +279,14 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
                 </div>
               </div>
 
-              <Button 
+              <AuthGatedButton 
                 onClick={handleCard2CryptoPayment}
                 size="lg"
                 className="w-full text-lg py-6 hover-scale"
                 disabled={isProcessing || !amount || !email}
               >
                 {isProcessing ? 'Processing...' : 'Pay with Card'}
-              </Button>
+              </AuthGatedButton>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">

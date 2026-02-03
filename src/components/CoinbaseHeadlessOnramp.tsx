@@ -8,6 +8,7 @@ import { useAccount } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { AuthGatedButton } from "./AuthGatedButton";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
@@ -545,7 +546,7 @@ export function CoinbaseHeadlessOnramp({
               )}
             </div>
 
-            <Button
+            <AuthGatedButton
               onClick={sendVerificationCode}
               size="lg"
               className="w-full"
@@ -567,7 +568,7 @@ export function CoinbaseHeadlessOnramp({
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
-            </Button>
+            </AuthGatedButton>
 
             <p className="text-[10px] text-muted-foreground text-center">
               Powered by trusted third-party providers. EZOnRamp never stores your payment details.
@@ -705,7 +706,7 @@ export function CoinbaseHeadlessOnramp({
                   Back
                 </Button>
               )}
-              <Button
+              <AuthGatedButton
                 onClick={getQuote}
                 className="flex-1"
                 disabled={isLoadingQuote || !amount || parseFloat(amount) < 1}
@@ -721,7 +722,7 @@ export function CoinbaseHeadlessOnramp({
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
-              </Button>
+              </AuthGatedButton>
             </div>
           </div>
         )}

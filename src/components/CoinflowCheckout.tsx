@@ -7,6 +7,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+import { AuthGatedButton } from './AuthGatedButton';
 
 // Use environment variable for merchant ID, fallback to sandbox for development
 const MERCHANT_ID = import.meta.env.VITE_COINFLOW_MERCHANT_ID || 'lovable-test';
@@ -192,14 +193,14 @@ export const CoinflowCheckout: FC = () => {
           </div>
         </div>
 
-        <Button 
+        <AuthGatedButton 
           onClick={handleStartCheckout}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
           disabled={!publicKey || !amount || !email}
         >
           Continue to Payment
-        </Button>
+        </AuthGatedButton>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
