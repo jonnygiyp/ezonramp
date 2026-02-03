@@ -12,6 +12,12 @@ verify_jwt = false
 [functions.coinbase-config]
 verify_jwt = false
 
+[functions.coinbase-webhook]
+verify_jwt = false
+
+[functions.coinbase-webhook-manager]
+verify_jwt = false
+
 [functions.moonpay-sign]
 verify_jwt = false
 
