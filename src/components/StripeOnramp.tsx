@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useAccount } from '@/hooks/useParticle';
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
+import { AuthGatedButton } from "./AuthGatedButton";
 
 // Validate Solana address
 const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
@@ -230,7 +231,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           </div>
         </div>
 
-        <Button
+        <AuthGatedButton
           onClick={handleStartOnramp}
           size="lg"
           className="w-full text-lg py-6 hover-scale"
@@ -245,7 +246,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
           ) : (
             "Buy Crypto with Stripe"
           )}
-        </Button>
+        </AuthGatedButton>
       </div>
 
       <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">

@@ -6,6 +6,7 @@ import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { Loader2, Moon, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthGatedButton } from "./AuthGatedButton";
 
 interface MoonPayOnrampProps {
   defaultAsset?: string;
@@ -146,7 +147,7 @@ export function MoonPayOnramp({
               </div>
             </div>
 
-            <Button
+            <AuthGatedButton
               onClick={handleBuyClick}
               size="lg"
               className="w-full text-lg py-6 hover-scale"
@@ -155,7 +156,7 @@ export function MoonPayOnramp({
             >
               <Moon className="mr-2 h-5 w-5" />
               Buy with MoonPay
-            </Button>
+            </AuthGatedButton>
 
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <ExternalLink className="h-4 w-4" />
