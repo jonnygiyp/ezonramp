@@ -12,13 +12,11 @@ import { supabase } from "@/integrations/supabase/client";
 interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
   defaultNetwork?: string;
-  onAuthRequired?: () => void;
 }
 
 export function CoinbaseOnrampWidget({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
-  onAuthRequired,
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -54,14 +52,6 @@ export function CoinbaseOnrampWidget({
 
   // Handle the buy action - get session token and open URL
   const handleBuy = useCallback(async () => {
-    // Check if user is connected first - if not, trigger auth modal
-    if (!isConnected || !address) {
-      if (onAuthRequired) {
-        onAuthRequired();
-        return;
-      }
-    }
-    
     if (!session) {
       toast({
         title: "Authentication Required",
@@ -141,7 +131,7 @@ export function CoinbaseOnrampWidget({
     } finally {
       setIsLoading(false);
     }
-  }, [destinationAddress, defaultNetwork, defaultAsset, amount, toast, session, isConnected, address, onAuthRequired]);
+  }, [destinationAddress, defaultNetwork, defaultAsset, amount, toast, session]);
 
   if (isLoadingConfig) {
     return (
