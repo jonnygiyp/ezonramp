@@ -75,6 +75,7 @@ export type Database = {
         Row: {
           content: Json
           id: string
+          published: boolean
           section: string
           updated_at: string
           updated_by: string | null
@@ -82,6 +83,7 @@ export type Database = {
         Insert: {
           content?: Json
           id?: string
+          published?: boolean
           section: string
           updated_at?: string
           updated_by?: string | null
@@ -89,6 +91,7 @@ export type Database = {
         Update: {
           content?: Json
           id?: string
+          published?: boolean
           section?: string
           updated_at?: string
           updated_by?: string | null
