@@ -187,7 +187,7 @@ async function callCDPApi(
 const PROTECTED_WALLET_ACTIONS = ["getSessionToken", "generateBuyUrl"];
 
 // Actions that require authentication only (no wallet binding needed)
-const PROTECTED_ACTIONS = ["createUser"];
+const PROTECTED_ACTIONS = ["createUser", "pollTransactionStatus"];
 
 // Actions that are public (config/quote info)
 const PUBLIC_ACTIONS = ["getCountries", "getQuote", "getTransaction"];
