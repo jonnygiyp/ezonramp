@@ -112,16 +112,13 @@ export function CoinbaseHeadlessOnramp({
   const [isVerifying, setIsVerifying] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
 
-  // Quote state
+  // Quote state - inline auto-refresh
   const [amount, setAmount] = useState("100");
-  const [quote, setQuote] = useState<{
-    purchaseAmount: string;
-    fee: string;
-    total: string;
-    quoteId: string;
-    buyUrl: string | null;
-  } | null>(null);
-  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [quote, setQuote] = useState<QuoteData | null>(null);
+  const [quoteState, setQuoteState] = useState<QuoteState>('idle');
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [isLoadingBuy, setIsLoadingBuy] = useState(false);
+  const quoteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Transaction state - event-driven
   const [txState, setTxState] = useState<TxState>('waiting');
