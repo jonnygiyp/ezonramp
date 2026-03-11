@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock, AlertCircle } from "lucide-react";
+import { Skeleton } from "./ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,8 +15,18 @@ const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
 const codeSchema = z.string().trim().regex(/^\d{4,8}$/, "Enter a valid verification code");
 
-type Step = 'identity' | 'verify' | 'amount' | 'confirm' | 'result';
+type Step = 'identity' | 'verify' | 'amount' | 'result';
 type TxState = 'waiting' | 'incomplete' | 'initialized' | 'processing' | 'completed' | 'failed' | 'delayed';
+
+interface QuoteData {
+  purchaseAmount: string;
+  fee: string;
+  networkFee: string;
+  total: string;
+  quoteId: string;
+}
+
+type QuoteState = 'idle' | 'loading' | 'ready' | 'error';
 type VerifyChannel = 'sms' | 'email';
 
 // Verification storage key and validity period (60 days in milliseconds)
