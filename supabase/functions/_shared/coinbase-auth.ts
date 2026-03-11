@@ -5,6 +5,7 @@ const COINBASE_ALLOWED_ORIGINS = [
   "https://ezonramp.com",
   "https://ezonramp.lovable.app",
   "https://id-preview--7b38c753-20a4-4c8b-8302-f8796fd8f46e.lovable.app",
+  "https://7b38c753-20a4-4c8b-8302-f8796fd8f46e.lovableproject.com",
 ];
 
 // Include localhost for development if needed
