@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock } from "lucide-react";
+import { Skeleton } from "./ui/skeleton";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,34 +15,41 @@ const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
 const codeSchema = z.string().trim().regex(/^\d{4,8}$/, "Enter a valid verification code");
 
-type Step = 'identity' | 'verify' | 'amount' | 'confirm' | 'result';
+type Step = 'identity' | 'verify' | 'amount' | 'result';
 type TxState = 'waiting' | 'incomplete' | 'initialized' | 'processing' | 'completed' | 'failed' | 'delayed';
 type VerifyChannel = 'sms' | 'email';
+type QuoteState = 'idle' | 'loading' | 'ready' | 'error';
+
+interface QuoteData {
+  purchaseAmount: string;
+  fee: string;
+  networkFee: string;
+  total: string;
+  quoteId: string;
+}
 
 // Verification storage key and validity period (60 days in milliseconds)
 const VERIFICATION_STORAGE_KEY = 'coinbase_onramp_verification';
 const VERIFICATION_VALIDITY_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
+const QUOTE_DEBOUNCE_MS = 500;
+const MIN_AMOUNT = 1;
+const MAX_AMOUNT = 500;
 
 interface StoredVerification {
   channel: VerifyChannel;
-  value: string; // email or phone
-  verifiedAt: number; // timestamp
+  value: string;
+  verifiedAt: number;
 }
 
 function getStoredVerification(): StoredVerification | null {
   try {
     const stored = localStorage.getItem(VERIFICATION_STORAGE_KEY);
     if (!stored) return null;
-    
     const parsed: StoredVerification = JSON.parse(stored);
     const now = Date.now();
-    
-    // Check if verification is still valid (within 60 days)
     if (now - parsed.verifiedAt < VERIFICATION_VALIDITY_MS) {
       return parsed;
     }
-    
-    // Expired, remove it
     localStorage.removeItem(VERIFICATION_STORAGE_KEY);
     return null;
   } catch {
@@ -75,14 +83,12 @@ export function CoinbaseHeadlessOnramp({
   const { address, isConnected } = useAccount();
   const { session } = useAuth();
 
-  // Check for existing verification on mount
   const storedVerification = getStoredVerification();
   const hasStoredVerification = !!storedVerification;
 
-  // Step state - skip to 'amount' if already verified
   const [step, setStep] = useState<Step>(hasStoredVerification ? 'amount' : 'identity');
 
-  // Identity state - prefill from stored verification
+  // Identity state
   const [verifyChannel, setVerifyChannel] = useState<VerifyChannel>(
     storedVerification?.channel || 'sms'
   );
@@ -101,18 +107,15 @@ export function CoinbaseHeadlessOnramp({
   const [isVerifying, setIsVerifying] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
 
-  // Quote state
+  // Quote state - inline auto-refresh
   const [amount, setAmount] = useState("100");
-  const [quote, setQuote] = useState<{
-    purchaseAmount: string;
-    fee: string;
-    total: string;
-    quoteId: string;
-    buyUrl: string | null;
-  } | null>(null);
-  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [quote, setQuote] = useState<QuoteData | null>(null);
+  const [quoteState, setQuoteState] = useState<QuoteState>('idle');
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [isLoadingBuy, setIsLoadingBuy] = useState(false);
+  const quoteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Transaction state - event-driven
+  // Transaction state
   const [txState, setTxState] = useState<TxState>('waiting');
   const [purchaseAttemptId, setPurchaseAttemptId] = useState<string | null>(null);
   const [coinbaseTxId, setCoinbaseTxId] = useState<string | null>(null);
@@ -122,22 +125,22 @@ export function CoinbaseHeadlessOnramp({
   const messageHandlerRef = useRef<((e: MessageEvent) => void) | null>(null);
   const windowCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Validate that connected wallet address matches the target network
+  // Address validation
   const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
   const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
-  
+
   const connectedAddressValid = isConnected && address && (
     defaultNetwork === 'solana' ? isSolanaAddress(address) : isEvmAddress(address)
   );
-  
-  // Use connected address only if it matches the target network, otherwise require manual input
+
   const destinationAddress = connectedAddressValid ? address : manualAddress;
   const identityValue = verifyChannel === 'email' ? email : `+1${phone}`;
-  
-  // Show warning if connected to wrong network type
   const showNetworkMismatch = isConnected && address && !connectedAddressValid;
 
-  // Calculate days remaining on verification
+  const isValidDestinationAddress = destinationAddress && (
+    defaultNetwork === 'solana' ? isSolanaAddress(destinationAddress) : isEvmAddress(destinationAddress)
+  );
+
   const getDaysRemaining = useCallback(() => {
     if (!storedVerification) return 0;
     const elapsed = Date.now() - storedVerification.verifiedAt;
@@ -145,23 +148,13 @@ export function CoinbaseHeadlessOnramp({
     return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
   }, [storedVerification]);
 
-  // Stop polling and cleanup timers
+  // --- Polling & cleanup ---
   const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (windowCheckRef.current) {
-      clearInterval(windowCheckRef.current);
-      windowCheckRef.current = null;
-    }
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+    if (windowCheckRef.current) { clearInterval(windowCheckRef.current); windowCheckRef.current = null; }
   }, []);
 
-  // Update tx state helper
   const updateTxState = useCallback((state: TxState) => {
     txStateRef.current = state;
     setTxState(state);
@@ -170,42 +163,27 @@ export function CoinbaseHeadlessOnramp({
     }
   }, [stopPolling]);
 
-  // Start polling for transaction status
   const startPolling = useCallback((attemptId: string) => {
     if (pollingRef.current) return;
-    
+
     pollingRef.current = setInterval(async () => {
       try {
         const { data, error } = await supabase.functions.invoke('coinbase-headless', {
-          body: {
-            action: 'pollTransactionStatus',
-            partnerUserRef: attemptId,
-          },
+          body: { action: 'pollTransactionStatus', partnerUserRef: attemptId },
         });
-        
-        if (error) {
-          console.error('[COINBASE-POLL] Error:', error);
-          return;
-        }
-        
+        if (error) { console.error('[COINBASE-POLL] Error:', error); return; }
         if (data?.status) {
           const current = txStateRef.current;
           if (['completed', 'failed', 'delayed'].includes(current)) return;
-          if (data.status !== current) {
-            updateTxState(data.status as TxState);
-          }
+          if (data.status !== current) updateTxState(data.status as TxState);
         }
-      } catch (err) {
-        console.error('[COINBASE-POLL] Error:', err);
-      }
+      } catch (err) { console.error('[COINBASE-POLL] Error:', err); }
     }, 10000);
 
-    // 30-minute timeout
     timeoutRef.current = setTimeout(() => {
       const current = txStateRef.current;
       if (current === 'initialized' || current === 'processing') {
         updateTxState('delayed');
-        // Update DB
         (supabase as any).from('purchase_attempts')
           .update({ status: 'delayed' })
           .eq('partner_user_ref', attemptId);
@@ -213,158 +191,160 @@ export function CoinbaseHeadlessOnramp({
     }, 30 * 60 * 1000);
   }, [updateTxState]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopPolling();
-      if (messageHandlerRef.current) {
-        window.removeEventListener('message', messageHandlerRef.current);
-      }
+      if (messageHandlerRef.current) window.removeEventListener('message', messageHandlerRef.current);
+      if (quoteDebounceRef.current) clearTimeout(quoteDebounceRef.current);
     };
   }, [stopPolling]);
 
-  // Send verification code
+  // --- Debounced quote fetching ---
+  const fetchQuote = useCallback(async (amt: string) => {
+    const numAmount = parseFloat(amt);
+    if (!amt || isNaN(numAmount) || numAmount < MIN_AMOUNT || numAmount > MAX_AMOUNT) {
+      setQuote(null);
+      setQuoteState('idle');
+      setQuoteError(null);
+      return;
+    }
+
+    setQuoteState('loading');
+    setQuoteError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('coinbase-headless', {
+        body: {
+          action: 'getQuote',
+          purchaseCurrency: defaultAsset,
+          purchaseNetwork: defaultNetwork,
+          paymentAmount: amt,
+          paymentCurrency: 'USD',
+          paymentMethod: 'CARD',
+          country: 'US',
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setQuote({
+        purchaseAmount: data.purchase_amount?.value || amt,
+        fee: data.coinbase_fee?.value || '0',
+        networkFee: data.network_fee?.value || '0',
+        total: data.payment_total?.value || amt,
+        quoteId: data.quote_id || '',
+      });
+      setQuoteState('ready');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get quote';
+      setQuoteError(message);
+      setQuoteState('error');
+      setQuote(null);
+    }
+  }, [defaultAsset, defaultNetwork]);
+
+  // Trigger debounced quote on amount change (only when on amount step and authenticated)
+  useEffect(() => {
+    if (step !== 'amount' || !session) return;
+
+    if (quoteDebounceRef.current) clearTimeout(quoteDebounceRef.current);
+
+    const numAmount = parseFloat(amount);
+    if (!amount || isNaN(numAmount) || numAmount < MIN_AMOUNT || numAmount > MAX_AMOUNT) {
+      setQuote(null);
+      setQuoteState('idle');
+      setQuoteError(null);
+      return;
+    }
+
+    quoteDebounceRef.current = setTimeout(() => {
+      fetchQuote(amount);
+    }, QUOTE_DEBOUNCE_MS);
+
+    return () => {
+      if (quoteDebounceRef.current) clearTimeout(quoteDebounceRef.current);
+    };
+  }, [amount, step, session, fetchQuote]);
+
+  // --- Verification ---
   const sendVerificationCode = async () => {
-    const validation = verifyChannel === 'email' 
+    const validation = verifyChannel === 'email'
       ? emailSchema.safeParse(email)
       : phoneSchema.safeParse(phone);
 
     if (!validation.success) {
-      toast({
-        title: "Invalid Input",
-        description: validation.error.errors[0]?.message,
-        variant: "destructive",
-      });
+      toast({ title: "Invalid Input", description: validation.error.errors[0]?.message, variant: "destructive" });
       return;
     }
 
     setIsSendingCode(true);
     try {
       const { data, error } = await supabase.functions.invoke("twilio-verify", {
-        body: {
-          action: 'send',
-          channel: verifyChannel,
-          to: identityValue,
-        },
+        body: { action: 'send', channel: verifyChannel, to: identityValue },
       });
-
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Failed to send code');
 
       setCodeSent(true);
       setStep('verify');
-      toast({
-        title: "Code Sent",
-        description: `Verification code sent to ${verifyChannel === 'email' ? 'your email' : 'your phone'}`,
-      });
+      toast({ title: "Code Sent", description: `Verification code sent to ${verifyChannel === 'email' ? 'your email' : 'your phone'}` });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send verification code';
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setIsSendingCode(false);
     }
   };
 
-  // Verify code
   const verifyCode = async () => {
     const validation = codeSchema.safeParse(verificationCode);
     if (!validation.success) {
-      toast({
-        title: "Invalid Code",
-        description: validation.error.errors[0]?.message,
-        variant: "destructive",
-      });
+      toast({ title: "Invalid Code", description: validation.error.errors[0]?.message, variant: "destructive" });
       return;
     }
 
     setIsVerifying(true);
     try {
       const { data, error } = await supabase.functions.invoke("twilio-verify", {
-        body: {
-          action: 'check',
-          channel: verifyChannel,
-          to: identityValue,
-          code: verificationCode,
-        },
+        body: { action: 'check', channel: verifyChannel, to: identityValue, code: verificationCode },
       });
-
       if (error) throw error;
-      if (!data?.verified) {
-        throw new Error('Invalid verification code');
-      }
+      if (!data?.verified) throw new Error('Invalid verification code');
 
-      // Store verification for 60 days
       storeVerification(verifyChannel, identityValue);
-      
       setIsVerified(true);
       setStep('amount');
-      toast({
-        title: "Verified",
-        description: "Your identity has been verified for 60 days",
-      });
+      toast({ title: "Verified", description: "Your identity has been verified for 60 days" });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to verify code';
-      toast({
-        title: "Verification Failed",
-        description: message,
-        variant: "destructive",
-      });
+      toast({ title: "Verification Failed", description: message, variant: "destructive" });
     } finally {
       setIsVerifying(false);
     }
   };
 
-  // Validate destination address matches the target network
-  const isValidDestinationAddress = destinationAddress && (
-    defaultNetwork === 'solana' ? isSolanaAddress(destinationAddress) : isEvmAddress(destinationAddress)
-  );
-
-  // Get quote and generate buy URL
-  const getQuote = async () => {
+  // --- Continue to Purchase: generate buy URL and open popup ---
+  const continueToPurchase = async () => {
     if (!session) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to use Coinbase onramp",
-        variant: "destructive",
-      });
+      toast({ title: "Authentication Required", description: "Please sign in to use Coinbase onramp", variant: "destructive" });
+      return;
+    }
+    if (!amount || parseFloat(amount) < MIN_AMOUNT) {
+      toast({ title: "Invalid Amount", description: `Please enter an amount of at least $${MIN_AMOUNT}`, variant: "destructive" });
+      return;
+    }
+    if (!destinationAddress || !isValidDestinationAddress) {
+      toast({ title: "Missing Wallet", description: "Please connect your wallet or enter a valid address", variant: "destructive" });
       return;
     }
 
-    if (!amount || parseFloat(amount) < 1) {
-      toast({
-        title: "Invalid Amount",
-        description: "Please enter an amount of at least $1",
-        variant: "destructive",
-      });
-      return;
-    }
+    setIsLoadingBuy(true);
 
-    if (!destinationAddress) {
-      toast({
-        title: "Missing Wallet",
-        description: "Please connect your wallet or enter an address",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!isValidDestinationAddress) {
-      toast({
-        title: "Invalid Address",
-        description: defaultNetwork === 'solana' 
-          ? "Please enter a valid Solana wallet address (32-44 characters)" 
-          : "Please enter a valid EVM wallet address (starts with 0x)",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoadingQuote(true);
     try {
+      // Generate unique purchase attempt ID
+      const attemptId = crypto.randomUUID();
+
       const { data, error } = await supabase.functions.invoke("coinbase-headless", {
         body: {
           action: 'generateBuyUrl',
@@ -376,157 +356,118 @@ export function CoinbaseHeadlessOnramp({
           country: 'US',
           destinationAddress,
           connectedWalletAddress: isConnected && address ? address : undefined,
+          partnerUserId: attemptId,
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const quoteData = data.quote || data;
-      setQuote({
-        purchaseAmount: quoteData.purchase_amount?.value || amount,
-        fee: quoteData.coinbase_fee?.value || '0',
-        total: quoteData.payment_total?.value || amount,
-        quoteId: quoteData.quote_id || '',
-        buyUrl: data.buyUrl || null,
-      });
-      setStep('confirm');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to get quote';
-      toast({
-        title: "Quote Error",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingQuote(false);
-    }
-  };
+      const buyUrl = data.buyUrl;
+      if (!buyUrl) throw new Error('No payment URL received');
 
-  // Execute buy - event-driven approach
-  const executeBuy = async () => {
-    if (!quote?.buyUrl || !session) {
-      toast({
-        title: "Error",
-        description: "No payment URL available. Please try getting a new quote.",
-        variant: "destructive",
-      });
-      return;
-    }
+      // Set state and switch to result view
+      setPurchaseAttemptId(attemptId);
+      updateTxState('waiting');
+      setStep('result');
 
-    // Generate unique purchase attempt ID
-    const attemptId = crypto.randomUUID();
-    setPurchaseAttemptId(attemptId);
-    updateTxState('waiting');
-    setStep('result');
-
-    // Insert purchase attempt record
-    try {
-      await (supabase as any).from('purchase_attempts').insert({
-        user_id: session.user.id,
-        wallet_address: destinationAddress,
-        amount: parseFloat(amount),
-        currency: 'USD',
-        crypto_currency: defaultAsset,
-        network: defaultNetwork,
-        partner_user_ref: attemptId,
-        status: 'idle',
-      });
-    } catch (err) {
-      console.error('[COINBASE] Failed to create purchase attempt:', err);
-    }
-
-    // Add partnerUserId to buy URL for tracking
-    const url = new URL(quote.buyUrl);
-    url.searchParams.set('partnerUserId', attemptId);
-
-    const paymentWindow = window.open(url.toString(), '_blank', 'width=500,height=700');
-    
-    if (!paymentWindow) {
-      // If popup blocked, redirect in same window
-      window.location.href = url.toString();
-      return;
-    }
-
-    toast({
-      title: "Complete Payment",
-      description: "Complete your card payment in the Coinbase window",
-    });
-
-    // Listen for postMessage events from Coinbase
-    const handleMessage = (event: MessageEvent) => {
-      // Only accept messages from Coinbase origins
-      if (!event.origin.includes('coinbase.com')) return;
-      
-      const data = event.data;
-      if (!data || typeof data !== 'object') return;
-      
-      const eventName = data.eventName || data.event || data.type;
-      console.log('[COINBASE-EVENT]', eventName, data);
-
-      switch (eventName) {
-        case 'onramp_api.commit_success': {
-          updateTxState('initialized');
-          const txId = data.transactionId || data.data?.transactionId || data.orderId;
-          if (txId) setCoinbaseTxId(txId);
-          startPolling(attemptId);
-          // Update purchase attempt in DB
-          (supabase as any).from('purchase_attempts')
-            .update({ 
-              status: 'initialized', 
-              coinbase_transaction_id: txId || null 
-            })
-            .eq('partner_user_ref', attemptId);
-          break;
-        }
-        case 'onramp_api.cancel':
-          updateTxState('incomplete');
-          (supabase as any).from('purchase_attempts')
-            .update({ status: 'incomplete' })
-            .eq('partner_user_ref', attemptId);
-          break;
-        case 'onramp_api.polling_success':
-          updateTxState('completed');
-          (supabase as any).from('purchase_attempts')
-            .update({ status: 'completed' })
-            .eq('partner_user_ref', attemptId);
-          break;
-        case 'onramp_api.polling_error':
-          updateTxState('failed');
-          (supabase as any).from('purchase_attempts')
-            .update({ status: 'failed' })
-            .eq('partner_user_ref', attemptId);
-          break;
+      // Insert purchase attempt record
+      try {
+        await (supabase as any).from('purchase_attempts').insert({
+          user_id: session.user.id,
+          wallet_address: destinationAddress,
+          amount: parseFloat(amount),
+          currency: 'USD',
+          crypto_currency: defaultAsset,
+          network: defaultNetwork,
+          partner_user_ref: attemptId,
+          status: 'idle',
+        });
+      } catch (err) {
+        console.error('[COINBASE] Failed to create purchase attempt:', err);
       }
-    };
 
-    messageHandlerRef.current = handleMessage;
-    window.addEventListener('message', handleMessage);
+      // Open payment window
+      const paymentWindow = window.open(buyUrl, '_blank', 'width=500,height=700');
 
-    // Monitor for window close - only mark incomplete if no events received
-    windowCheckRef.current = setInterval(() => {
-      if (paymentWindow.closed) {
-        if (windowCheckRef.current) clearInterval(windowCheckRef.current);
-        windowCheckRef.current = null;
-        
-        // Give events/webhooks a moment to arrive
-        setTimeout(async () => {
-          const current = txStateRef.current;
-          if (current === 'waiting') {
-            // No events received - user closed without completing
-            updateTxState('incomplete');
-            try {
-              await (supabase as any).from('purchase_attempts')
-                .update({ status: 'incomplete' })
-                .eq('partner_user_ref', attemptId);
-            } catch {}
+      if (!paymentWindow) {
+        window.location.href = buyUrl;
+        return;
+      }
+
+      toast({ title: "Complete Payment", description: "Complete your card payment in the Coinbase window" });
+
+      // Listen for postMessage events from Coinbase
+      const handleMessage = (event: MessageEvent) => {
+        if (!event.origin.includes('coinbase.com')) return;
+        const msgData = event.data;
+        if (!msgData || typeof msgData !== 'object') return;
+
+        const eventName = msgData.eventName || msgData.event || msgData.type;
+        console.log('[COINBASE-EVENT]', eventName, msgData);
+
+        switch (eventName) {
+          case 'onramp_api.commit_success': {
+            updateTxState('initialized');
+            const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
+            if (txId) setCoinbaseTxId(txId);
+            startPolling(attemptId);
+            (supabase as any).from('purchase_attempts')
+              .update({ status: 'initialized', coinbase_transaction_id: txId || null })
+              .eq('partner_user_ref', attemptId);
+            break;
           }
-        }, 3000);
-      }
-    }, 1000);
+          case 'onramp_api.cancel':
+            updateTxState('incomplete');
+            (supabase as any).from('purchase_attempts')
+              .update({ status: 'incomplete' })
+              .eq('partner_user_ref', attemptId);
+            break;
+          case 'onramp_api.polling_success':
+            updateTxState('completed');
+            (supabase as any).from('purchase_attempts')
+              .update({ status: 'completed' })
+              .eq('partner_user_ref', attemptId);
+            break;
+          case 'onramp_api.polling_error':
+            updateTxState('failed');
+            (supabase as any).from('purchase_attempts')
+              .update({ status: 'failed' })
+              .eq('partner_user_ref', attemptId);
+            break;
+        }
+      };
+
+      messageHandlerRef.current = handleMessage;
+      window.addEventListener('message', handleMessage);
+
+      // Monitor window close
+      windowCheckRef.current = setInterval(() => {
+        if (paymentWindow.closed) {
+          if (windowCheckRef.current) clearInterval(windowCheckRef.current);
+          windowCheckRef.current = null;
+          setTimeout(async () => {
+            const current = txStateRef.current;
+            if (current === 'waiting') {
+              updateTxState('incomplete');
+              try {
+                await (supabase as any).from('purchase_attempts')
+                  .update({ status: 'incomplete' })
+                  .eq('partner_user_ref', attemptId);
+              } catch {}
+            }
+          }, 3000);
+        }
+      }, 1000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to initiate purchase';
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setIsLoadingBuy(false);
+    }
   };
 
-  // Reset flow (keeps verification)
+  // --- Reset ---
   const resetFlow = () => {
     stopPolling();
     if (messageHandlerRef.current) {
@@ -537,12 +478,13 @@ export function CoinbaseHeadlessOnramp({
     setVerificationCode("");
     setCodeSent(false);
     setQuote(null);
+    setQuoteState('idle');
+    setQuoteError(null);
     setPurchaseAttemptId(null);
     setCoinbaseTxId(null);
     updateTxState('waiting');
   };
 
-  // Full reset including verification
   const resetVerification = () => {
     clearStoredVerification();
     setIsVerified(false);
@@ -552,15 +494,23 @@ export function CoinbaseHeadlessOnramp({
     setVerificationCode("");
     setCodeSent(false);
     setQuote(null);
+    setQuoteState('idle');
+    setQuoteError(null);
     setPurchaseAttemptId(null);
     setCoinbaseTxId(null);
     updateTxState('waiting');
   };
 
-  // Step indicators - adjust based on verification status
-  const steps = isVerified && hasStoredVerification 
-    ? ['amount', 'confirm', 'result'] 
-    : ['identity', 'verify', 'amount', 'confirm', 'result'];
+  // Amount validation
+  const numAmount = parseFloat(amount);
+  const amountValid = !isNaN(numAmount) && numAmount >= MIN_AMOUNT && numAmount <= MAX_AMOUNT;
+  const amountTooLow = amount !== '' && !isNaN(numAmount) && numAmount < MIN_AMOUNT;
+  const amountTooHigh = amount !== '' && !isNaN(numAmount) && numAmount > MAX_AMOUNT;
+
+  // Progress steps
+  const steps = isVerified && hasStoredVerification
+    ? ['amount', 'result']
+    : ['identity', 'verify', 'amount', 'result'];
   const currentStepIndex = steps.indexOf(step);
 
   return (
@@ -602,7 +552,6 @@ export function CoinbaseHeadlessOnramp({
               </p>
             </div>
 
-            {/* Channel selector */}
             <div className="flex gap-2" data-tutorial="verification-method">
               <Button
                 variant={verifyChannel === 'sms' ? 'default' : 'outline'}
@@ -622,7 +571,6 @@ export function CoinbaseHeadlessOnramp({
               </Button>
             </div>
 
-            {/* Input fields */}
             {verifyChannel === 'email' ? (
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -660,20 +608,16 @@ export function CoinbaseHeadlessOnramp({
               </div>
             )}
 
-            {/* Network mismatch warning */}
             {showNetworkMismatch && (
               <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-2">
-                <p className="text-xs text-destructive font-medium">
-                  Wrong wallet type connected
-                </p>
+                <p className="text-xs text-destructive font-medium">Wrong wallet type connected</p>
                 <p className="text-[10px] text-muted-foreground">
-                  Your connected wallet ({address?.slice(0, 8)}...) is not compatible with {defaultNetwork}. 
+                  Your connected wallet ({address?.slice(0, 8)}...) is not compatible with {defaultNetwork}.
                   Please enter a valid {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet address below.
                 </p>
               </div>
             )}
 
-            {/* Wallet address display */}
             <div className="space-y-2" data-tutorial="wallet-input">
               <Label htmlFor="wallet">
                 {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet address to receive {defaultAsset}
@@ -683,22 +627,16 @@ export function CoinbaseHeadlessOnramp({
                   <div className="p-3 bg-muted/50 rounded-lg border border-border">
                     <p className="font-mono text-sm truncate">{address}</p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground/70">
-                    Connected wallet detected
-                  </p>
+                  <p className="text-[10px] text-muted-foreground/70">Connected wallet detected</p>
                 </>
               ) : showNetworkMismatch ? (
-                <>
-                  <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-                    <p className="text-xs text-destructive font-medium">
-                      Wrong wallet type connected
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Your connected wallet is not compatible with {defaultNetwork}. 
-                      Please sign in with a {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet.
-                    </p>
-                  </div>
-                </>
+                <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                  <p className="text-xs text-destructive font-medium">Wrong wallet type connected</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Your connected wallet is not compatible with {defaultNetwork}.
+                    Please sign in with a {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet.
+                  </p>
+                </div>
               ) : (
                 <>
                   <Input
@@ -720,23 +658,13 @@ export function CoinbaseHeadlessOnramp({
               onClick={sendVerificationCode}
               size="lg"
               className="w-full"
-              disabled={
-                isSendingCode || 
-                !identityValue || 
-                !destinationAddress
-              }
+              disabled={isSendingCode || !identityValue || !destinationAddress}
               data-tutorial="send-verification"
             >
               {isSendingCode ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending Code...
-                </>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending Code...</>
               ) : (
-                <>
-                  Continue securely
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
+                <>Continue securely<ArrowRight className="ml-2 h-4 w-4" /></>
               )}
             </AuthGatedButton>
 
@@ -770,53 +698,34 @@ export function CoinbaseHeadlessOnramp({
             </div>
 
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setStep('identity')}
-                className="flex-1"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+              <Button variant="outline" onClick={() => setStep('identity')} className="flex-1">
+                <ArrowLeft className="mr-2 h-4 w-4" />Back
               </Button>
-              <Button
-                onClick={verifyCode}
-                className="flex-1"
-                disabled={isVerifying || verificationCode.length < 4}
-              >
+              <Button onClick={verifyCode} className="flex-1" disabled={isVerifying || verificationCode.length < 4}>
                 {isVerifying ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</>
                 ) : (
-                  <>
-                    Verify
-                    <Check className="ml-2 h-4 w-4" />
-                  </>
+                  <>Verify<Check className="ml-2 h-4 w-4" /></>
                 )}
               </Button>
             </div>
 
-            <Button
-              variant="ghost"
-              onClick={sendVerificationCode}
-              disabled={isSendingCode}
-              className="w-full"
-            >
+            <Button variant="ghost" onClick={sendVerificationCode} disabled={isSendingCode} className="w-full">
               <RefreshCw className={`mr-2 h-4 w-4 ${isSendingCode ? 'animate-spin' : ''}`} />
               Resend Code
             </Button>
           </div>
         )}
 
-        {/* Step: Amount */}
+        {/* Step: Amount - single-page purchase experience */}
         {step === 'amount' && (
-          <div className="space-y-6">
+          <div className="space-y-5">
+            {/* Verified badge */}
             <div className="text-center space-y-2">
-              <div className="inline-flex items-center gap-2 text-green-500 mb-2">
+              <div className="inline-flex items-center gap-2 text-primary mb-1">
                 <ShieldCheck className="h-5 w-5" />
                 <span className="text-sm font-medium">
-                  {hasStoredVerification 
+                  {hasStoredVerification
                     ? `Verified (${getDaysRemaining()} days remaining)`
                     : 'Identity Verified'
                   }
@@ -825,12 +734,7 @@ export function CoinbaseHeadlessOnramp({
               {hasStoredVerification && storedVerification && (
                 <p className="text-xs text-muted-foreground">
                   {storedVerification.channel === 'email' ? 'Email' : 'Phone'}: {storedVerification.value}
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="text-xs p-0 h-auto ml-2"
-                    onClick={resetVerification}
-                  >
+                  <Button variant="link" size="sm" className="text-xs p-0 h-auto ml-2" onClick={resetVerification}>
                     Change
                   </Button>
                 </p>
@@ -838,20 +742,31 @@ export function CoinbaseHeadlessOnramp({
               <h2 className="text-xl font-semibold">How much do you want to buy?</h2>
             </div>
 
+            {/* Amount input */}
             <div className="space-y-2">
               <Label htmlFor="amount">Amount (USD)</Label>
-              <Input
-                id="amount"
-                type="number"
-                placeholder="100"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min="1"
-                max="10000"
-                className="text-2xl"
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xl text-muted-foreground font-medium">$</span>
+                <Input
+                  id="amount"
+                  type="number"
+                  placeholder="100"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  min={MIN_AMOUNT}
+                  max={MAX_AMOUNT}
+                  className="text-2xl pl-8"
+                />
+              </div>
+              {amountTooLow && (
+                <p className="text-xs text-destructive">Minimum purchase amount is ${MIN_AMOUNT}</p>
+              )}
+              {amountTooHigh && (
+                <p className="text-xs text-destructive">Maximum purchase amount is ${MAX_AMOUNT}</p>
+              )}
             </div>
 
+            {/* Preset amounts */}
             <div className="grid grid-cols-4 gap-2">
               {['50', '100', '250', '500'].map((preset) => (
                 <Button
@@ -865,83 +780,98 @@ export function CoinbaseHeadlessOnramp({
               ))}
             </div>
 
+            {/* Inline quote summary */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              {quoteState === 'idle' && (
+                <div className="p-4 text-center">
+                  <p className="text-sm text-muted-foreground">Enter an amount to see estimated fees</p>
+                </div>
+              )}
+
+              {quoteState === 'loading' && (
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-5 w-1/2 ml-auto" />
+                </div>
+              )}
+
+              {quoteState === 'error' && (
+                <div className="p-4 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm text-destructive font-medium">Unable to load quote</p>
+                    <p className="text-xs text-muted-foreground mt-1">{quoteError || 'Please try again.'}</p>
+                    <Button variant="link" size="sm" className="text-xs p-0 h-auto mt-1" onClick={() => fetchQuote(amount)}>
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {quoteState === 'ready' && quote && (
+                <div className="p-4 space-y-2.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">You pay</span>
+                    <span className="font-medium">${amount} USD</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Coinbase fee</span>
+                    <span className="font-medium">${quote.fee}</span>
+                  </div>
+                  {parseFloat(quote.networkFee) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Network fee</span>
+                      <span className="font-medium">${quote.networkFee}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-border pt-2.5 flex justify-between">
+                    <span className="text-sm text-muted-foreground">Est. {defaultAsset} received</span>
+                    <span className="font-bold text-base">
+                      {quote.purchaseAmount} {defaultAsset}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70 pt-1">
+                    Final fees and received amount may vary slightly before payment is completed.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Destination preview */}
+            {destinationAddress && isValidDestinationAddress && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Destination</p>
+                <p className="font-mono text-sm truncate">{destinationAddress}</p>
+              </div>
+            )}
+
+            {/* CTA */}
             <div className="flex gap-2">
               {!hasStoredVerification && (
-                <Button
-                  variant="outline"
-                  onClick={() => setStep('identity')}
-                  className="flex-1"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
+                <Button variant="outline" onClick={() => setStep('identity')} className="flex-1">
+                  <ArrowLeft className="mr-2 h-4 w-4" />Back
                 </Button>
               )}
               <AuthGatedButton
-                onClick={getQuote}
+                onClick={continueToPurchase}
+                size="lg"
                 className="flex-1"
-                disabled={isLoadingQuote || !amount || parseFloat(amount) < 1}
+                disabled={
+                  isLoadingBuy ||
+                  !amountValid ||
+                  quoteState !== 'ready' ||
+                  !destinationAddress ||
+                  !isValidDestinationAddress
+                }
               >
-                {isLoadingQuote ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Getting Quote...
-                  </>
+                {isLoadingBuy ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing...</>
                 ) : (
-                  <>
-                    Get Quote
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
+                  <>Continue to Purchase<ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
               </AuthGatedButton>
-            </div>
-          </div>
-        )}
-
-        {/* Step: Confirm */}
-        {step === 'confirm' && quote && (
-          <div className="space-y-6">
-            <div className="text-center space-y-2">
-              <h2 className="text-xl font-semibold">Confirm Your Purchase</h2>
-            </div>
-
-            <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">You Pay</span>
-                <span className="font-medium">${amount} USD</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fee</span>
-                <span className="font-medium">${quote.fee}</span>
-              </div>
-              <div className="border-t border-border pt-3 flex justify-between">
-                <span className="text-muted-foreground">You Receive</span>
-                <span className="font-bold text-lg">
-                  {quote.purchaseAmount} {defaultAsset}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-3 bg-muted/30 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Destination</p>
-              <p className="font-mono text-sm truncate">{destinationAddress}</p>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setStep('amount')}
-                className="flex-1"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                onClick={executeBuy}
-                className="flex-1"
-              >
-                Confirm Purchase
-                <Check className="ml-2 h-4 w-4" />
-              </Button>
             </div>
           </div>
         )}
@@ -949,20 +879,16 @@ export function CoinbaseHeadlessOnramp({
         {/* Step: Result - event-driven transaction states */}
         {step === 'result' && (
           <div className="py-8 text-center space-y-6">
-            {/* Waiting: popup open, no events yet */}
             {txState === 'waiting' && (
               <>
                 <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold">Complete Your Purchase</h2>
-                  <p className="text-muted-foreground">
-                    Please complete your payment in the Coinbase window.
-                  </p>
+                  <p className="text-muted-foreground">Please complete your payment in the Coinbase window.</p>
                 </div>
               </>
             )}
 
-            {/* Incomplete: user cancelled or exited */}
             {txState === 'incomplete' && (
               <>
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
@@ -970,17 +896,12 @@ export function CoinbaseHeadlessOnramp({
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold">Incomplete Transaction!</h2>
-                  <p className="text-muted-foreground">
-                    You exited the process before completing your purchase.
-                  </p>
+                  <p className="text-muted-foreground">You exited the process before completing your purchase.</p>
                 </div>
-                <Button onClick={resetFlow} className="w-full">
-                  Try Again
-                </Button>
+                <Button onClick={resetFlow} className="w-full">Try Again</Button>
               </>
             )}
 
-            {/* Initialized or Processing: transaction in progress */}
             {(txState === 'initialized' || txState === 'processing') && (
               <>
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
@@ -998,23 +919,18 @@ export function CoinbaseHeadlessOnramp({
                     <p className="font-mono text-sm truncate">{coinbaseTxId}</p>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Status will automatically update every 10 seconds.
-                </p>
+                <p className="text-xs text-muted-foreground">Status will automatically update every 10 seconds.</p>
               </>
             )}
 
-            {/* Completed: transaction successful */}
             {txState === 'completed' && (
               <>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10">
-                  <Check className="h-8 w-8 text-green-500" />
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
+                  <Check className="h-8 w-8 text-primary" />
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-                  <p className="text-lg font-medium text-green-500">
-                    Transaction Status: Completed
-                  </p>
+                  <p className="text-lg font-medium text-primary">Transaction Status: Completed</p>
                 </div>
                 {coinbaseTxId && (
                   <div className="p-3 bg-muted/50 rounded-lg">
@@ -1022,13 +938,10 @@ export function CoinbaseHeadlessOnramp({
                     <p className="font-mono text-sm truncate">{coinbaseTxId}</p>
                   </div>
                 )}
-                <Button onClick={resetFlow} variant="outline" className="w-full">
-                  Make Another Purchase
-                </Button>
+                <Button onClick={resetFlow} variant="outline" className="w-full">Make Another Purchase</Button>
               </>
             )}
 
-            {/* Failed: transaction failed */}
             {txState === 'failed' && (
               <>
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
@@ -1036,34 +949,23 @@ export function CoinbaseHeadlessOnramp({
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-                  <p className="text-lg font-medium text-destructive">
-                    Transaction Status: Failed
-                  </p>
+                  <p className="text-lg font-medium text-destructive">Transaction Status: Failed</p>
                 </div>
-                <Button onClick={resetFlow} className="w-full">
-                  Try Again
-                </Button>
+                <Button onClick={resetFlow} className="w-full">Try Again</Button>
               </>
             )}
 
-            {/* Delayed: timeout reached */}
             {txState === 'delayed' && (
               <>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10">
-                  <Clock className="h-8 w-8 text-yellow-500" />
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent">
+                  <Clock className="h-8 w-8 text-accent-foreground" />
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-                  <p className="text-lg font-medium text-yellow-500">
-                    Transaction Status: Delayed
-                  </p>
-                  <p className="text-muted-foreground">
-                    Your transaction is taking longer than expected. Please check again later.
-                  </p>
+                  <p className="text-lg font-medium text-muted-foreground">Transaction Status: Delayed</p>
+                  <p className="text-muted-foreground">Your transaction is taking longer than expected. Please check again later.</p>
                 </div>
-                <Button onClick={resetFlow} variant="outline" className="w-full">
-                  Make Another Purchase
-                </Button>
+                <Button onClick={resetFlow} variant="outline" className="w-full">Make Another Purchase</Button>
               </>
             )}
           </div>
