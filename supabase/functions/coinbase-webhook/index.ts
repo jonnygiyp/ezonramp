@@ -280,6 +280,28 @@ serve(async (req) => {
       console.log(`[COINBASE-WEBHOOK] Updated transaction ${transactionId} to status: ${canonicalStatus}`);
     }
 
+    // Also update purchase_attempts if partnerUserId is present in webhook payload
+    const partnerUserId = event.partnerUserId || event.partner_user_id || event.partnerUserRef;
+    if (partnerUserId) {
+      let purchaseStatus = 'processing';
+      if (canonicalStatus === 'success') purchaseStatus = 'completed';
+      else if (canonicalStatus === 'failed') purchaseStatus = 'failed';
+
+      const { error: purchaseUpdateError } = await supabase
+        .from("purchase_attempts")
+        .update({
+          status: purchaseStatus,
+          coinbase_transaction_id: transactionId,
+        })
+        .eq("partner_user_ref", partnerUserId);
+
+      if (purchaseUpdateError) {
+        console.error("[COINBASE-WEBHOOK] Purchase attempt update error:", purchaseUpdateError);
+      } else {
+        console.log(`[COINBASE-WEBHOOK] Updated purchase attempt ${partnerUserId} to status: ${purchaseStatus}`);
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, received: transactionId }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

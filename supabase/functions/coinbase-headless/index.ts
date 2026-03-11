@@ -604,6 +604,114 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      if (action === "pollTransactionStatus") {
+        const { partnerUserRef } = body;
+
+        if (!partnerUserRef) {
+          return new Response(JSON.stringify({ error: "partnerUserRef required" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+        // Look up purchase attempt - verify ownership
+        const { data: attempt, error: lookupError } = await supabaseAdmin
+          .from("purchase_attempts")
+          .select("*")
+          .eq("partner_user_ref", partnerUserRef)
+          .eq("user_id", authResult.userId)
+          .single();
+
+        if (lookupError || !attempt) {
+          return new Response(JSON.stringify({ error: "Purchase attempt not found" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // If status is already terminal, just return it
+        if (["completed", "failed", "delayed"].includes(attempt.status)) {
+          return new Response(JSON.stringify({ status: attempt.status }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // If we have a coinbase transaction ID, query Coinbase for latest status
+        if (attempt.coinbase_transaction_id) {
+          try {
+            const txResponse = await callCDPApi(
+              "GET",
+              `/onramp/v1/buy/transaction/${attempt.coinbase_transaction_id}`
+            );
+            const txData = await txResponse.json();
+
+            if (txResponse.ok && txData.status) {
+              let newStatus = attempt.status;
+              const cbStatus = txData.status;
+
+              if (
+                cbStatus === "ONRAMP_TRANSACTION_STATUS_SUCCESS" ||
+                cbStatus === "SUCCESS"
+              ) {
+                newStatus = "completed";
+              } else if (
+                cbStatus === "ONRAMP_TRANSACTION_STATUS_FAILED" ||
+                cbStatus === "FAILED"
+              ) {
+                newStatus = "failed";
+              } else if (
+                cbStatus === "ONRAMP_TRANSACTION_STATUS_IN_PROGRESS" ||
+                cbStatus === "IN_PROGRESS"
+              ) {
+                newStatus = "processing";
+              }
+
+              if (newStatus !== attempt.status) {
+                await supabaseAdmin
+                  .from("purchase_attempts")
+                  .update({ status: newStatus })
+                  .eq("id", attempt.id);
+              }
+
+              return new Response(
+                JSON.stringify({ status: newStatus, coinbaseStatus: cbStatus }),
+                {
+                  headers: { ...corsHeaders, "Content-Type": "application/json" },
+                }
+              );
+            }
+          } catch (err) {
+            console.error("[COINBASE] Poll transaction error:", err);
+          }
+        }
+
+        // Check for timeout (30 minutes)
+        const createdAt = new Date(attempt.created_at).getTime();
+        const elapsed = Date.now() - createdAt;
+        if (
+          elapsed > 30 * 60 * 1000 &&
+          !["completed", "failed"].includes(attempt.status)
+        ) {
+          await supabaseAdmin
+            .from("purchase_attempts")
+            .update({ status: "delayed" })
+            .eq("id", attempt.id);
+
+          return new Response(JSON.stringify({ status: "delayed" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Return current DB status
+        return new Response(JSON.stringify({ status: attempt.status }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Handle public actions

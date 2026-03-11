@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,7 +14,8 @@ const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
 const codeSchema = z.string().trim().regex(/^\d{4,8}$/, "Enter a valid verification code");
 
-type Step = 'identity' | 'verify' | 'amount' | 'confirm' | 'processing' | 'complete';
+type Step = 'identity' | 'verify' | 'amount' | 'confirm' | 'result';
+type TxState = 'waiting' | 'incomplete' | 'initialized' | 'processing' | 'completed' | 'failed' | 'delayed';
 type VerifyChannel = 'sms' | 'email';
 
 // Verification storage key and validity period (60 days in milliseconds)
@@ -111,14 +112,17 @@ export function CoinbaseHeadlessOnramp({
   } | null>(null);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
 
-  // Transaction state
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [transactionId, setTransactionId] = useState<string | null>(null);
-  const [transactionStatus, setTransactionStatus] = useState<string | null>(null);
+  // Transaction state - event-driven
+  const [txState, setTxState] = useState<TxState>('waiting');
+  const [purchaseAttemptId, setPurchaseAttemptId] = useState<string | null>(null);
+  const [coinbaseTxId, setCoinbaseTxId] = useState<string | null>(null);
+  const txStateRef = useRef<TxState>('waiting');
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageHandlerRef = useRef<((e: MessageEvent) => void) | null>(null);
+  const windowCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Validate that connected wallet address matches the target network
-  // Solana addresses are base58, typically 32-44 chars, no 0x prefix
-  // EVM addresses start with 0x and are 42 chars
   const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
   const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
   
@@ -140,6 +144,84 @@ export function CoinbaseHeadlessOnramp({
     const remaining = VERIFICATION_VALIDITY_MS - elapsed;
     return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
   }, [storedVerification]);
+
+  // Stop polling and cleanup timers
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (windowCheckRef.current) {
+      clearInterval(windowCheckRef.current);
+      windowCheckRef.current = null;
+    }
+  }, []);
+
+  // Update tx state helper
+  const updateTxState = useCallback((state: TxState) => {
+    txStateRef.current = state;
+    setTxState(state);
+    if (['completed', 'failed', 'delayed', 'incomplete'].includes(state)) {
+      stopPolling();
+    }
+  }, [stopPolling]);
+
+  // Start polling for transaction status
+  const startPolling = useCallback((attemptId: string) => {
+    if (pollingRef.current) return;
+    
+    pollingRef.current = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('coinbase-headless', {
+          body: {
+            action: 'pollTransactionStatus',
+            partnerUserRef: attemptId,
+          },
+        });
+        
+        if (error) {
+          console.error('[COINBASE-POLL] Error:', error);
+          return;
+        }
+        
+        if (data?.status) {
+          const current = txStateRef.current;
+          if (['completed', 'failed', 'delayed'].includes(current)) return;
+          if (data.status !== current) {
+            updateTxState(data.status as TxState);
+          }
+        }
+      } catch (err) {
+        console.error('[COINBASE-POLL] Error:', err);
+      }
+    }, 10000);
+
+    // 30-minute timeout
+    timeoutRef.current = setTimeout(() => {
+      const current = txStateRef.current;
+      if (current === 'initialized' || current === 'processing') {
+        updateTxState('delayed');
+        // Update DB
+        (supabase as any).from('purchase_attempts')
+          .update({ status: 'delayed' })
+          .eq('partner_user_ref', attemptId);
+      }
+    }, 30 * 60 * 1000);
+  }, [updateTxState]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      if (messageHandlerRef.current) {
+        window.removeEventListener('message', messageHandlerRef.current);
+      }
+    };
+  }, [stopPolling]);
 
   // Send verification code
   const sendVerificationCode = async () => {
@@ -283,8 +365,6 @@ export function CoinbaseHeadlessOnramp({
 
     setIsLoadingQuote(true);
     try {
-      // Use generateBuyUrl action which includes destination_address to get one-click-buy URL
-      // Pass connectedWalletAddress to verify the destination matches the user's connected wallet
       const { data, error } = await supabase.functions.invoke("coinbase-headless", {
         body: {
           action: 'generateBuyUrl',
@@ -295,7 +375,6 @@ export function CoinbaseHeadlessOnramp({
           paymentMethod: 'CARD',
           country: 'US',
           destinationAddress,
-          // Pass the currently connected Particle wallet address for session verification
           connectedWalletAddress: isConnected && address ? address : undefined,
         },
       });
@@ -324,9 +403,9 @@ export function CoinbaseHeadlessOnramp({
     }
   };
 
-  // Redirect to Coinbase payment page
+  // Execute buy - event-driven approach
   const executeBuy = async () => {
-    if (!quote?.buyUrl) {
+    if (!quote?.buyUrl || !session) {
       toast({
         title: "Error",
         description: "No payment URL available. Please try getting a new quote.",
@@ -335,42 +414,132 @@ export function CoinbaseHeadlessOnramp({
       return;
     }
 
-    // Open Coinbase payment page in a new window
-    const paymentWindow = window.open(quote.buyUrl, '_blank', 'width=500,height=700');
-    
-    if (paymentWindow) {
-      setStep('processing');
-      toast({
-        title: "Complete Payment",
-        description: "Complete your card payment in the Coinbase window",
+    // Generate unique purchase attempt ID
+    const attemptId = crypto.randomUUID();
+    setPurchaseAttemptId(attemptId);
+    updateTxState('waiting');
+    setStep('result');
+
+    // Insert purchase attempt record
+    try {
+      await (supabase as any).from('purchase_attempts').insert({
+        user_id: session.user.id,
+        wallet_address: destinationAddress,
+        amount: parseFloat(amount),
+        currency: 'USD',
+        crypto_currency: defaultAsset,
+        network: defaultNetwork,
+        partner_user_ref: attemptId,
+        status: 'idle',
       });
-      
-      // Monitor for window close
-      const checkWindow = setInterval(() => {
-        if (paymentWindow.closed) {
-          clearInterval(checkWindow);
-          setStep('complete');
-          setTransactionStatus('pending');
-          toast({
-            title: "Payment Window Closed",
-            description: "Check your wallet for the transaction status",
-          });
-        }
-      }, 1000);
-    } else {
-      // If popup blocked, redirect in same window
-      window.location.href = quote.buyUrl;
+    } catch (err) {
+      console.error('[COINBASE] Failed to create purchase attempt:', err);
     }
+
+    // Add partnerUserId to buy URL for tracking
+    const url = new URL(quote.buyUrl);
+    url.searchParams.set('partnerUserId', attemptId);
+
+    const paymentWindow = window.open(url.toString(), '_blank', 'width=500,height=700');
+    
+    if (!paymentWindow) {
+      // If popup blocked, redirect in same window
+      window.location.href = url.toString();
+      return;
+    }
+
+    toast({
+      title: "Complete Payment",
+      description: "Complete your card payment in the Coinbase window",
+    });
+
+    // Listen for postMessage events from Coinbase
+    const handleMessage = (event: MessageEvent) => {
+      // Only accept messages from Coinbase origins
+      if (!event.origin.includes('coinbase.com')) return;
+      
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      
+      const eventName = data.eventName || data.event || data.type;
+      console.log('[COINBASE-EVENT]', eventName, data);
+
+      switch (eventName) {
+        case 'onramp_api.commit_success': {
+          updateTxState('initialized');
+          const txId = data.transactionId || data.data?.transactionId || data.orderId;
+          if (txId) setCoinbaseTxId(txId);
+          startPolling(attemptId);
+          // Update purchase attempt in DB
+          (supabase as any).from('purchase_attempts')
+            .update({ 
+              status: 'initialized', 
+              coinbase_transaction_id: txId || null 
+            })
+            .eq('partner_user_ref', attemptId);
+          break;
+        }
+        case 'onramp_api.cancel':
+          updateTxState('incomplete');
+          (supabase as any).from('purchase_attempts')
+            .update({ status: 'incomplete' })
+            .eq('partner_user_ref', attemptId);
+          break;
+        case 'onramp_api.polling_success':
+          updateTxState('completed');
+          (supabase as any).from('purchase_attempts')
+            .update({ status: 'completed' })
+            .eq('partner_user_ref', attemptId);
+          break;
+        case 'onramp_api.polling_error':
+          updateTxState('failed');
+          (supabase as any).from('purchase_attempts')
+            .update({ status: 'failed' })
+            .eq('partner_user_ref', attemptId);
+          break;
+      }
+    };
+
+    messageHandlerRef.current = handleMessage;
+    window.addEventListener('message', handleMessage);
+
+    // Monitor for window close - only mark incomplete if no events received
+    windowCheckRef.current = setInterval(() => {
+      if (paymentWindow.closed) {
+        if (windowCheckRef.current) clearInterval(windowCheckRef.current);
+        windowCheckRef.current = null;
+        
+        // Give events/webhooks a moment to arrive
+        setTimeout(async () => {
+          const current = txStateRef.current;
+          if (current === 'waiting') {
+            // No events received - user closed without completing
+            updateTxState('incomplete');
+            try {
+              await (supabase as any).from('purchase_attempts')
+                .update({ status: 'incomplete' })
+                .eq('partner_user_ref', attemptId);
+            } catch {}
+          }
+        }, 3000);
+      }
+    }, 1000);
   };
 
   // Reset flow (keeps verification)
   const resetFlow = () => {
+    stopPolling();
+    if (messageHandlerRef.current) {
+      window.removeEventListener('message', messageHandlerRef.current);
+      messageHandlerRef.current = null;
+    }
     setStep(isVerified ? 'amount' : 'identity');
     setVerificationCode("");
     setCodeSent(false);
     setQuote(null);
-    setTransactionId(null);
-    setTransactionStatus(null);
+    setPurchaseAttemptId(null);
+    setCoinbaseTxId(null);
+    updateTxState('waiting');
   };
 
   // Full reset including verification
@@ -383,15 +552,16 @@ export function CoinbaseHeadlessOnramp({
     setVerificationCode("");
     setCodeSent(false);
     setQuote(null);
-    setTransactionId(null);
-    setTransactionStatus(null);
+    setPurchaseAttemptId(null);
+    setCoinbaseTxId(null);
+    updateTxState('waiting');
   };
 
   // Step indicators - adjust based on verification status
   const steps = isVerified && hasStoredVerification 
-    ? ['amount', 'confirm', 'complete'] 
-    : ['identity', 'verify', 'amount', 'confirm', 'complete'];
-  const currentStepIndex = steps.indexOf(step === 'processing' ? 'complete' : step);
+    ? ['amount', 'confirm', 'result'] 
+    : ['identity', 'verify', 'amount', 'confirm', 'result'];
+  const currentStepIndex = steps.indexOf(step);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -417,7 +587,7 @@ export function CoinbaseHeadlessOnramp({
           ))}
         </div>
         <span className="text-[10px] text-muted-foreground/70">
-          {step === 'complete' || step === 'processing' ? 'Done!' : `Step ${currentStepIndex + 1} of ${steps.length - 1}`}
+          {step === 'result' ? 'Done!' : `Step ${currentStepIndex + 1} of ${steps.length - 1}`}
         </span>
       </div>
 
@@ -768,56 +938,134 @@ export function CoinbaseHeadlessOnramp({
               <Button
                 onClick={executeBuy}
                 className="flex-1"
-                disabled={isProcessing}
               >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Confirm Purchase
-                    <Check className="ml-2 h-4 w-4" />
-                  </>
-                )}
+                Confirm Purchase
+                <Check className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* Step: Processing */}
-        {step === 'processing' && (
-          <div className="py-12 text-center space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-            <h2 className="text-xl font-semibold">Processing Your Purchase</h2>
-            <p className="text-muted-foreground">Please wait while we process your transaction...</p>
-          </div>
-        )}
-
-        {/* Step: Complete */}
-        {step === 'complete' && (
+        {/* Step: Result - event-driven transaction states */}
+        {step === 'result' && (
           <div className="py-8 text-center space-y-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10">
-              <Check className="h-8 w-8 text-green-500" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-              <p className="text-muted-foreground">
-                Your {defaultAsset} purchase is being processed
-              </p>
-            </div>
-
-            {transactionId && (
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
-                <p className="font-mono text-sm truncate">{transactionId}</p>
-              </div>
+            {/* Waiting: popup open, no events yet */}
+            {txState === 'waiting' && (
+              <>
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Complete Your Purchase</h2>
+                  <p className="text-muted-foreground">
+                    Please complete your payment in the Coinbase window.
+                  </p>
+                </div>
+              </>
             )}
 
-            <Button onClick={resetFlow} variant="outline" className="w-full">
-              Make Another Purchase
-            </Button>
+            {/* Incomplete: user cancelled or exited */}
+            {txState === 'incomplete' && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
+                  <X className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Incomplete Transaction!</h2>
+                  <p className="text-muted-foreground">
+                    You exited the process before completing your purchase.
+                  </p>
+                </div>
+                <Button onClick={resetFlow} className="w-full">
+                  Try Again
+                </Button>
+              </>
+            )}
+
+            {/* Initialized or Processing: transaction in progress */}
+            {(txState === 'initialized' || txState === 'processing') && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
+                  <p className="text-lg font-medium">
+                    Transaction Status: {txState === 'initialized' ? 'Initialized' : 'Processing'}
+                  </p>
+                </div>
+                {coinbaseTxId && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
+                    <p className="font-mono text-sm truncate">{coinbaseTxId}</p>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Status will automatically update every 10 seconds.
+                </p>
+              </>
+            )}
+
+            {/* Completed: transaction successful */}
+            {txState === 'completed' && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10">
+                  <Check className="h-8 w-8 text-green-500" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
+                  <p className="text-lg font-medium text-green-500">
+                    Transaction Status: Completed
+                  </p>
+                </div>
+                {coinbaseTxId && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
+                    <p className="font-mono text-sm truncate">{coinbaseTxId}</p>
+                  </div>
+                )}
+                <Button onClick={resetFlow} variant="outline" className="w-full">
+                  Make Another Purchase
+                </Button>
+              </>
+            )}
+
+            {/* Failed: transaction failed */}
+            {txState === 'failed' && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
+                  <X className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
+                  <p className="text-lg font-medium text-destructive">
+                    Transaction Status: Failed
+                  </p>
+                </div>
+                <Button onClick={resetFlow} className="w-full">
+                  Try Again
+                </Button>
+              </>
+            )}
+
+            {/* Delayed: timeout reached */}
+            {txState === 'delayed' && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10">
+                  <Clock className="h-8 w-8 text-yellow-500" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
+                  <p className="text-lg font-medium text-yellow-500">
+                    Transaction Status: Delayed
+                  </p>
+                  <p className="text-muted-foreground">
+                    Your transaction is taking longer than expected. Please check again later.
+                  </p>
+                </div>
+                <Button onClick={resetFlow} variant="outline" className="w-full">
+                  Make Another Purchase
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
