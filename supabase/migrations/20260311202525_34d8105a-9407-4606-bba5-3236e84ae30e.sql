@@ -1,0 +1,1 @@
+UPDATE public.onramp_providers SET display_name = 'Stripe (US)' WHERE name = 'stripe';
