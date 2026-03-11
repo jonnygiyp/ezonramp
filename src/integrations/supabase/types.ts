@@ -71,6 +71,54 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_attempts: {
+        Row: {
+          amount: number
+          coinbase_transaction_id: string | null
+          created_at: string
+          crypto_currency: string
+          currency: string
+          id: string
+          network: string
+          partner_user_ref: string
+          provider: string
+          status: string
+          updated_at: string
+          user_id: string
+          wallet_address: string
+        }
+        Insert: {
+          amount?: number
+          coinbase_transaction_id?: string | null
+          created_at?: string
+          crypto_currency?: string
+          currency?: string
+          id?: string
+          network?: string
+          partner_user_ref: string
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          wallet_address: string
+        }
+        Update: {
+          amount?: number
+          coinbase_transaction_id?: string | null
+          created_at?: string
+          crypto_currency?: string
+          currency?: string
+          id?: string
+          network?: string
+          partner_user_ref?: string
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
       site_content: {
         Row: {
           content: Json
