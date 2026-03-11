@@ -457,7 +457,7 @@ serve(async (req) => {
       }
 
       if (action === "generateBuyUrl") {
-        const { purchaseCurrency, purchaseNetwork, paymentAmount, paymentCurrency } = body;
+        const { purchaseCurrency, purchaseNetwork, paymentAmount, paymentCurrency, partnerUserId } = body;
 
         if (!purchaseCurrency || !paymentAmount || !purchaseNetwork) {
           return new Response(JSON.stringify({ error: "Missing required parameters for buy URL" }), {
