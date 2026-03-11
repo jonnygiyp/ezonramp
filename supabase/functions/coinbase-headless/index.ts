@@ -529,6 +529,11 @@ serve(async (req) => {
           urlParams.set("appId", appId);
         }
 
+        // Add partnerUserId for purchase tracking
+        if (partnerUserId) {
+          urlParams.set("partnerUserId", partnerUserId);
+        }
+
         const buyUrl = `https://pay.coinbase.com/buy?${urlParams.toString()}`;
 
         console.log("[COINBASE] Generated buy URL successfully");
