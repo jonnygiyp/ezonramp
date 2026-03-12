@@ -520,7 +520,7 @@ export function CoinbaseHeadlessOnramp({
           Buy {defaultAsset} instantly with debit or Apple Pay
         </h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          US users can purchase up to $500 per week - no Coinbase account required.
+          Purchase up to $500 per week - no Coinbase account required.
         </p>
       </div>
 
