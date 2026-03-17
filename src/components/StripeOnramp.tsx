@@ -20,7 +20,7 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
-  const { getAccessToken, isLoading: isSessionLoading } = useSupabaseSession();
+  const { setOpen } = useModal();
 
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
