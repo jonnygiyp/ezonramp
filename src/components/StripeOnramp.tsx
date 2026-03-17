@@ -191,9 +191,17 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       )}
 
       {loadState === 'idle' && !connectedAddressValid && (
-        <div className="bg-card border border-border rounded-xl p-8 text-center">
+        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
+          <Button
+            onClick={() => setOpen(true)}
+            className="gap-2 px-6"
+            size="lg"
+          >
+            <LogIn className="h-4 w-4" />
+            Sign In
+          </Button>
           <p className="text-sm text-muted-foreground">
-            Sign in to start your purchase
+            to start your purchase
           </p>
         </div>
       )}
