@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "./ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, RefreshCw, Wallet } from "lucide-react";
-import { useAccount } from '@/hooks/useParticle';
+import { Loader2, RefreshCw, Wallet, LogIn } from "lucide-react";
+import { useAccount, useModal } from '@/hooks/useParticle';
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
@@ -20,6 +20,7 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
+  const { setOpen } = useModal();
   const { getAccessToken, isLoading: isSessionLoading } = useSupabaseSession();
 
   const [loadState, setLoadState] = useState<LoadState>('idle');
@@ -191,9 +192,17 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       )}
 
       {loadState === 'idle' && !connectedAddressValid && (
-        <div className="bg-card border border-border rounded-xl p-8 text-center">
+        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
+          <Button
+            onClick={() => setOpen(true)}
+            className="gap-2 px-6"
+            size="lg"
+          >
+            <LogIn className="h-4 w-4" />
+            Sign In
+          </Button>
           <p className="text-sm text-muted-foreground">
-            Sign in to start your purchase
+            to start your purchase
           </p>
         </div>
       )}
