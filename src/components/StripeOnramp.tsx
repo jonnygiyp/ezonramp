@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "./ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, RefreshCw, Wallet } from "lucide-react";
-import { useAccount } from '@/hooks/useParticle';
+import { Loader2, RefreshCw, Wallet, LogIn } from "lucide-react";
+import { useAccount, useModal } from '@/hooks/useParticle';
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp, StripeOnramp as StripeOnrampType } from "@stripe/crypto";
 
