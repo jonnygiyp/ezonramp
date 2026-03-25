@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.stripe-config]
 verify_jwt = false
+
+[functions.process-email-queue]
+verify_jwt = true
