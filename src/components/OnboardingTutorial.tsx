@@ -119,9 +119,9 @@ const coinbaseGlobalSteps: TutorialStep[] = [
   },
   {
     target: "[data-tutorial='global-buy-button']",
-    title: "Complete Purchase",
+    title: "Continue to Coinbase",
     description:
-      "Click this button to open Coinbase in a new window where you can complete your purchase. Identity verification may be required.",
+      'Click "Continue" to open Coinbase in a new window where you can complete your purchase. Identity verification may be required.',
     position: "top",
     loggedInOnly: true,
   },
