@@ -135,7 +135,7 @@ const moonpaySteps: TutorialStep[] = [
     target: "[data-tutorial='moonpay-wallet-input']",
     title: "Wallet Address",
     description:
-      "Sign in to automatically populate your Solana wallet address.",
+      "Sign in to automatically populate your wallet address. Your connected wallet will appear here once logged in.",
     position: "top",
   },
   {
