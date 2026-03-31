@@ -846,7 +846,7 @@ export function CoinbaseHeadlessOnramp({
                 {isLoadingBuy ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing...</>
                 ) : (
-                  <>Continue to Purchase<ArrowRight className="ml-2 h-4 w-4" /></>
+                  <>Continue<ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
               </AuthGatedButton>
             </div>
