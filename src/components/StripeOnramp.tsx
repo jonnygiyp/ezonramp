@@ -338,7 +338,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       )}
 
       {/* Wallet Address Card */}
-      <div className="bg-card border border-border rounded-xl p-4 space-y-1.5">
+      <div className="bg-card border border-border rounded-xl p-4 space-y-1.5" data-tutorial="stripe-wallet-card">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Wallet className="h-4 w-4 text-primary" />
           <span>{defaultNetwork === 'solana' ? 'Wallet address to receive Solana USDC' : 'EVM Wallet Address'}</span>
