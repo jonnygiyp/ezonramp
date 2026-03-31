@@ -517,10 +517,10 @@ export function CoinbaseHeadlessOnramp({
     <div className="space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
         <h1 className="text-lg md:text-2xl font-bold tracking-tight">
-          Buy {defaultAsset} instantly with debit or Apple Pay
+          Buy USDC with debit or Apple Pay
         </h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          Purchase up to $500 per week - no Coinbase account required.
+          Up to $500 per week - no Coinbase account required.
         </p>
       </div>
 
