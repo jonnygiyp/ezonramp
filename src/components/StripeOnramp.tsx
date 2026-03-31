@@ -306,7 +306,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
 
       {/* Stripe container - visible during mounted and ready states */}
       {(loadState === 'mounted' || loadState === 'ready') && (
-        <div className="relative">
+        <div className="relative" data-tutorial="stripe-checkout">
           {loadState === 'mounted' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-card/80 rounded-xl">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
