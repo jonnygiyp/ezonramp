@@ -507,12 +507,6 @@ export function CoinbaseHeadlessOnramp({
   const amountTooLow = amount !== '' && !isNaN(numAmount) && numAmount < MIN_AMOUNT;
   const amountTooHigh = amount !== '' && !isNaN(numAmount) && numAmount > MAX_AMOUNT;
 
-  // Progress steps
-  const steps = isVerified && hasStoredVerification
-    ? ['amount', 'result']
-    : ['identity', 'verify', 'amount', 'result'];
-  const currentStepIndex = steps.indexOf(step);
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
@@ -522,23 +516,6 @@ export function CoinbaseHeadlessOnramp({
         <p className="text-xs md:text-sm text-muted-foreground">
           Up to $500 per week - no Coinbase account required.
         </p>
-      </div>
-
-      {/* Progress indicator */}
-      <div className="flex flex-col items-center gap-1" role="progressbar" aria-valuenow={currentStepIndex + 1} aria-valuemin={1} aria-valuemax={steps.length}>
-        <div className="flex justify-center gap-2">
-          {steps.map((s, i) => (
-            <div
-              key={s}
-              className={`h-2 w-8 rounded-full transition-colors ${
-                i <= currentStepIndex ? 'bg-primary' : 'bg-muted'
-              }`}
-            />
-          ))}
-        </div>
-        <span className="text-[10px] text-muted-foreground/70">
-          {step === 'result' ? 'Done!' : `Step ${currentStepIndex + 1} of ${steps.length - 1}`}
-        </span>
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
