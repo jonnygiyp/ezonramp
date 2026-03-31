@@ -267,7 +267,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [destroySession]);
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-lg mx-auto">
+    <div className="space-y-5 animate-fade-in max-w-lg mx-auto" data-tutorial="stripe-content">
       {/* Header */}
       <div className="text-center space-y-1">
         <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy Crypto with Stripe</h1>
