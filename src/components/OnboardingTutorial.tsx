@@ -1,292 +1,182 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, HelpCircle, ShieldCheck, ArrowRight, ExternalLink } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAccount } from "@/hooks/useParticle";
+import { useIsMobile } from "@/hooks/use-mobile";
 
+// ─── Step definition ─────────────────────────────────────────────
 interface TutorialStep {
+  /** CSS selector for the element to highlight */
   target: string;
   title: string;
   description: string;
+  /** Preferred tooltip placement */
   position: "top" | "bottom" | "left" | "right";
-  mock?: 'verification-code' | 'verified-state' | 'global-buy-button';
+  /** If true, step only shows when user is logged OUT */
+  loggedOutOnly?: boolean;
+  /** If true, step only shows when user is logged IN */
+  loggedInOnly?: boolean;
 }
 
 interface OnboardingTutorialProps {
   selectedProvider?: string;
 }
 
-// Coinbase US tutorial steps
+// ─── Shared steps (identical across all ramps) ──────────────────
+const signInStep: TutorialStep = {
+  target: "[data-tutorial='particle-connect']",
+  title: "Sign In or Sign Up",
+  description:
+    "Create a free wallet to get started. Click Sign In if you already have an account, or Sign Up to create one.",
+  position: "bottom",
+  loggedOutOnly: true,
+};
+
+const providerTabsStep: TutorialStep = {
+  target: "[data-tutorial='provider-tabs']",
+  title: "Select an Onramp",
+  description:
+    "Choose how you'd like to buy crypto. Each onramp offers different payment methods, fees, and regional support.",
+  position: "bottom",
+};
+
+// ─── Stripe steps ───────────────────────────────────────────────
+const stripeSteps: TutorialStep[] = [
+  signInStep,
+  providerTabsStep,
+  {
+    target: "[data-tutorial='stripe-sign-in']",
+    title: "Sign In to Continue",
+    description:
+      "You need to sign in before the Stripe checkout will load. Click the Sign In button to open the login flow.",
+    position: "top",
+    loggedOutOnly: true,
+  },
+  {
+    target: "[data-tutorial='stripe-checkout']",
+    title: "Stripe Checkout",
+    description:
+      "The Stripe checkout loads automatically once you're signed in. Enter your payment details directly in the embedded widget to complete your purchase.",
+    position: "top",
+    loggedInOnly: true,
+  },
+  {
+    target: "[data-tutorial='stripe-wallet-card']",
+    title: "Your Wallet Address",
+    description:
+      "Your connected wallet address is shown here. This is where your purchased crypto will be sent.",
+    position: "top",
+    loggedInOnly: true,
+  },
+];
+
+// ─── Coinbase US (Headless) steps ───────────────────────────────
 const coinbaseUSSteps: TutorialStep[] = [
-  {
-    target: "[data-tutorial='particle-connect']",
-    title: "Create Your Wallet",
-    description: "Sign up for a free wallet through Particle Network to get started!",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='provider-tabs']",
-    title: "Select An Onramp",
-    description: "Select an onramp to buy crypto. Each has different features, processing times and fees.",
-    position: "bottom",
-  },
+  signInStep,
+  providerTabsStep,
   {
     target: "[data-tutorial='verification-method']",
-    title: "Verification Method",
-    description: "If you're a first time buyer, enter US phone number or your email address for verification purposes.",
+    title: "Choose Verification Method",
+    description:
+      "First-time buyers: enter your US phone number or email address for identity verification.",
     position: "top",
   },
   {
     target: "[data-tutorial='wallet-input']",
     title: "Wallet Address",
-    description: "Sign in to automatically populate your wallet address. Your connected wallet address will appear here once you're logged in.",
+    description:
+      "Sign in to automatically populate your wallet address. Your connected wallet will appear here once logged in.",
     position: "top",
   },
   {
     target: "[data-tutorial='send-verification']",
     title: "Send Verification Code",
-    description: "Click \"Continue securely\" and proceed to the next step where you will enter the verification code you receive.",
+    description:
+      'Click "Continue securely" to receive a one-time code via SMS or email.',
     position: "top",
-  },
-  {
-    target: "[data-tutorial='mock-verification-code']",
-    title: "Enter Verification Code",
-    description: "After receiving your code via SMS or email, enter it here to verify your identity.",
-    position: "top",
-    mock: 'verification-code',
-  },
-  {
-    target: "[data-tutorial='mock-verified-state']",
-    title: "Verified User Experience",
-    description: "Once verified, you'll see your verification status and can proceed directly to purchasing. Your verification is valid for 60 days!",
-    position: "top",
-    mock: 'verified-state',
   },
 ];
 
-// Coinbase Global tutorial steps
+// ─── Coinbase Global steps ──────────────────────────────────────
 const coinbaseGlobalSteps: TutorialStep[] = [
-  {
-    target: "[data-tutorial='particle-connect']",
-    title: "Create Your Wallet",
-    description: "Sign up for a free wallet through Particle Network to get started!",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='provider-tabs']",
-    title: "Select An Onramp",
-    description: "Select an onramp to buy crypto. Each has different features, processing times and fees.",
-    position: "bottom",
-  },
+  signInStep,
+  providerTabsStep,
   {
     target: "[data-tutorial='global-amount-input']",
     title: "Enter Amount",
-    description: "Enter the amount of USDC you would like to purchase.",
+    description: "Enter the USD amount of USDC you would like to purchase.",
     position: "top",
   },
   {
     target: "[data-tutorial='global-wallet-input']",
-    title: "Receiving Wallet Address",
-    description: "Sign in to automatically populate your wallet address. Your connected wallet address will appear here once you're logged in.",
+    title: "Wallet Address",
+    description:
+      "Sign in to automatically populate your wallet address. Your connected wallet will appear here once logged in.",
     position: "top",
   },
   {
-    target: "[data-tutorial='mock-global-buy-button']",
+    target: "[data-tutorial='global-buy-button']",
     title: "Complete Purchase",
-    description: "Clicking this button will open Coinbase in a new window so you can complete your purchase. You may be required to verify your identity to purchase. Once you have successfully purchased, your funds will be available in your wallet.",
+    description:
+      "Click this button to open Coinbase in a new window where you can complete your purchase. Identity verification may be required.",
     position: "top",
-    mock: 'global-buy-button',
+    loggedInOnly: true,
   },
 ];
 
-// Stripe tutorial steps
-const stripeSteps: TutorialStep[] = [
-  {
-    target: "[data-tutorial='particle-connect']",
-    title: "Create Your Wallet",
-    description: "Sign up for a free wallet through Particle Network to get started!",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='provider-tabs']",
-    title: "Select An Onramp",
-    description: "Select an onramp to buy crypto. Each has different features, processing times and fees.",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='stripe-wallet-input']",
-    title: "Receiving Wallet Address",
-    description: "Sign in to automatically populate your wallet address. Your connected Solana wallet address will appear here once you're logged in.",
-    position: "top",
-  },
-  {
-    target: "[data-tutorial='stripe-buy-button']",
-    title: "Complete Your Purchase With Stripe",
-    description: "Follow the instructions for verification and then enter your payment information to complete your purchase with Stripe.",
-    position: "top",
-  },
-];
-
-// MoonPay tutorial steps
+// ─── MoonPay steps ──────────────────────────────────────────────
 const moonpaySteps: TutorialStep[] = [
-  {
-    target: "[data-tutorial='particle-connect']",
-    title: "Create Your Wallet",
-    description: "Sign up for a free wallet through Particle Network to get started!",
-    position: "bottom",
-  },
-  {
-    target: "[data-tutorial='provider-tabs']",
-    title: "Select An Onramp",
-    description: "Select an onramp to buy crypto. Each has different features, processing times and fees.",
-    position: "bottom",
-  },
+  signInStep,
+  providerTabsStep,
   {
     target: "[data-tutorial='moonpay-wallet-input']",
-    title: "Receiving Wallet Address",
-    description: "Sign in to automatically populate your wallet address. Your connected Solana wallet address will appear here once you're logged in.",
+    title: "Wallet Address",
+    description:
+      "Sign in to automatically populate your Solana wallet address.",
     position: "top",
   },
   {
     target: "[data-tutorial='moonpay-amount-input']",
     title: "Enter Amount",
-    description: "Enter the amount in USD that you would like to spend on crypto.",
+    description: "Enter the USD amount you'd like to spend on crypto.",
     position: "top",
   },
   {
     target: "[data-tutorial='moonpay-buy-button']",
-    title: "Complete Your Purchase With MoonPay",
-    description: "Click the button to open the MoonPay widget where you can complete your purchase with credit card, debit card, or bank transfer.",
+    title: "Buy with MoonPay",
+    description:
+      "Click to open the MoonPay widget where you can complete your purchase with card, debit, or bank transfer.",
     position: "top",
+    loggedInOnly: true,
   },
 ];
+
+// ─── Provider → steps map ───────────────────────────────────────
+const STEP_MAP: Record<string, TutorialStep[]> = {
+  stripe: stripeSteps,
+  coinbase: coinbaseUSSteps,
+  coinbase_global: coinbaseGlobalSteps,
+  moonpay: moonpaySteps,
+};
 
 const STORAGE_KEY = "onboarding_completed";
 const FIRST_VISIT_KEY = "tutorial_first_visit";
 
-// Mock component for verification code entry
-function MockVerificationCode() {
-  return (
-    <div 
-      data-tutorial="mock-verification-code"
-      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
-    >
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-xl font-semibold">Enter Verification Code</h2>
-          <p className="text-sm text-muted-foreground">
-            We sent a code to (415) 555-1234
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="mock-code">Verification Code</Label>
-          <Input
-            id="mock-code"
-            type="text"
-            placeholder="Enter 6-digit code"
-            value="123456"
-            readOnly
-            className="text-center text-lg tracking-widest font-mono"
-          />
-        </div>
-
-        <Button size="lg" className="w-full" disabled>
-          Verify Code
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-
-        <p className="text-center text-xs text-muted-foreground">
-          Didn't receive a code? <span className="text-primary">Resend</span>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// Mock component for verified user state
-function MockVerifiedState() {
-  return (
-    <div 
-      data-tutorial="mock-verified-state"
-      className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
-    >
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-xl font-semibold">Ready to Purchase</h2>
-          <p className="text-sm text-muted-foreground">
-            Your identity is verified. You can now buy crypto!
-          </p>
-        </div>
-
-        {/* Verified badge */}
-        <div className="flex items-center justify-center gap-3 p-4 bg-primary/10 border border-primary/20 rounded-lg">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-          <div className="text-left">
-            <p className="font-medium text-sm">Verified Account</p>
-            <p className="text-xs text-muted-foreground">+1 (415) 555-1234 • 59 days remaining</p>
-          </div>
-        </div>
-
-        {/* Amount input preview */}
-        <div className="space-y-2">
-          <Label>Purchase Amount (USD)</Label>
-          <Input
-            type="text"
-            value="$100.00"
-            readOnly
-            className="text-lg font-semibold"
-          />
-        </div>
-
-        <Button size="lg" className="w-full" disabled>
-          Get Quote
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// Mock component for global buy button
-function MockGlobalBuyButton() {
-  return (
-    <div 
-      data-tutorial="mock-global-buy-button"
-      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9997] w-[90%] max-w-md bg-card border border-border rounded-xl p-6 shadow-2xl"
-    >
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-xl font-semibold">Ready to Purchase</h2>
-          <p className="text-sm text-muted-foreground">
-            Click the button below to open Coinbase and complete your purchase.
-          </p>
-        </div>
-
-        <Button size="lg" className="w-full" disabled>
-          Buy USDC with Coinbase
-          <ExternalLink className="ml-2 h-4 w-4" />
-        </Button>
-
-        <p className="text-xs text-center text-muted-foreground">
-          A Coinbase window will open to complete your purchase.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-export function OnboardingTutorial({ selectedProvider = 'coinbase' }: OnboardingTutorialProps) {
+// ─── Main component ────────────────────────────────────────────
+export function OnboardingTutorial({
+  selectedProvider = "coinbase",
+}: OnboardingTutorialProps) {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [showHelpButton, setShowHelpButton] = useState(true);
   const [isFirstVisit, setIsFirstVisit] = useState(false);
-  
+  const prevProviderRef = useRef(selectedProvider);
+
   const { isConnected } = useAccount();
-  
-  // Check if this is the user's first visit
+  const isMobile = useIsMobile();
+
+  // First visit glow
   useEffect(() => {
     const hasVisited = localStorage.getItem(FIRST_VISIT_KEY);
     if (!hasVisited) {
@@ -294,59 +184,65 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
       localStorage.setItem(FIRST_VISIT_KEY, "true");
     }
   }, []);
-  
-  // Get the appropriate tutorial steps based on selected provider
-  const baseTutorialSteps = useMemo(() => {
-    if (selectedProvider === 'coinbase_global') {
-      return coinbaseGlobalSteps;
+
+  // Close walkthrough if user switches ramps while it's open
+  useEffect(() => {
+    if (isActive && selectedProvider !== prevProviderRef.current) {
+      setIsActive(false);
+      setCurrentStep(0);
     }
-    if (selectedProvider === 'stripe') {
-      return stripeSteps;
-    }
-    if (selectedProvider === 'moonpay') {
-      return moonpaySteps;
-    }
-    return coinbaseUSSteps;
-  }, [selectedProvider]);
-  
-  // Filter out step 1 (wallet creation) if user is already connected
+    prevProviderRef.current = selectedProvider;
+  }, [selectedProvider, isActive]);
+
+  // Build filtered steps based on auth state + provider
   const activeSteps = useMemo(() => {
-    if (isConnected) {
-      return baseTutorialSteps.slice(1); // Skip first step
-    }
-    return baseTutorialSteps;
-  }, [isConnected, baseTutorialSteps]);
+    const base = STEP_MAP[selectedProvider] || coinbaseUSSteps;
+    return base.filter((step) => {
+      if (step.loggedOutOnly && isConnected) return false;
+      if (step.loggedInOnly && !isConnected) return false;
+      return true;
+    });
+  }, [selectedProvider, isConnected]);
 
   const currentTutorialStep = activeSteps[currentStep];
-  const currentMock = currentTutorialStep?.mock;
 
+  // ─── Position tracking ──────────────────────────────────────
   const updateTargetPosition = useCallback(() => {
     if (!isActive || !currentTutorialStep) return;
 
-    // Small delay to let mock components render
-    setTimeout(() => {
-      const element = document.querySelector(currentTutorialStep.target);
-      if (element) {
-        const rect = element.getBoundingClientRect();
-        setTargetRect(rect);
+    requestAnimationFrame(() => {
+      const el = document.querySelector(currentTutorialStep.target);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        // Only update if the element is visible
+        if (rect.width > 0 && rect.height > 0) {
+          setTargetRect(rect);
+        } else {
+          setTargetRect(null);
+        }
       } else {
         setTargetRect(null);
       }
-    }, 50);
+    });
   }, [isActive, currentTutorialStep]);
-
 
   useEffect(() => {
     updateTargetPosition();
+
+    // Re-check after a short delay for elements that render asynchronously
+    const delayTimer = setTimeout(updateTargetPosition, 200);
+
     window.addEventListener("resize", updateTargetPosition);
     window.addEventListener("scroll", updateTargetPosition);
 
     return () => {
+      clearTimeout(delayTimer);
       window.removeEventListener("resize", updateTargetPosition);
       window.removeEventListener("scroll", updateTargetPosition);
     };
   }, [updateTargetPosition]);
 
+  // ─── Navigation ─────────────────────────────────────────────
   const handleNext = () => {
     if (currentStep < activeSteps.length - 1) {
       setCurrentStep((prev) => prev + 1);
@@ -377,91 +273,114 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
     setIsActive(true);
   };
 
-  const getTooltipPosition = () => {
-    if (!targetRect) return { top: "50%", left: "50%" };
+  // ─── Tooltip positioning ────────────────────────────────────
+  const getTooltipStyle = (): React.CSSProperties => {
+    const tooltipW = isMobile ? 280 : 320;
+    const pad = 16;
 
-    const padding = 16;
-    const tooltipWidth = 320;
-    const tooltipHeight = 160;
+    // Fallback: center on screen
+    if (!targetRect) {
+      return {
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: tooltipW,
+      };
+    }
 
-    switch (currentTutorialStep.position) {
+    const pos = currentTutorialStep?.position ?? "bottom";
+
+    let top: number;
+    let left: number;
+
+    switch (pos) {
+      case "bottom":
+        top = targetRect.bottom + pad;
+        left = targetRect.left + targetRect.width / 2 - tooltipW / 2;
+        break;
+      case "top":
+        top = targetRect.top - pad - 180; // approximate tooltip height
+        left = targetRect.left + targetRect.width / 2 - tooltipW / 2;
+        break;
+      case "left":
+        top = targetRect.top + targetRect.height / 2 - 90;
+        left = targetRect.left - tooltipW - pad;
+        break;
+      case "right":
+        top = targetRect.top + targetRect.height / 2 - 90;
+        left = targetRect.right + pad;
+        break;
+      default:
+        top = targetRect.bottom + pad;
+        left = targetRect.left + targetRect.width / 2 - tooltipW / 2;
+    }
+
+    // Clamp to viewport
+    left = Math.max(pad, Math.min(left, window.innerWidth - tooltipW - pad));
+    top = Math.max(pad, Math.min(top, window.innerHeight - 200));
+
+    return { top, left, width: tooltipW };
+  };
+
+  // ─── Arrow style ────────────────────────────────────────────
+  const getArrowStyle = (): React.CSSProperties => {
+    if (!targetRect || !currentTutorialStep) return { display: "none" };
+
+    const sz = 10;
+    const pos = currentTutorialStep.position;
+
+    switch (pos) {
       case "bottom":
         return {
-          top: `${targetRect.bottom + padding}px`,
-          left: `${Math.max(padding, Math.min(targetRect.left + targetRect.width / 2 - tooltipWidth / 2, window.innerWidth - tooltipWidth - padding))}px`,
+          top: -sz,
+          left: "50%",
+          marginLeft: -sz,
+          borderLeft: `${sz}px solid transparent`,
+          borderRight: `${sz}px solid transparent`,
+          borderBottom: `${sz}px solid hsl(var(--card))`,
         };
       case "top":
         return {
-          top: `${targetRect.top - tooltipHeight - padding}px`,
-          left: `${Math.max(padding, Math.min(targetRect.left + targetRect.width / 2 - tooltipWidth / 2, window.innerWidth - tooltipWidth - padding))}px`,
+          bottom: -sz,
+          left: "50%",
+          marginLeft: -sz,
+          borderLeft: `${sz}px solid transparent`,
+          borderRight: `${sz}px solid transparent`,
+          borderTop: `${sz}px solid hsl(var(--card))`,
         };
       case "left":
         return {
-          top: `${targetRect.top + targetRect.height / 2 - tooltipHeight / 2}px`,
-          left: `${targetRect.left - tooltipWidth - padding}px`,
+          right: -sz,
+          top: "50%",
+          marginTop: -sz,
+          borderTop: `${sz}px solid transparent`,
+          borderBottom: `${sz}px solid transparent`,
+          borderLeft: `${sz}px solid hsl(var(--card))`,
         };
       case "right":
         return {
-          top: `${targetRect.top + targetRect.height / 2 - tooltipHeight / 2}px`,
-          left: `${targetRect.right + padding}px`,
+          left: -sz,
+          top: "50%",
+          marginTop: -sz,
+          borderTop: `${sz}px solid transparent`,
+          borderBottom: `${sz}px solid transparent`,
+          borderRight: `${sz}px solid hsl(var(--card))`,
         };
       default:
-        return { top: "50%", left: "50%" };
+        return { display: "none" };
     }
   };
 
-  const getArrowStyle = () => {
-    if (!targetRect) return {};
-
-    const arrowSize = 12;
-
-    switch (currentTutorialStep.position) {
-      case "bottom":
-        return {
-          top: `-${arrowSize}px`,
-          left: `${Math.min(Math.max(targetRect.left + targetRect.width / 2 - parseInt(getTooltipPosition().left) - arrowSize / 2, 20), 280)}px`,
-          borderLeft: `${arrowSize}px solid transparent`,
-          borderRight: `${arrowSize}px solid transparent`,
-          borderBottom: `${arrowSize}px solid hsl(var(--card))`,
-        };
-      case "top":
-        return {
-          bottom: `-${arrowSize}px`,
-          left: `${Math.min(Math.max(targetRect.left + targetRect.width / 2 - parseInt(getTooltipPosition().left) - arrowSize / 2, 20), 280)}px`,
-          borderLeft: `${arrowSize}px solid transparent`,
-          borderRight: `${arrowSize}px solid transparent`,
-          borderTop: `${arrowSize}px solid hsl(var(--card))`,
-        };
-      case "left":
-        return {
-          right: `-${arrowSize}px`,
-          top: "50%",
-          transform: "translateY(-50%)",
-          borderTop: `${arrowSize}px solid transparent`,
-          borderBottom: `${arrowSize}px solid transparent`,
-          borderLeft: `${arrowSize}px solid hsl(var(--card))`,
-        };
-      case "right":
-        return {
-          left: `-${arrowSize}px`,
-          top: "50%",
-          transform: "translateY(-50%)",
-          borderTop: `${arrowSize}px solid transparent`,
-          borderBottom: `${arrowSize}px solid transparent`,
-          borderRight: `${arrowSize}px solid hsl(var(--card))`,
-        };
-      default:
-        return {};
-    }
-  };
-
+  // ─── Help button (inactive state) ──────────────────────────
   if (!isActive && showHelpButton) {
     return (
       <Button
         onClick={startTutorial}
         variant="outline"
         className={`fixed bottom-16 right-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow h-[45px] w-[45px] p-0 ${
-          isFirstVisit ? "animate-pulse ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+          isFirstVisit
+            ? "animate-pulse ring-2 ring-primary ring-offset-2 ring-offset-background"
+            : ""
         }`}
         aria-label="Start tutorial"
       >
@@ -478,14 +397,10 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
 
   if (!isActive) return null;
 
+  // ─── Active walkthrough overlay ────────────────────────────
   return (
     <>
-      {/* Mock displays for tutorial steps */}
-      {currentMock === 'verification-code' && <MockVerificationCode />}
-      {currentMock === 'verified-state' && <MockVerifiedState />}
-      {currentMock === 'global-buy-button' && <MockGlobalBuyButton />}
-
-      {/* Overlay */}
+      {/* Dark overlay with spotlight cutout */}
       <div className="fixed inset-0 z-[9998] pointer-events-none">
         <svg className="w-full h-full">
           <defs>
@@ -529,13 +444,13 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
 
       {/* Tooltip */}
       <div
-        className="fixed z-[10000] w-80 bg-card border border-border rounded-xl shadow-2xl p-4"
-        style={getTooltipPosition()}
+        className="fixed z-[10000] bg-card border border-border rounded-xl shadow-2xl p-4"
+        style={getTooltipStyle()}
       >
         {/* Arrow */}
         <div className="absolute w-0 h-0" style={getArrowStyle()} />
 
-        {/* Close button */}
+        {/* Close */}
         <button
           onClick={handleSkip}
           className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -546,12 +461,19 @@ export function OnboardingTutorial({ selectedProvider = 'coinbase' }: Onboarding
 
         {/* Content */}
         <div className="pr-6">
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            {currentTutorialStep.title}
+          <h3 className="text-base md:text-lg font-semibold text-foreground mb-2">
+            {currentTutorialStep?.title}
           </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            {currentTutorialStep.description}
+          <p className="text-xs md:text-sm text-muted-foreground mb-4">
+            {currentTutorialStep?.description}
           </p>
+
+          {/* Fallback notice when target element not found */}
+          {!targetRect && currentTutorialStep && (
+            <p className="text-xs text-muted-foreground/60 italic mb-2">
+              This element may not be visible in the current view.
+            </p>
+          )}
         </div>
 
         {/* Footer */}
