@@ -230,7 +230,7 @@ export function CoinbaseOnrampWidget({
             "Enter Wallet Address"
           ) : (
             <>
-              Buy {defaultAsset} with Coinbase
+              Continue
               <ExternalLink className="ml-2 h-4 w-4" />
             </>
           )}

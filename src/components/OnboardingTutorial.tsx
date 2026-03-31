@@ -92,7 +92,7 @@ const coinbaseUSSteps: TutorialStep[] = [
     target: "[data-tutorial='send-verification']",
     title: "Send Verification Code",
     description:
-      'Click "Continue securely" to receive a one-time code via SMS or email.',
+      'Click "Continue" to receive a one-time code via SMS or email.',
     position: "top",
   },
 ];
