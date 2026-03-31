@@ -80,6 +80,7 @@ const coinbaseUSSteps: TutorialStep[] = [
     description:
       "First-time buyers: enter your US phone number or email address for identity verification.",
     position: "top",
+    loggedInOnly: true,
   },
   {
     target: "[data-tutorial='wallet-input']",
@@ -87,13 +88,15 @@ const coinbaseUSSteps: TutorialStep[] = [
     description:
       "Sign in to automatically populate your wallet address. Your connected wallet will appear here once logged in.",
     position: "top",
+    loggedInOnly: true,
   },
   {
     target: "[data-tutorial='send-verification']",
     title: "Send Verification Code",
     description:
-      'Click "Continue" to receive a one-time code via SMS or email.',
+      'Click "Continue" to receive a one-time code via SMS or email. Once verified, you can purchase for 60 days without re-verifying.',
     position: "top",
+    loggedInOnly: true,
   },
 ];
 
@@ -116,9 +119,9 @@ const coinbaseGlobalSteps: TutorialStep[] = [
   },
   {
     target: "[data-tutorial='global-buy-button']",
-    title: "Complete Purchase",
+    title: "Continue to Coinbase",
     description:
-      "Click this button to open Coinbase in a new window where you can complete your purchase. Identity verification may be required.",
+      'Click "Continue" to open Coinbase in a new window where you can complete your purchase. Identity verification may be required.',
     position: "top",
     loggedInOnly: true,
   },
@@ -132,7 +135,7 @@ const moonpaySteps: TutorialStep[] = [
     target: "[data-tutorial='moonpay-wallet-input']",
     title: "Wallet Address",
     description:
-      "Sign in to automatically populate your Solana wallet address.",
+      "Sign in to automatically populate your wallet address. Your connected wallet will appear here once logged in.",
     position: "top",
   },
   {
