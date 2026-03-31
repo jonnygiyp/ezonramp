@@ -270,9 +270,9 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
     <div className="space-y-5 animate-fade-in max-w-lg mx-auto" data-tutorial="stripe-content">
       {/* Header */}
       <div className="text-center space-y-1">
-        <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy Crypto with Stripe</h1>
+        <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy USDC with Stripe</h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          Secure fiat-to-crypto purchases powered by Stripe
+          US residents with a Stripe account can buy instantly.
         </p>
       </div>
 
