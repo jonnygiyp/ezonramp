@@ -80,6 +80,7 @@ const coinbaseUSSteps: TutorialStep[] = [
     description:
       "First-time buyers: enter your US phone number or email address for identity verification.",
     position: "top",
+    loggedInOnly: true,
   },
   {
     target: "[data-tutorial='wallet-input']",
@@ -87,13 +88,15 @@ const coinbaseUSSteps: TutorialStep[] = [
     description:
       "Sign in to automatically populate your wallet address. Your connected wallet will appear here once logged in.",
     position: "top",
+    loggedInOnly: true,
   },
   {
     target: "[data-tutorial='send-verification']",
     title: "Send Verification Code",
     description:
-      'Click "Continue" to receive a one-time code via SMS or email.',
+      'Click "Continue" to receive a one-time code via SMS or email. Once verified, you can purchase for 60 days without re-verifying.',
     position: "top",
+    loggedInOnly: true,
   },
 ];
 
