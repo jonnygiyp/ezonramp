@@ -267,7 +267,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
   }, [destroySession]);
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-lg mx-auto">
+    <div className="space-y-5 animate-fade-in max-w-lg mx-auto" data-tutorial="stripe-content">
       {/* Header */}
       <div className="text-center space-y-1">
         <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy Crypto with Stripe</h1>
@@ -306,7 +306,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
 
       {/* Stripe container - visible during mounted and ready states */}
       {(loadState === 'mounted' || loadState === 'ready') && (
-        <div className="relative">
+        <div className="relative" data-tutorial="stripe-checkout">
           {loadState === 'mounted' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-card/80 rounded-xl">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -322,7 +322,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
 
       {/* Logged-out sign-in state */}
       {loadState === 'idle' && !connectedAddressValid && (
-        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
+        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center" data-tutorial="stripe-sign-in">
           <Button
             onClick={() => setOpen(true)}
             className="gap-2 px-6"
@@ -338,7 +338,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       )}
 
       {/* Wallet Address Card */}
-      <div className="bg-card border border-border rounded-xl p-4 space-y-1.5">
+      <div className="bg-card border border-border rounded-xl p-4 space-y-1.5" data-tutorial="stripe-wallet-card">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Wallet className="h-4 w-4 text-primary" />
           <span>{defaultNetwork === 'solana' ? 'Wallet address to receive Solana USDC' : 'EVM Wallet Address'}</span>

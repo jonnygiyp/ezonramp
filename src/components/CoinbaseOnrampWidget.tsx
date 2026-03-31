@@ -219,6 +219,7 @@ export function CoinbaseOnrampWidget({
           size="lg"
           className="w-full"
           disabled={isLoading || !destinationAddress}
+          data-tutorial="global-buy-button"
         >
           {isLoading ? (
             <>
