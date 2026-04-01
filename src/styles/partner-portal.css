@@ -1,0 +1,240 @@
+/* Partner Portal — fully scoped styles */
+
+.pp-root {
+  background-color: #000000;
+  color: #FFFFFF;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.pp-glow {
+  position: fixed;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(196, 64, 224, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Text utilities */
+.pp-text-white { color: #FFFFFF; }
+.pp-text-secondary { color: #BABABA; }
+.pp-text-primary { color: #C440E0; }
+.pp-text-success { color: #01B216; }
+.pp-text-error { color: #EA393A; }
+
+/* Layout */
+.pp-container {
+  max-width: 420px;
+  margin: 0 auto;
+}
+@media (min-width: 640px) {
+  .pp-container {
+    max-width: 520px;
+  }
+}
+
+/* Header */
+.pp-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+}
+.pp-header-inner {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Context message */
+.pp-context-msg {
+  background: rgba(196, 64, 224, 0.06);
+  border: 1px solid rgba(196, 64, 224, 0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+/* Tab bar */
+.pp-tab-bar {
+  display: flex;
+  gap: 4px;
+  background: #1C1C1C;
+  border-radius: 9999px;
+  padding: 4px;
+}
+.pp-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+}
+.pp-tab-active {
+  background: #C440E0;
+  color: #FFFFFF;
+  box-shadow: 0 0 16px rgba(196, 64, 224, 0.4);
+}
+.pp-tab-inactive {
+  color: #BABABA;
+}
+.pp-tab-inactive:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Card */
+.pp-card {
+  background: #1C1C1C;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  position: relative;
+}
+
+.pp-provider-label {
+  text-align: center;
+  font-size: 11px;
+  color: #BABABA;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
+.pp-widget-content {
+  position: relative;
+}
+
+/* Override child component styles within partner portal */
+.pp-card .bg-card { background: transparent !important; }
+.pp-card .border-border { border-color: rgba(255, 255, 255, 0.08) !important; }
+.pp-card .text-foreground { color: #FFFFFF !important; }
+.pp-card .text-muted-foreground { color: #BABABA !important; }
+.pp-card .bg-background { background: #1C1C1C !important; }
+.pp-card .bg-muted { background: rgba(255, 255, 255, 0.05) !important; }
+.pp-card .border { border-color: rgba(255, 255, 255, 0.1) !important; }
+.pp-card .bg-primary { background: #C440E0 !important; }
+.pp-card .bg-primary:hover { background: #E0004C !important; }
+.pp-card .text-primary { color: #C440E0 !important; }
+.pp-card .text-primary-foreground { color: #FFFFFF !important; }
+.pp-card .ring-ring { --tw-ring-color: #C440E0 !important; }
+.pp-card .bg-primary\/10 { background: rgba(196, 64, 224, 0.1) !important; }
+.pp-card .border-primary { border-color: #C440E0 !important; }
+.pp-card .border-primary\/50 { border-color: rgba(196, 64, 224, 0.5) !important; }
+.pp-card .hover\:border-primary\/50:hover { border-color: rgba(196, 64, 224, 0.5) !important; }
+
+/* Input overrides */
+.pp-card input,
+.pp-card select,
+.pp-card textarea {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #FFFFFF !important;
+}
+.pp-card input::placeholder {
+  color: #BABABA !important;
+}
+.pp-card input:focus {
+  border-color: #C440E0 !important;
+  box-shadow: 0 0 0 2px rgba(196, 64, 224, 0.2) !important;
+}
+
+/* Label overrides */
+.pp-card label {
+  color: #BABABA !important;
+}
+
+/* Button overrides — primary CTA */
+.pp-card button[class*="bg-primary"],
+.pp-card .hover-scale {
+  background: #C440E0 !important;
+  color: #FFFFFF !important;
+  min-height: 52px;
+  border-radius: 12px !important;
+  box-shadow: 0 0 20px rgba(196, 64, 224, 0.3);
+  transition: all 0.2s ease;
+}
+.pp-card button[class*="bg-primary"]:hover,
+.pp-card .hover-scale:hover {
+  background: #E0004C !important;
+  box-shadow: 0 0 24px rgba(224, 0, 76, 0.4);
+  transform: scale(1.01);
+}
+.pp-card button[class*="bg-primary"]:active,
+.pp-card .hover-scale:active {
+  transform: scale(0.98);
+}
+
+/* Outline button overrides */
+.pp-card button[class*="variant-outline"],
+.pp-card button[class*="bg-secondary"] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #BABABA !important;
+}
+
+/* Card within card (nested) */
+.pp-card .rounded-xl,
+.pp-card .rounded-lg {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Trust badges */
+.pp-trust-line {
+  text-align: center;
+}
+.pp-trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #BABABA;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Footer */
+.pp-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 50;
+}
+
+/* Override header components inside pp-root */
+.pp-root .text-foreground { color: #FFFFFF; }
+.pp-root .text-muted-foreground { color: #BABABA; }
+.pp-root button[class*="variant"][class*="outline"] {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #FFFFFF;
+}
+
+/* Dropdown overrides */
+.pp-root [data-radix-popper-content-wrapper] {
+  --tw-bg-opacity: 1;
+}
+
+/* Skeleton overrides */
+.pp-card .animate-pulse {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
