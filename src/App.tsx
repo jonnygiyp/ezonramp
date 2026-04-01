@@ -16,6 +16,7 @@ import Privacy from "./pages/Privacy";
 import Diagnostics from "./pages/Diagnostics";
 import NotFound from "./pages/NotFound";
 import PartnerPortal from "./pages/PartnerPortal";
+import DarkPortal from "./pages/DarkPortal";
 
 const queryClient = new QueryClient();
 
