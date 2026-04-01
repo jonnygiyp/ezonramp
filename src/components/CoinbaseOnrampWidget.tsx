@@ -13,6 +13,7 @@ import { AuthGatedButton } from "./AuthGatedButton";
 interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
   defaultNetwork?: string;
+  subtitle?: string;
 }
 
 export function CoinbaseOnrampWidget({
