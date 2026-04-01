@@ -191,6 +191,11 @@
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
+/* Hide feature badge grids from embedded onramp components */
+.pp-card .grid-cols-3 {
+  display: none !important;
+}
+
 /* Trust badges */
 .pp-trust-line {
   text-align: center;
