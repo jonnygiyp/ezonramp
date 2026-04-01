@@ -19,6 +19,7 @@ interface CoinbaseOnrampWidgetProps {
 export function CoinbaseOnrampWidget({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
+  subtitle,
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
