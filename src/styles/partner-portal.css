@@ -238,7 +238,3 @@
   background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Remove any background from embedded component wrappers */
-.pp-card > .pp-widget-content > div > .space-y-8 > div:first-child {
-  display: none; /* Hide the header/title sections from embedded components */
-}
