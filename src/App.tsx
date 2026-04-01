@@ -37,6 +37,7 @@ const AppContent = () => {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/partnerportal" element={<PartnerPortal />} />
+          <Route path="/dark" element={<DarkPortal />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
