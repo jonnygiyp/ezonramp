@@ -166,7 +166,7 @@ export function CoinbaseOnrampWidget({
           Buy USDC with Coinbase
         </h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          International users can buy USDC with credit card, debit card, or bank transfer through Coinbase. May require KYC.
+          {subtitle ?? "International users can buy USDC with credit card, debit card, or bank transfer through Coinbase. May require KYC."}
         </p>
       </div>
 
