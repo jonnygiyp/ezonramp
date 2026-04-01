@@ -68,9 +68,6 @@ const PartnerPortal = () => {
               <h1 className="text-2xl md:text-3xl font-bold pp-text-white mb-2">
                 Add Funds to Your Wallet
               </h1>
-              <p className="text-sm pp-text-secondary max-w-sm mx-auto">
-                Purchase USDC using a trusted provider. Funds will appear in your wallet after completion.
-              </p>
             </div>
 
             {/* Context message */}
