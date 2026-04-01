@@ -117,7 +117,7 @@ const PartnerPortal = () => {
                   <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
                 )}
                 {activeTab === 'coinbase_global' && (
-                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" />
+                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Requires Coinbase account. May require KYC." />
                 )}
                 {activeTab === 'stripe' && (
                   <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" />
