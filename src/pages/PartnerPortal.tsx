@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import "@/styles/partner-portal.css";
 import { Link } from "react-router-dom";
 import { Shield, Zap, Lock, CheckCircle } from "lucide-react";
 import CustomConnectButton from "@/components/CustomConnectButton";
