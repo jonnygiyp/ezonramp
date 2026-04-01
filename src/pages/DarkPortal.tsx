@@ -78,6 +78,12 @@ const DarkPortal = () => {
               </h1>
             </div>
 
+            {/* Context message */}
+            <div className="dp-context-msg mb-4">
+              <p className="text-[11px] dp-text-secondary text-center">
+                If you already purchased USDC, return to your wallet and complete your deposit.
+              </p>
+            </div>
 
             {/* Tab selector */}
             {providersLoading ? (
