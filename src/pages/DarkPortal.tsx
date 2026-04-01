@@ -73,12 +73,9 @@ const DarkPortal = () => {
           <div className="dp-container w-full">
             {/* Headline */}
             <div className="text-center mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold dp-text-white mb-2">
+              <h1 className="text-2xl md:text-3xl font-bold dp-text-white">
                 Add Funds to Your Wallet
               </h1>
-              <p className="text-sm dp-text-secondary">
-                Purchase USDC using a trusted provider. Funds will appear in your wallet after completion.
-              </p>
             </div>
 
             {/* Context message */}
