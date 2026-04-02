@@ -15,7 +15,7 @@
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(196, 64, 224, 0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(58, 173, 154, 0.12) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -23,7 +23,7 @@
 /* Text utilities */
 .pp-text-white { color: #FFFFFF; }
 .pp-text-secondary { color: #BABABA; }
-.pp-text-primary { color: #C440E0; }
+.pp-text-primary { color: #3AAD9A; }
 .pp-text-success { color: #01B216; }
 .pp-text-error { color: #EA393A; }
 
@@ -58,8 +58,8 @@
 
 /* Context message */
 .pp-context-msg {
-  background: rgba(196, 64, 224, 0.06);
-  border: 1px solid rgba(196, 64, 224, 0.15);
+  background: rgba(58, 173, 154, 0.06);
+  border: 1px solid rgba(58, 173, 154, 0.15);
   border-radius: 10px;
   padding: 10px 14px;
 }
@@ -84,9 +84,9 @@
   background: transparent;
 }
 .pp-tab-active {
-  background: #C440E0;
+  background: #3AAD9A;
   color: #FFFFFF;
-  box-shadow: 0 0 16px rgba(196, 64, 224, 0.4);
+  box-shadow: none;
 }
 .pp-tab-inactive {
   color: #BABABA;
@@ -125,15 +125,15 @@
 .pp-card .bg-background { background: #1C1C1C !important; }
 .pp-card .bg-muted { background: rgba(255, 255, 255, 0.05) !important; }
 .pp-card .border { border-color: rgba(255, 255, 255, 0.1) !important; }
-.pp-card .bg-primary { background: #C440E0 !important; }
-.pp-card .bg-primary:hover { background: #E0004C !important; }
-.pp-card .text-primary { color: #C440E0 !important; }
+.pp-card .bg-primary { background: #3AAD9A !important; }
+.pp-card .bg-primary:hover { background: #2E9484 !important; }
+.pp-card .text-primary { color: #3AAD9A !important; }
 .pp-card .text-primary-foreground { color: #FFFFFF !important; }
-.pp-card .ring-ring { --tw-ring-color: #C440E0 !important; }
-.pp-card .bg-primary\/10 { background: rgba(196, 64, 224, 0.1) !important; }
-.pp-card .border-primary { border-color: #C440E0 !important; }
-.pp-card .border-primary\/50 { border-color: rgba(196, 64, 224, 0.5) !important; }
-.pp-card .hover\:border-primary\/50:hover { border-color: rgba(196, 64, 224, 0.5) !important; }
+.pp-card .ring-ring { --tw-ring-color: #3AAD9A !important; }
+.pp-card .bg-primary\/10 { background: rgba(58, 173, 154, 0.1) !important; }
+.pp-card .border-primary { border-color: #3AAD9A !important; }
+.pp-card .border-primary\/50 { border-color: rgba(58, 173, 154, 0.5) !important; }
+.pp-card .hover\:border-primary\/50:hover { border-color: rgba(58, 173, 154, 0.5) !important; }
 
 /* Input overrides */
 .pp-card input,
@@ -147,8 +147,8 @@
   color: #BABABA !important;
 }
 .pp-card input:focus {
-  border-color: #C440E0 !important;
-  box-shadow: 0 0 0 2px rgba(196, 64, 224, 0.2) !important;
+  border-color: #3AAD9A !important;
+  box-shadow: 0 0 0 2px rgba(58, 173, 154, 0.2) !important;
 }
 
 /* Label overrides */
@@ -159,17 +159,17 @@
 /* Button overrides — primary CTA */
 .pp-card button[class*="bg-primary"],
 .pp-card .hover-scale {
-  background: #C440E0 !important;
+  background: #3AAD9A !important;
   color: #FFFFFF !important;
   min-height: 52px;
   border-radius: 12px !important;
-  box-shadow: 0 0 20px rgba(196, 64, 224, 0.3);
+  box-shadow: none;
   transition: all 0.2s ease;
 }
 .pp-card button[class*="bg-primary"]:hover,
 .pp-card .hover-scale:hover {
-  background: #E0004C !important;
-  box-shadow: 0 0 24px rgba(224, 0, 76, 0.4);
+  background: #2E9484 !important;
+  box-shadow: none;
   transform: scale(1.01);
 }
 .pp-card button[class*="bg-primary"]:active,
