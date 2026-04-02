@@ -87,16 +87,9 @@ const PartnerPortal = () => {
           <div className="pp-container w-full">
             {/* Headline */}
             <div className="text-center mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold pp-text-white mb-2">
+              <h1 className="text-xl md:text-2xl font-bold pp-text-white mb-2">
                 Add Funds to Your Wallet
               </h1>
-            </div>
-
-            {/* Context message */}
-            <div className="pp-context-msg mb-4">
-              <p className="text-xs pp-text-secondary text-center">
-                If you already purchased USDC, return to your wallet and complete your deposit.
-              </p>
             </div>
 
             {/* Tab selector */}
