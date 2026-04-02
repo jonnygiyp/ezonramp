@@ -147,8 +147,8 @@
   color: #BABABA !important;
 }
 .pp-card input:focus {
-  border-color: #C440E0 !important;
-  box-shadow: 0 0 0 2px rgba(196, 64, 224, 0.2) !important;
+  border-color: #3AAD9A !important;
+  box-shadow: 0 0 0 2px rgba(58, 173, 154, 0.2) !important;
 }
 
 /* Label overrides */
