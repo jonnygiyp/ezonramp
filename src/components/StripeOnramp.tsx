@@ -20,6 +20,7 @@ const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 interface StripeOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
+  theme?: 'light' | 'dark';
 }
 
 type LoadState = 'idle' | 'loading' | 'mounted' | 'ready' | 'error';
