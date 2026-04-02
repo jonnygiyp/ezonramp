@@ -58,8 +58,8 @@
 
 /* Context message */
 .pp-context-msg {
-  background: rgba(196, 64, 224, 0.06);
-  border: 1px solid rgba(196, 64, 224, 0.15);
+  background: rgba(58, 173, 154, 0.06);
+  border: 1px solid rgba(58, 173, 154, 0.15);
   border-radius: 10px;
   padding: 10px 14px;
 }
