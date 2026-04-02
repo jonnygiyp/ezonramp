@@ -747,7 +747,7 @@ export function CoinbaseHeadlessOnramp({
 
             {/* Preset amounts */}
             <div className="grid grid-cols-4 gap-2">
-              {['50', '100', '250', '500'].map((preset) => (
+              {presetAmounts.map((preset) => (
                 <Button
                   key={preset}
                   variant={amount === preset ? 'default' : 'outline'}
