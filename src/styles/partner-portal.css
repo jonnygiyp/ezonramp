@@ -159,17 +159,17 @@
 /* Button overrides — primary CTA */
 .pp-card button[class*="bg-primary"],
 .pp-card .hover-scale {
-  background: #C440E0 !important;
+  background: #3AAD9A !important;
   color: #FFFFFF !important;
   min-height: 52px;
   border-radius: 12px !important;
-  box-shadow: 0 0 20px rgba(196, 64, 224, 0.3);
+  box-shadow: none;
   transition: all 0.2s ease;
 }
 .pp-card button[class*="bg-primary"]:hover,
 .pp-card .hover-scale:hover {
-  background: #E0004C !important;
-  box-shadow: 0 0 24px rgba(224, 0, 76, 0.4);
+  background: #2E9484 !important;
+  box-shadow: none;
   transform: scale(1.01);
 }
 .pp-card button[class*="bg-primary"]:active,
