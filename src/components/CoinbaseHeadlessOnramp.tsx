@@ -112,7 +112,7 @@ export function CoinbaseHeadlessOnramp({
   const [codeSent, setCodeSent] = useState(false);
 
   // Quote state - inline auto-refresh
-  const [amount, setAmount] = useState("100");
+  const [amount, setAmount] = useState(defaultAmount);
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [quoteState, setQuoteState] = useState<QuoteState>('idle');
   const [quoteError, setQuoteError] = useState<string | null>(null);
