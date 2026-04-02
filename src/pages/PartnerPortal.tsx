@@ -1,14 +1,21 @@
 import { useState, useEffect } from "react";
 import "@/styles/partner-portal.css";
 import { Link } from "react-router-dom";
-import { Shield, Zap, Lock, CheckCircle } from "lucide-react";
+import { Shield, Zap, Lock, CheckCircle, HelpCircle, X } from "lucide-react";
 import ppLogo from "@/assets/ezonramp-pp-logo.png";
-import CustomConnectButton from "@/components/CustomConnectButton";
 import { CoinbaseHeadlessOnramp } from "@/components/CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "@/components/CoinbaseOnrampWidget";
 import { StripeOnramp } from "@/components/StripeOnramp";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 import { Loader2, CreditCard, Wallet, Globe, DollarSign } from "lucide-react";
+import { useFAQContent } from "@/hooks/useSiteContent";
+import DOMPurify from "dompurify";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const getTabIcon = (name: string) => {
   switch (name) {
