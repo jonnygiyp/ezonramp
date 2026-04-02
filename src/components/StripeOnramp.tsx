@@ -25,7 +25,7 @@ interface StripeOnrampProps {
 
 type LoadState = 'idle' | 'loading' | 'mounted' | 'ready' | 'error';
 
-export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
+export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { setOpen } = useModal();
