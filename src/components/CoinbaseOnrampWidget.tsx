@@ -15,6 +15,8 @@ interface CoinbaseOnrampWidgetProps {
   defaultNetwork?: string;
   subtitle?: string;
   defaultAmount?: string;
+  hideHeader?: boolean;
+  checkoutDescription?: string;
 }
 
 export function CoinbaseOnrampWidget({
@@ -22,6 +24,8 @@ export function CoinbaseOnrampWidget({
   defaultNetwork = "solana",
   subtitle,
   defaultAmount = "100",
+  hideHeader = false,
+  checkoutDescription,
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -163,6 +167,7 @@ export function CoinbaseOnrampWidget({
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {!hideHeader && (
       <div className="text-center space-y-2">
         <h1 className="text-lg md:text-2xl font-bold tracking-tight">
           Buy USDC with Coinbase
@@ -171,6 +176,7 @@ export function CoinbaseOnrampWidget({
           {subtitle ?? "International users can buy USDC with credit card, debit card, or bank transfer through Coinbase. May require KYC."}
         </p>
       </div>
+      )}
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Amount Input */}
@@ -241,8 +247,8 @@ export function CoinbaseOnrampWidget({
         </AuthGatedButton>
 
         <p className="text-xs text-center text-muted-foreground">
-          A Coinbase window will open to complete your purchase. <br />
-          Available worldwide with support for multiple payment methods.
+          {checkoutDescription ?? (<>A Coinbase window will open to complete your purchase. <br />
+          Available worldwide with support for multiple payment methods.</>)}
         </p>
       </div>
 

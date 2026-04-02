@@ -75,6 +75,7 @@ interface CoinbaseHeadlessOnrampProps {
   defaultNetwork?: string;
   presetAmounts?: string[];
   defaultAmount?: string;
+  hideHeader?: boolean;
 }
 
 export function CoinbaseHeadlessOnramp({
@@ -82,6 +83,7 @@ export function CoinbaseHeadlessOnramp({
   defaultNetwork = "solana",
   presetAmounts = ['50', '100', '250', '500'],
   defaultAmount = "100",
+  hideHeader = false,
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -513,6 +515,7 @@ export function CoinbaseHeadlessOnramp({
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {!hideHeader && (
       <div className="text-center space-y-2">
         <h1 className="text-lg md:text-2xl font-bold tracking-tight">
           Buy USDC with debit or Apple Pay
@@ -521,6 +524,7 @@ export function CoinbaseHeadlessOnramp({
           Up to $500 per week - no Coinbase account required.
         </p>
       </div>
+      )}
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Step: Identity */}
