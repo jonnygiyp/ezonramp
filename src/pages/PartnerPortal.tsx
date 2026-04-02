@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import "@/styles/partner-portal.css";
 import { Link } from "react-router-dom";
 import { Shield, Zap, Lock, CheckCircle } from "lucide-react";
+import ppLogo from "@/assets/ezonramp-pp-logo.png";
 import CustomConnectButton from "@/components/CustomConnectButton";
 import { CoinbaseHeadlessOnramp } from "@/components/CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "@/components/CoinbaseOnrampWidget";
@@ -51,8 +52,7 @@ const PartnerPortal = () => {
         <header className="pp-header">
           <div className="pp-header-inner">
             <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 pp-text-primary" />
-              <span className="text-sm font-semibold pp-text-white">Secure Deposit</span>
+              <img src={ppLogo} alt="EZOnRamp" className="h-5 w-auto" />
             </div>
             <div className="[&_button]:!bg-[#1C1C1C] [&_button]:!text-white [&_button]:!border-white/10 [&_button]:hover:!bg-[#2E9484] [&_button]:hover:!border-[#3AAD9A]/50">
               <CustomConnectButton />
