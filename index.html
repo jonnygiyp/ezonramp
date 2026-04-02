@@ -2,6 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>if(/^\/(partnerportal|dark)/i.test(location.pathname)){document.documentElement.style.background='#000';document.documentElement.style.colorScheme='dark'}</script>
+    <style id="pp-preload">.pp-preload-dark html,.pp-preload-dark body,.pp-preload-dark #root{background:#000!important;color:#fff!important}</style>
+    <script>if(/^\/(partnerportal|dark)/i.test(location.pathname)){document.documentElement.classList.add('pp-preload-dark')}</script>
     <!-- CRITICAL: Error catching BEFORE anything else loads -->
     <script>
       (function () {
@@ -129,7 +132,6 @@
   </head>
 
   <body>
-    <script>if(/^\/partnerportal/i.test(location.pathname)||/^\/dark/i.test(location.pathname)){document.body.style.backgroundColor='#000'}</script>
     <div id="root"></div>
     <!-- Buffer polyfill MUST load before any module scripts for Particle SDK -->
     <script>
