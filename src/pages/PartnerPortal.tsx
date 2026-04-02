@@ -52,7 +52,7 @@ const PartnerPortal = () => {
         <header className="pp-header">
           <div className="pp-header-inner">
             <div className="flex items-center gap-2">
-              <img src={ppLogo} alt="EZOnRamp" className="h-5 w-auto" />
+              <img src={ppLogo} alt="EZOnRamp" className="h-[1.875rem] w-auto" />
             </div>
             <div className="[&_button]:!bg-[#1C1C1C] [&_button]:!text-white [&_button]:!border-white/10 [&_button]:hover:!bg-[#2E9484] [&_button]:hover:!border-[#3AAD9A]/50">
               <CustomConnectButton />
