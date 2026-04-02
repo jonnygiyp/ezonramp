@@ -74,12 +74,14 @@ interface CoinbaseHeadlessOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
   presetAmounts?: string[];
+  defaultAmount?: string;
 }
 
 export function CoinbaseHeadlessOnramp({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
   presetAmounts = ['50', '100', '250', '500'],
+  defaultAmount = "100",
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -110,7 +112,7 @@ export function CoinbaseHeadlessOnramp({
   const [codeSent, setCodeSent] = useState(false);
 
   // Quote state - inline auto-refresh
-  const [amount, setAmount] = useState("100");
+  const [amount, setAmount] = useState(defaultAmount);
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [quoteState, setQuoteState] = useState<QuoteState>('idle');
   const [quoteError, setQuoteError] = useState<string | null>(null);

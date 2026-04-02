@@ -136,7 +136,7 @@ const PartnerPortal = () => {
               {/* Widget content */}
               <div className="pp-widget-content">
                 {activeTab === 'coinbase' && (
-                  <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" presetAmounts={['5', '10', '20', '50']} />
+                  <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" presetAmounts={['5', '10', '20', '50']} defaultAmount="10" />
                 )}
                 {activeTab === 'coinbase_global' && (
                   <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Requires Coinbase account. May require KYC." />
