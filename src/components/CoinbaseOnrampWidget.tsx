@@ -247,8 +247,8 @@ export function CoinbaseOnrampWidget({
         </AuthGatedButton>
 
         <p className="text-xs text-center text-muted-foreground">
-          A Coinbase window will open to complete your purchase. <br />
-          Available worldwide with support for multiple payment methods.
+          {checkoutDescription ?? (<>A Coinbase window will open to complete your purchase. <br />
+          Available worldwide with support for multiple payment methods.</>)}
         </p>
       </div>
 
