@@ -19,6 +19,16 @@ import PartnerPortal from "./pages/PartnerPortal";
 import DarkPortal from "./pages/DarkPortal";
 
 const queryClient = new QueryClient();
+const path = typeof window !== "undefined" ? window.location.pathname : "";
+const isDarkPortalRoute = path.startsWith("/partnerportal") || path.startsWith("/dark");
+
+const suspenseFallback = isDarkPortalRoute ? (
+  <div className="min-h-screen bg-black text-white flex items-center justify-center">
+    <div className="h-7 w-7 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" aria-label="Loading" />
+  </div>
+) : (
+  <div className="flex items-center justify-center min-h-screen">Loading...</div>
+);
 
 // Inner component that can use hooks
 const AppContent = () => {
@@ -48,7 +58,7 @@ const AppContent = () => {
 
 const App = () => (
   <ErrorBoundary>
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+    <Suspense fallback={suspenseFallback}>
       <ParticleConnectkit>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
