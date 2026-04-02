@@ -1,14 +1,21 @@
 import { useState, useEffect } from "react";
 import "@/styles/partner-portal.css";
 import { Link } from "react-router-dom";
-import { Shield, Zap, Lock, CheckCircle } from "lucide-react";
+import { Shield, Zap, Lock, CheckCircle, HelpCircle, X } from "lucide-react";
 import ppLogo from "@/assets/ezonramp-pp-logo.png";
-import CustomConnectButton from "@/components/CustomConnectButton";
 import { CoinbaseHeadlessOnramp } from "@/components/CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "@/components/CoinbaseOnrampWidget";
 import { StripeOnramp } from "@/components/StripeOnramp";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 import { Loader2, CreditCard, Wallet, Globe, DollarSign } from "lucide-react";
+import { useFAQContent } from "@/hooks/useSiteContent";
+import DOMPurify from "dompurify";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const getTabIcon = (name: string) => {
   switch (name) {
@@ -23,6 +30,17 @@ const PartnerPortal = () => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
   const [activeTab, setActiveTab] = useState<string>('');
   const [visible, setVisible] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const { data: faqData } = useFAQContent();
+
+  const defaultFaqs = [
+    { question: "What is a crypto onramp?", answer: "A crypto onramp is a service that allows you to convert traditional currency (like USD) into cryptocurrency." },
+    { question: "How long does a transaction take?", answer: "Transaction times vary depending on the payment method and network conditions. Credit card purchases are typically instant, while bank transfers may take 1-3 business days." },
+    { question: "Is my personal information secure?", answer: "Yes, all personal information is encrypted and stored securely. We comply with industry-standard security practices." },
+    { question: "What payment methods do you accept?", answer: "We accept major credit and debit cards, as well as bank transfers. Available methods may vary by location." },
+    { question: "Are there any fees?", answer: "Fees vary by payment method and provider. Each service displays its fees transparently before you complete a transaction." },
+  ];
+  const faqs = faqData?.items?.length ? faqData.items : defaultFaqs;
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -54,9 +72,13 @@ const PartnerPortal = () => {
             <div className="flex items-center gap-2">
               <img src={ppLogo} alt="EZOnRamp" className="h-[1.875rem] w-auto" />
             </div>
-            <div className="[&_button]:!bg-[#1C1C1C] [&_button]:!text-white [&_button]:!border-white/10 [&_button]:hover:!bg-[#2E9484] [&_button]:hover:!border-[#3AAD9A]/50">
-              <CustomConnectButton />
-            </div>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+              Help
+            </button>
           </div>
         </header>
 
@@ -154,6 +176,45 @@ const PartnerPortal = () => {
             <Link to="/privacy" className="hover:pp-text-white transition-colors">Privacy</Link>
           </div>
         </footer>
+      </div>
+
+      {/* Help / FAQ slide-in panel */}
+      <div
+        className={`fixed inset-0 z-[100] transition-opacity duration-300 ${showHelp ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setShowHelp(false)}
+      >
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
+      <div
+        className={`fixed top-0 right-0 h-full w-full max-w-md z-[101] bg-[#111111] border-l border-white/8 transform transition-transform duration-300 ease-out ${showHelp ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+          <h2 className="text-lg font-semibold text-white">Help & FAQ</h2>
+          <button
+            onClick={() => setShowHelp(false)}
+            className="p-1.5 rounded-full text-[#BABABA] hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto h-[calc(100%-57px)] px-5 py-4">
+          <Accordion type="single" collapsible className="w-full">
+            {faqs.map((faq, index) => (
+              <AccordionItem
+                key={index}
+                value={`item-${index}`}
+                className="border-b border-white/8"
+              >
+                <AccordionTrigger className="text-left text-sm font-medium text-white hover:no-underline py-3 [&[data-state=open]>svg]:text-[#3AAD9A] [&>svg]:text-[#BABABA] [&>svg]:transition-colors">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-[#BABABA] leading-relaxed pb-3">
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
       </div>
     </>
   );
