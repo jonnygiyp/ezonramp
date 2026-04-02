@@ -120,7 +120,7 @@ const PartnerPortal = () => {
                   <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Requires Coinbase account. May require KYC." />
                 )}
                 {activeTab === 'stripe' && (
-                  <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" />
+                  <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" theme="dark" />
                 )}
               </div>
             </div>

@@ -20,11 +20,12 @@ const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 interface StripeOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
+  theme?: 'light' | 'dark';
 }
 
 type LoadState = 'idle' | 'loading' | 'mounted' | 'ready' | 'error';
 
-export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" }: StripeOnrampProps) {
+export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { setOpen } = useModal();
@@ -150,7 +151,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana" 
       }
 
       log("Container ready, creating session and mounting...");
-      const onrampSession = stripeOnramp.createSession({ clientSecret });
+      const onrampSession = stripeOnramp.createSession({
+        clientSecret,
+        ...(theme && { appearance: { theme } }),
+      });
       currentSessionRef.current = onrampSession;
 
       // Listen for session updates
