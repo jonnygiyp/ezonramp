@@ -14,12 +14,14 @@ interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
   defaultNetwork?: string;
   subtitle?: string;
+  defaultAmount?: string;
 }
 
 export function CoinbaseOnrampWidget({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
   subtitle,
+  defaultAmount = "100",
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -27,7 +29,7 @@ export function CoinbaseOnrampWidget({
   
   const [isLoading, setIsLoading] = useState(false);
   const [manualAddress, setManualAddress] = useState("");
-  const [amount, setAmount] = useState("100");
+  const [amount, setAmount] = useState(defaultAmount);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [appId, setAppId] = useState<string | null>(null);
   
