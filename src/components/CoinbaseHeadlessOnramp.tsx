@@ -722,7 +722,7 @@ export function CoinbaseHeadlessOnramp({
                   </Button>
                 </p>
               )}
-              <h2 className="text-base font-semibold">How much do you want to buy?</h2>
+              <h2 className="text-base font-semibold text-muted-foreground">How much do you want to buy?</h2>
             </div>
 
             {/* Amount input */}
