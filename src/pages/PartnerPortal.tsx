@@ -182,7 +182,7 @@ const PartnerPortal = () => {
         className={`fixed top-0 right-0 h-full w-full max-w-md z-[101] bg-[#111111] border-l border-white/8 transform transition-transform duration-300 ease-out ${showHelp ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
-          <h2 className="text-lg font-semibold text-white">Help & FAQ</h2>
+          <h2 className="text-lg font-semibold text-white">Help <span className="text-primary">&</span> FAQ</h2>
           <button
             onClick={() => setShowHelp(false)}
             className="p-1.5 rounded-full text-[#BABABA] hover:text-white hover:bg-white/10 transition-colors"
@@ -198,7 +198,7 @@ const PartnerPortal = () => {
                 value={`item-${index}`}
                 className="border-b border-white/8"
               >
-                <AccordionTrigger className="text-left text-sm font-normal text-muted-foreground hover:no-underline py-3 [&[data-state=open]>svg]:text-[#3AAD9A] [&>svg]:text-[#BABABA] [&>svg]:transition-colors">
+                <AccordionTrigger className="text-left text-sm font-normal text-muted-foreground hover:no-underline py-3 [&[data-state=open]]:text-primary [&[data-state=open]>svg]:text-primary [&>svg]:text-[#BABABA] [&>svg]:transition-colors">
                   {faq.question}
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-[#BABABA] leading-relaxed pb-3">
