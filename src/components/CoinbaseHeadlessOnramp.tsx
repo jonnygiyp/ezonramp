@@ -75,6 +75,7 @@ interface CoinbaseHeadlessOnrampProps {
   defaultNetwork?: string;
   presetAmounts?: string[];
   defaultAmount?: string;
+  hideHeader?: boolean;
 }
 
 export function CoinbaseHeadlessOnramp({

@@ -15,6 +15,8 @@ interface CoinbaseOnrampWidgetProps {
   defaultNetwork?: string;
   subtitle?: string;
   defaultAmount?: string;
+  hideHeader?: boolean;
+  checkoutDescription?: string;
 }
 
 export function CoinbaseOnrampWidget({
@@ -22,6 +24,8 @@ export function CoinbaseOnrampWidget({
   defaultNetwork = "solana",
   subtitle,
   defaultAmount = "100",
+  hideHeader = false,
+  checkoutDescription,
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
