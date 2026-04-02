@@ -8,6 +8,8 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 10%;
+    --portal-background: 0 0% 0%;
+    --portal-foreground: 0 0% 100%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 10%;
     --popover: 0 0% 100%;
@@ -71,10 +73,34 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
+  html.pp-preload-dark,
+  html.pp-preload-dark body,
+  html.pp-preload-dark #root {
+    background-color: hsl(var(--portal-background)) !important;
+    color: hsl(var(--portal-foreground)) !important;
+  }
+
+  html.pp-preload-dark body,
+  html.pp-preload-dark #root {
+    min-height: 100vh;
+  }
+
   --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @layer utilities {
+  .pp-route-boot {
+    @apply min-h-screen flex items-center justify-center;
+    background-color: hsl(var(--portal-background));
+    color: hsl(var(--portal-foreground));
+  }
+
+  .pp-route-spinner {
+    @apply h-7 w-7 rounded-full border-[3px] animate-spin;
+    border-color: hsl(var(--primary) / 0.3);
+    border-top-color: hsl(var(--primary));
+  }
+
   .slide-out-left {
     animation: slide-out-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }

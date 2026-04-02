@@ -8,6 +8,7 @@ import { ParticleConnectkit } from "./connectkit";
 import { AuthProvider } from "./hooks/useAuth";
 import { useGlobalErrorLogger } from "./hooks/useGlobalErrorLogger";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { isCurrentDarkPortalRoute } from "./lib/portalRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -19,12 +20,11 @@ import PartnerPortal from "./pages/PartnerPortal";
 import DarkPortal from "./pages/DarkPortal";
 
 const queryClient = new QueryClient();
-const path = typeof window !== "undefined" ? window.location.pathname : "";
-const isDarkPortalRoute = path.startsWith("/partnerportal") || path.startsWith("/dark");
+const isDarkPortalRoute = isCurrentDarkPortalRoute();
 
 const suspenseFallback = isDarkPortalRoute ? (
-  <div className="min-h-screen bg-black text-white flex items-center justify-center">
-    <div className="h-7 w-7 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" aria-label="Loading" />
+  <div className="pp-route-boot" data-route-theme="dark-portal">
+    <div className="pp-route-spinner" aria-label="Loading" />
   </div>
 ) : (
   <div className="flex items-center justify-center min-h-screen">Loading...</div>

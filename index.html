@@ -2,9 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <script>if(/^\/(partnerportal|dark)/i.test(location.pathname)){document.documentElement.style.background='#000';document.documentElement.style.colorScheme='dark'}</script>
-    <style id="pp-preload">.pp-preload-dark html,.pp-preload-dark body,.pp-preload-dark #root{background:#000!important;color:#fff!important}</style>
-    <script>if(/^\/(partnerportal|dark)/i.test(location.pathname)){document.documentElement.classList.add('pp-preload-dark')}</script>
+    <script>
+      (function () {
+        if (!/^\/(partnerportal|dark)(?:\/|$)/i.test(location.pathname)) return;
+        document.documentElement.classList.add('pp-preload-dark');
+        document.documentElement.style.background = '#000';
+        document.documentElement.style.colorScheme = 'dark';
+      })();
+    </script>
+    <style id="pp-preload">
+      html.pp-preload-dark,
+      html.pp-preload-dark body,
+      html.pp-preload-dark #root {
+        background: #000 !important;
+        color: #fff !important;
+      }
+
+      html.pp-preload-dark body,
+      html.pp-preload-dark #root {
+        min-height: 100vh;
+      }
+    </style>
     <!-- CRITICAL: Error catching BEFORE anything else loads -->
     <script>
       (function () {

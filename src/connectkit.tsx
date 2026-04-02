@@ -1,4 +1,5 @@
 import React, { useState, useEffect, ReactNode, useRef } from 'react';
+import { isCurrentDarkPortalRoute } from './lib/portalRoute';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ConnectKitProvider: React.ComponentType<any> | null = null;
@@ -139,6 +140,7 @@ async function loadParticleSDK(): Promise<void> {
 export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
   const isMounted = useRef(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const isDarkPortalRoute = isCurrentDarkPortalRoute();
 
   useEffect(() => {
     isMounted.current = true;
@@ -163,6 +165,14 @@ export const ParticleConnectkit = ({ children }: { children: ReactNode }) => {
 
   // Must wait for provider to be ready - children use useAccount() hook
   if (!isLoaded || !ConnectKitProvider || !particleConfig) {
+    if (isDarkPortalRoute) {
+      return (
+        <div className="pp-route-boot" data-route-theme="dark-portal">
+          <div className="pp-route-spinner" aria-label="Loading" />
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-3 bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
