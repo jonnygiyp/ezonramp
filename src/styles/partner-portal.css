@@ -84,9 +84,9 @@
   background: transparent;
 }
 .pp-tab-active {
-  background: #C440E0;
+  background: #3AAD9A;
   color: #FFFFFF;
-  box-shadow: 0 0 16px rgba(196, 64, 224, 0.4);
+  box-shadow: none;
 }
 .pp-tab-inactive {
   color: #BABABA;
