@@ -74,12 +74,14 @@ interface CoinbaseHeadlessOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
   presetAmounts?: string[];
+  defaultAmount?: string;
 }
 
 export function CoinbaseHeadlessOnramp({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
   presetAmounts = ['50', '100', '250', '500'],
+  defaultAmount = "100",
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
