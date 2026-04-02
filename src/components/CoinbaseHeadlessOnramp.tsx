@@ -73,11 +73,13 @@ function clearStoredVerification(): void {
 interface CoinbaseHeadlessOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
+  presetAmounts?: string[];
 }
 
 export function CoinbaseHeadlessOnramp({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
+  presetAmounts = ['50', '100', '250', '500'],
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -745,7 +747,7 @@ export function CoinbaseHeadlessOnramp({
 
             {/* Preset amounts */}
             <div className="grid grid-cols-4 gap-2">
-              {['50', '100', '250', '500'].map((preset) => (
+              {presetAmounts.map((preset) => (
                 <Button
                   key={preset}
                   variant={amount === preset ? 'default' : 'outline'}
