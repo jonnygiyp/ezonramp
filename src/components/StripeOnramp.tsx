@@ -344,25 +344,31 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
         </div>
       )}
 
-      {/* Wallet Address Card */}
-      <div className="bg-card border border-border rounded-xl p-4 space-y-1.5" data-tutorial="stripe-wallet-card">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Wallet className="h-4 w-4 text-primary" />
-          <span>{defaultNetwork === 'solana' ? 'Wallet address to receive Solana USDC' : 'EVM Wallet Address'}</span>
-        </div>
+      {/* Wallet Address */}
+      <div className="space-y-2" data-tutorial="stripe-wallet-card">
+        <Label htmlFor="wallet-stripe">Wallet address to receive USDC</Label>
         {connectedAddressValid ? (
           <>
-            <div className="p-2.5 bg-muted/50 rounded-lg border border-border">
+            <div className="p-3 bg-muted/50 rounded-lg border border-border">
               <p className="font-mono text-sm truncate">{walletAddress}</p>
             </div>
-            <p className="text-xs text-muted-foreground">Connected wallet detected</p>
+            <p className="text-[10px] text-muted-foreground/70">
+              Connected wallet detected
+            </p>
           </>
         ) : (
           <>
-            <div className="p-2.5 bg-muted/50 rounded-lg border border-border">
-              <p className="text-sm text-muted-foreground">Sign Up / Sign In to populate address</p>
-            </div>
-            <p className="text-xs text-muted-foreground">Sign in to automatically populate your wallet address</p>
+            <Input
+              id="wallet-stripe"
+              type="text"
+              placeholder="Sign Up / Sign In To Populate Address"
+              value=""
+              disabled
+              className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground"
+            />
+            <p className="text-[10px] text-muted-foreground/70">
+              Sign in to automatically populate your wallet address
+            </p>
           </>
         )}
       </div>

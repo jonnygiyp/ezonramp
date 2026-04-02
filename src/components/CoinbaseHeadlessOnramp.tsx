@@ -604,9 +604,7 @@ export function CoinbaseHeadlessOnramp({
             )}
 
             <div className="space-y-2" data-tutorial="wallet-input">
-              <Label htmlFor="wallet">
-                {defaultNetwork === 'solana' ? 'Solana' : 'EVM'} wallet address to receive {defaultAsset}
-              </Label>
+              <Label htmlFor="wallet">Wallet address to receive USDC</Label>
               {isConnected && address && connectedAddressValid ? (
                 <>
                   <div className="p-3 bg-muted/50 rounded-lg border border-border">
