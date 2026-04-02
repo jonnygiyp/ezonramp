@@ -30,6 +30,17 @@ const PartnerPortal = () => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
   const [activeTab, setActiveTab] = useState<string>('');
   const [visible, setVisible] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const { data: faqData } = useFAQContent();
+
+  const defaultFaqs = [
+    { question: "What is a crypto onramp?", answer: "A crypto onramp is a service that allows you to convert traditional currency (like USD) into cryptocurrency." },
+    { question: "How long does a transaction take?", answer: "Transaction times vary depending on the payment method and network conditions. Credit card purchases are typically instant, while bank transfers may take 1-3 business days." },
+    { question: "Is my personal information secure?", answer: "Yes, all personal information is encrypted and stored securely. We comply with industry-standard security practices." },
+    { question: "What payment methods do you accept?", answer: "We accept major credit and debit cards, as well as bank transfers. Available methods may vary by location." },
+    { question: "Are there any fees?", answer: "Fees vary by payment method and provider. Each service displays its fees transparently before you complete a transaction." },
+  ];
+  const faqs = faqData?.items?.length ? faqData.items : defaultFaqs;
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
