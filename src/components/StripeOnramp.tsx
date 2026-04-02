@@ -21,11 +21,12 @@ interface StripeOnrampProps {
   defaultAsset?: string;
   defaultNetwork?: string;
   theme?: 'light' | 'dark';
+  hideHeader?: boolean;
 }
 
 type LoadState = 'idle' | 'loading' | 'mounted' | 'ready' | 'error';
 
-export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme }: StripeOnrampProps) {
+export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme, hideHeader = false }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { setOpen } = useModal();
