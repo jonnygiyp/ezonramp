@@ -72,9 +72,13 @@ const PartnerPortal = () => {
             <div className="flex items-center gap-2">
               <img src={ppLogo} alt="EZOnRamp" className="h-[1.875rem] w-auto" />
             </div>
-            <div className="[&_button]:!bg-[#1C1C1C] [&_button]:!text-white [&_button]:!border-white/10 [&_button]:hover:!bg-[#2E9484] [&_button]:hover:!border-[#3AAD9A]/50">
-              <CustomConnectButton />
-            </div>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+              Help
+            </button>
           </div>
         </header>
 
