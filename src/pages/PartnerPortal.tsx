@@ -198,7 +198,7 @@ const PartnerPortal = () => {
                 value={`item-${index}`}
                 className="border-b border-white/8"
               >
-                <AccordionTrigger className="text-left text-sm font-normal text-muted-foreground hover:no-underline py-3 [&[data-state=open]>svg]:text-[#3AAD9A] [&>svg]:text-[#BABABA] [&>svg]:transition-colors">
+                <AccordionTrigger className="text-left text-sm font-normal text-muted-foreground hover:no-underline py-3 [&[data-state=open]]:text-primary [&[data-state=open]>svg]:text-primary [&>svg]:text-[#BABABA] [&>svg]:transition-colors">
                   {faq.question}
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-[#BABABA] leading-relaxed pb-3">
