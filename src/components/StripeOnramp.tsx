@@ -151,7 +151,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       }
 
       log("Container ready, creating session and mounting...");
-      const onrampSession = stripeOnramp.createSession({ clientSecret });
+      const onrampSession = stripeOnramp.createSession({
+        clientSecret,
+        ...(theme && { appearance: { theme } }),
+      });
       currentSessionRef.current = onrampSession;
 
       // Listen for session updates
