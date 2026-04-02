@@ -177,6 +177,45 @@ const PartnerPortal = () => {
           </div>
         </footer>
       </div>
+
+      {/* Help / FAQ slide-in panel */}
+      <div
+        className={`fixed inset-0 z-[100] transition-opacity duration-300 ${showHelp ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setShowHelp(false)}
+      >
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
+      <div
+        className={`fixed top-0 right-0 h-full w-full max-w-md z-[101] bg-[#111111] border-l border-white/8 transform transition-transform duration-300 ease-out ${showHelp ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+          <h2 className="text-lg font-semibold text-white">Help & FAQ</h2>
+          <button
+            onClick={() => setShowHelp(false)}
+            className="p-1.5 rounded-full text-[#BABABA] hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto h-[calc(100%-57px)] px-5 py-4">
+          <Accordion type="single" collapsible className="w-full">
+            {faqs.map((faq, index) => (
+              <AccordionItem
+                key={index}
+                value={`item-${index}`}
+                className="border-b border-white/8"
+              >
+                <AccordionTrigger className="text-left text-sm font-medium text-white hover:no-underline py-3 [&[data-state=open]>svg]:text-[#3AAD9A] [&>svg]:text-[#BABABA] [&>svg]:transition-colors">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-[#BABABA] leading-relaxed pb-3">
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+      </div>
     </>
   );
 };
