@@ -182,7 +182,7 @@ const PartnerPortal = () => {
         className={`fixed top-0 right-0 h-full w-full max-w-md z-[101] bg-[#111111] border-l border-white/8 transform transition-transform duration-300 ease-out ${showHelp ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
-          <h2 className="text-lg font-semibold text-white">Help & FAQ</h2>
+          <h2 className="text-lg font-semibold text-white">Help <span className="text-primary">&</span> FAQ</h2>
           <button
             onClick={() => setShowHelp(false)}
             className="p-1.5 rounded-full text-[#BABABA] hover:text-white hover:bg-white/10 transition-colors"
