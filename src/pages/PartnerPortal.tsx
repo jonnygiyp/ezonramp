@@ -54,7 +54,7 @@ const PartnerPortal = () => {
               <Shield className="h-4 w-4 pp-text-primary" />
               <span className="text-sm font-semibold pp-text-white">Secure Deposit</span>
             </div>
-            <div className="[&_button]:!bg-[#1C1C1C] [&_button]:!text-white [&_button]:!border-white/10 [&_button]:hover:!bg-[#42005F] [&_button]:hover:!border-[#C440E0]/50">
+            <div className="[&_button]:!bg-[#1C1C1C] [&_button]:!text-white [&_button]:!border-white/10 [&_button]:hover:!bg-[#2E9484] [&_button]:hover:!border-[#3AAD9A]/50">
               <CustomConnectButton />
             </div>
           </div>
