@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import "@/styles/partner-portal.css";
 import { Link } from "react-router-dom";
-import { Shield, Zap, Lock, CheckCircle } from "lucide-react";
+import { Zap, Lock, CheckCircle } from "lucide-react";
+import ppLogo from "@/assets/ezonramp-pp-logo.png";
 import CustomConnectButton from "@/components/CustomConnectButton";
 import { CoinbaseHeadlessOnramp } from "@/components/CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "@/components/CoinbaseOnrampWidget";
