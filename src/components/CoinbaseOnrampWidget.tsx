@@ -3,9 +3,9 @@ import { generateOnRampURL } from "@coinbase/cbpay-js";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Loader2, ExternalLink, Globe } from "lucide-react";
+import { Loader2, ExternalLink, Globe, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAccount } from "@/hooks/useParticle";
+import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGatedButton } from "./AuthGatedButton";
@@ -29,6 +29,7 @@ export function CoinbaseOnrampWidget({
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
+  const { setOpen } = useModal();
   const { session } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
@@ -178,6 +179,24 @@ export function CoinbaseOnrampWidget({
       </div>
       )}
 
+      {/* Sign-in gate for logged-out users */}
+      {!isConnected && (
+        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
+          <Button
+            onClick={() => setOpen(true)}
+            className="gap-2 px-6"
+            size="lg"
+          >
+            <LogIn className="h-4 w-4" />
+            Sign In
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            to start your purchase
+          </p>
+        </div>
+      )}
+
+      {isConnected && (
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Amount Input */}
         <div className="space-y-2" data-tutorial="global-amount-input">
@@ -251,6 +270,7 @@ export function CoinbaseOnrampWidget({
           Available worldwide with support for multiple payment methods.</>)}
         </p>
       </div>
+      )}
 
       {/* Features */}
       <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">

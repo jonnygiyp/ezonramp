@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import "@/styles/partner-portal.css";
 import { Link } from "react-router-dom";
-import { Shield, Zap, Lock, CheckCircle, HelpCircle, X } from "lucide-react";
+import { Shield, Zap, Lock, CheckCircle, HelpCircle, X, User } from "lucide-react";
 import ppLogo from "@/assets/ezonramp-pp-logo.png";
 import { CoinbaseHeadlessOnramp } from "@/components/CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "@/components/CoinbaseOnrampWidget";
@@ -16,6 +16,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useAccount } from "@/hooks/useParticle";
+import AccountModal from "@/components/AccountModal";
 
 const getTabIcon = (name: string) => {
   switch (name) {
@@ -31,7 +33,9 @@ const PartnerPortal = () => {
   const [activeTab, setActiveTab] = useState<string>('');
   const [visible, setVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
   const { data: faqData } = useFAQContent();
+  const { isConnected } = useAccount();
 
   const defaultFaqs = [
     { question: "What is a crypto onramp?", answer: "A crypto onramp is a service that allows you to convert traditional currency (like USD) into cryptocurrency." },
@@ -72,13 +76,24 @@ const PartnerPortal = () => {
             <div className="flex items-center gap-2">
               <img src={ppLogo} alt="EZOnRamp" className="h-[1.875rem] w-auto" />
             </div>
-            <button
-              onClick={() => setShowHelp(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
-            >
-              <HelpCircle className="h-3.5 w-3.5" />
-              Help
-            </button>
+            <div className="flex items-center gap-2">
+              {isConnected && (
+                <button
+                  onClick={() => setAccountModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
+                >
+                  <User className="h-3.5 w-3.5" />
+                  My Account
+                </button>
+              )}
+              <button
+                onClick={() => setShowHelp(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
+              >
+                <HelpCircle className="h-3.5 w-3.5" />
+                Help
+              </button>
+            </div>
           </div>
         </header>
 
@@ -209,6 +224,7 @@ const PartnerPortal = () => {
           </Accordion>
         </div>
       </div>
+      <AccountModal open={accountModalOpen} onOpenChange={setAccountModalOpen} />
     </>
   );
 };

@@ -3,9 +3,9 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock, AlertCircle } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAccount } from "@/hooks/useParticle";
+import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
@@ -87,6 +87,7 @@ export function CoinbaseHeadlessOnramp({
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
+  const { setOpen } = useModal();
   const { session } = useAuth();
 
   const storedVerification = getStoredVerification();
@@ -526,6 +527,24 @@ export function CoinbaseHeadlessOnramp({
       </div>
       )}
 
+      {/* Sign-in gate for logged-out users */}
+      {!isConnected && (
+        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
+          <Button
+            onClick={() => setOpen(true)}
+            className="gap-2 px-6"
+            size="lg"
+          >
+            <LogIn className="h-4 w-4" />
+            Sign In
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            to start your purchase
+          </p>
+        </div>
+      )}
+
+      {isConnected && (
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Step: Identity */}
         {step === 'identity' && (
@@ -954,6 +973,7 @@ export function CoinbaseHeadlessOnramp({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
