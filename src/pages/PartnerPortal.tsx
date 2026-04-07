@@ -224,6 +224,7 @@ const PartnerPortal = () => {
           </Accordion>
         </div>
       </div>
+      <AccountModal open={accountModalOpen} onOpenChange={setAccountModalOpen} />
     </>
   );
 };
