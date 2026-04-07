@@ -973,6 +973,7 @@ export function CoinbaseHeadlessOnramp({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
