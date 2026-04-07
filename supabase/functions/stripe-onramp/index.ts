@@ -214,22 +214,25 @@ serve(async (req) => {
     const session = await response.json();
     console.log("Onramp session created:", { id: session.id, status: session.status, userId: userId.slice(0, 8) });
 
-    // Store session mapping for webhook correlation
-    const { error: insertError } = await supabase
-      .from("stripe_onramp_sessions")
-      .insert({
-        stripe_session_id: session.id,
-        user_id: userId,
-        wallet_address: walletAddress,
-        destination_currency: destinationCurrency || null,
-        destination_network: destinationNetwork || null,
-        source_amount: sourceAmount || null,
-        status: session.status || "created",
-      });
+    // Store session mapping for webhook correlation using service role
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (supabaseServiceKey) {
+      const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+      const { error: insertError } = await serviceClient
+        .from("stripe_onramp_sessions")
+        .insert({
+          stripe_session_id: session.id,
+          user_id: userId,
+          wallet_address: walletAddress,
+          destination_currency: destinationCurrency || null,
+          destination_network: destinationNetwork || null,
+          source_amount: sourceAmount || null,
+          status: session.status || "created",
+        });
 
-    if (insertError) {
-      console.error("Failed to record onramp session:", insertError);
-      // Non-fatal — still return the session to the client
+      if (insertError) {
+        console.error("Failed to record onramp session:", insertError);
+      }
     }
 
     return new Response(
