@@ -87,6 +87,7 @@ export function CoinbaseHeadlessOnramp({
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
+  const { setOpen } = useModal();
   const { session } = useAuth();
 
   const storedVerification = getStoredVerification();
