@@ -214,6 +214,24 @@ serve(async (req) => {
     const session = await response.json();
     console.log("Onramp session created:", { id: session.id, status: session.status, userId: userId.slice(0, 8) });
 
+    // Store session mapping for webhook correlation
+    const { error: insertError } = await supabase
+      .from("stripe_onramp_sessions")
+      .insert({
+        stripe_session_id: session.id,
+        user_id: userId,
+        wallet_address: walletAddress,
+        destination_currency: destinationCurrency || null,
+        destination_network: destinationNetwork || null,
+        source_amount: sourceAmount || null,
+        status: session.status || "created",
+      });
+
+    if (insertError) {
+      console.error("Failed to record onramp session:", insertError);
+      // Non-fatal — still return the session to the client
+    }
+
     return new Response(
       JSON.stringify({ 
         clientSecret: session.client_secret,
