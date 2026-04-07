@@ -233,6 +233,78 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_onramp_sessions: {
+        Row: {
+          callback_data: Json | null
+          created_at: string
+          destination_currency: string | null
+          destination_network: string | null
+          id: string
+          last_stripe_event_id: string | null
+          source_amount: number | null
+          status: string
+          stripe_session_id: string
+          updated_at: string
+          user_id: string
+          wallet_address: string
+        }
+        Insert: {
+          callback_data?: Json | null
+          created_at?: string
+          destination_currency?: string | null
+          destination_network?: string | null
+          id?: string
+          last_stripe_event_id?: string | null
+          source_amount?: number | null
+          status?: string
+          stripe_session_id: string
+          updated_at?: string
+          user_id: string
+          wallet_address: string
+        }
+        Update: {
+          callback_data?: Json | null
+          created_at?: string
+          destination_currency?: string | null
+          destination_network?: string | null
+          id?: string
+          last_stripe_event_id?: string | null
+          source_amount?: number | null
+          status?: string
+          stripe_session_id?: string
+          updated_at?: string
+          user_id?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
+      stripe_webhook_events: {
+        Row: {
+          event_type: string
+          id: string
+          livemode: boolean
+          payload: Json | null
+          processed_at: string
+          stripe_event_id: string
+        }
+        Insert: {
+          event_type: string
+          id?: string
+          livemode?: boolean
+          payload?: Json | null
+          processed_at?: string
+          stripe_event_id: string
+        }
+        Update: {
+          event_type?: string
+          id?: string
+          livemode?: boolean
+          payload?: Json | null
+          processed_at?: string
+          stripe_event_id?: string
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
