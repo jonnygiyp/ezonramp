@@ -179,6 +179,24 @@ export function CoinbaseOnrampWidget({
       </div>
       )}
 
+      {/* Sign-in gate for logged-out users */}
+      {!isConnected && (
+        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
+          <Button
+            onClick={() => setOpen(true)}
+            className="gap-2 px-6"
+            size="lg"
+          >
+            <LogIn className="h-4 w-4" />
+            Sign In
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            to start your purchase
+          </p>
+        </div>
+      )}
+
+      {isConnected && (
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Amount Input */}
         <div className="space-y-2" data-tutorial="global-amount-input">
