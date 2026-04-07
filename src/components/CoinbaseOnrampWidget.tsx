@@ -270,6 +270,7 @@ export function CoinbaseOnrampWidget({
           Available worldwide with support for multiple payment methods.</>)}
         </p>
       </div>
+      )}
 
       {/* Features */}
       <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">
