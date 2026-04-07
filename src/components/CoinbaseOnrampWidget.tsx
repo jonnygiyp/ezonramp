@@ -29,6 +29,7 @@ export function CoinbaseOnrampWidget({
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
+  const { setOpen } = useModal();
   const { session } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
