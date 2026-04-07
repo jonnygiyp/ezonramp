@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import "@/styles/partner-portal.css";
 import { Link } from "react-router-dom";
-import { Shield, Zap, Lock, CheckCircle, HelpCircle, X } from "lucide-react";
+import { Shield, Zap, Lock, CheckCircle, HelpCircle, X, User } from "lucide-react";
 import ppLogo from "@/assets/ezonramp-pp-logo.png";
 import { CoinbaseHeadlessOnramp } from "@/components/CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "@/components/CoinbaseOnrampWidget";
@@ -16,6 +16,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useAccount } from "@/hooks/useParticle";
+import AccountModal from "@/components/AccountModal";
 
 const getTabIcon = (name: string) => {
   switch (name) {
@@ -31,7 +33,9 @@ const PartnerPortal = () => {
   const [activeTab, setActiveTab] = useState<string>('');
   const [visible, setVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
   const { data: faqData } = useFAQContent();
+  const { isConnected } = useAccount();
 
   const defaultFaqs = [
     { question: "What is a crypto onramp?", answer: "A crypto onramp is a service that allows you to convert traditional currency (like USD) into cryptocurrency." },
