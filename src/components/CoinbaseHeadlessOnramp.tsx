@@ -37,18 +37,39 @@ const MAX_AMOUNT = 500;
 
 interface StoredVerification {
   channel: VerifyChannel;
-  value: string;
+  displayHint: string;
   verifiedAt: number;
+}
+
+function maskValue(channel: VerifyChannel, value: string): string {
+  if (channel === 'email') {
+    const [local, domain] = value.split('@');
+    if (!domain) return '***@***';
+    return `${local.slice(0, 2)}***@${domain}`;
+  }
+  // Phone: show last 4 digits
+  return `***${value.slice(-4)}`;
 }
 
 function getStoredVerification(): StoredVerification | null {
   try {
     const stored = localStorage.getItem(VERIFICATION_STORAGE_KEY);
     if (!stored) return null;
-    const parsed: StoredVerification = JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    // Migrate old format: if 'value' field exists, convert to new format
+    if (parsed.value && !parsed.displayHint) {
+      const migrated: StoredVerification = {
+        channel: parsed.channel,
+        displayHint: maskValue(parsed.channel, parsed.value),
+        verifiedAt: parsed.verifiedAt,
+      };
+      localStorage.setItem(VERIFICATION_STORAGE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+    const data: StoredVerification = parsed;
     const now = Date.now();
-    if (now - parsed.verifiedAt < VERIFICATION_VALIDITY_MS) {
-      return parsed;
+    if (now - data.verifiedAt < VERIFICATION_VALIDITY_MS) {
+      return data;
     }
     localStorage.removeItem(VERIFICATION_STORAGE_KEY);
     return null;
@@ -60,7 +81,7 @@ function getStoredVerification(): StoredVerification | null {
 function storeVerification(channel: VerifyChannel, value: string): void {
   const data: StoredVerification = {
     channel,
-    value,
+    displayHint: maskValue(channel, value),
     verifiedAt: Date.now(),
   };
   localStorage.setItem(VERIFICATION_STORAGE_KEY, JSON.stringify(data));
@@ -99,12 +120,8 @@ export function CoinbaseHeadlessOnramp({
   const [verifyChannel, setVerifyChannel] = useState<VerifyChannel>(
     storedVerification?.channel || 'sms'
   );
-  const [email, setEmail] = useState(
-    storedVerification?.channel === 'email' ? storedVerification.value : ""
-  );
-  const [phone, setPhone] = useState(
-    storedVerification?.channel === 'sms' ? storedVerification.value.replace(/^\+1/, '') : ""
-  );
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [manualAddress, setManualAddress] = useState("");
 
   // Verification state
@@ -735,7 +752,7 @@ export function CoinbaseHeadlessOnramp({
               </div>
               {hasStoredVerification && storedVerification && (
                 <p className="text-xs text-muted-foreground">
-                  {storedVerification.channel === 'email' ? 'Email' : 'Phone'}: {storedVerification.value}
+                  {storedVerification.channel === 'email' ? 'Email' : 'Phone'}: {storedVerification.displayHint}
                   <Button variant="link" size="sm" className="text-xs p-0 h-auto ml-2" onClick={resetVerification}>
                     Change
                   </Button>
