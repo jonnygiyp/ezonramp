@@ -120,12 +120,8 @@ export function CoinbaseHeadlessOnramp({
   const [verifyChannel, setVerifyChannel] = useState<VerifyChannel>(
     storedVerification?.channel || 'sms'
   );
-  const [email, setEmail] = useState(
-    storedVerification?.channel === 'email' ? storedVerification.value : ""
-  );
-  const [phone, setPhone] = useState(
-    storedVerification?.channel === 'sms' ? storedVerification.value.replace(/^\+1/, '') : ""
-  );
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [manualAddress, setManualAddress] = useState("");
 
   // Verification state
@@ -756,7 +752,7 @@ export function CoinbaseHeadlessOnramp({
               </div>
               {hasStoredVerification && storedVerification && (
                 <p className="text-xs text-muted-foreground">
-                  {storedVerification.channel === 'email' ? 'Email' : 'Phone'}: {storedVerification.value}
+                  {storedVerification.channel === 'email' ? 'Email' : 'Phone'}: {storedVerification.displayHint}
                   <Button variant="link" size="sm" className="text-xs p-0 h-auto ml-2" onClick={resetVerification}>
                     Change
                   </Button>
