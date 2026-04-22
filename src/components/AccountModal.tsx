@@ -33,9 +33,10 @@ const SOLANA_RPCS: string[] = ENV_SOLANA_RPC
 interface AccountModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  variant?: 'default' | 'dark';
 }
 
-const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
+const AccountModal = ({ open, onOpenChange, variant = 'default' }: AccountModalProps) => {
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
   const [wallets] = useWallets();
