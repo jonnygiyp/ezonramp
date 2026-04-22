@@ -107,6 +107,9 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
             walletAddress: walletAddress.trim(),
             destinationCurrency: defaultAsset.toLowerCase(),
             destinationNetwork: defaultNetwork.toLowerCase(),
+            // Safe default above Stripe's minimum purchase floor.
+            // Users can still edit the amount within the Stripe-hosted UI.
+            sourceAmount: "2",
           },
           headers: { authorization: `Bearer ${accessToken}` },
         }),
