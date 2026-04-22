@@ -168,36 +168,6 @@ serve(async (req) => {
       throw new Error("Wallet address is required");
     }
 
-    // ------------------------------------------------------------------
-    // DEFAULT AMOUNT POLICY
-    // ------------------------------------------------------------------
-    // We intentionally DO NOT prefill source_amount on the Stripe Crypto
-    // Onramp session. Stripe's API requires source_amount to be a positive
-    // number (minimum 1.00) — passing 0 returns a 400 error such as:
-    //   "source_amount must be greater than or equal to 1"
-    // By omitting source_amount entirely, Stripe's hosted UI opens with an
-    // empty amount field that the user must fill in themselves, which is
-    // the closest supported equivalent to "$0 default".
-    //
-    // If a caller explicitly passes a sourceAmount > 0 we still honour it
-    // (preserves existing behaviour for any future caller), but we log and
-    // drop any value <= 0 so a bad client value can't break session
-    // creation.
-    // ------------------------------------------------------------------
-    let normalizedSourceAmount: string | null = null;
-    if (sourceAmount !== undefined && sourceAmount !== null && sourceAmount !== "") {
-      const numeric = Number(sourceAmount);
-      if (Number.isFinite(numeric) && numeric >= 1) {
-        normalizedSourceAmount = numeric.toString();
-      } else {
-        console.log(
-          `[STRIPE] Ignoring sourceAmount="${sourceAmount}" (must be >= 1). Opening onramp with no prefilled amount.`,
-        );
-      }
-    } else {
-      console.log("[STRIPE] No sourceAmount provided — opening onramp with empty amount field.");
-    }
-
     // Build wallet addresses object based on network
     const walletAddresses: Record<string, string> = {};
     const network = destinationNetwork || "solana";
@@ -218,41 +188,26 @@ serve(async (req) => {
     }
 
     // Create crypto onramp session using direct API call
-    const sessionParams: Record<string, string> = {
-      ...(Object.keys(walletAddresses).length > 0 && {
-        [`wallet_addresses[${network}]`]: walletAddress,
-      }),
-      ...(destinationCurrency && { destination_currency: destinationCurrency }),
-      ...(destinationNetwork && { destination_network: destinationNetwork }),
-      ...(normalizedSourceAmount && { source_amount: normalizedSourceAmount }),
-      lock_wallet_address: "true",
-    };
-
-    console.log("[STRIPE] Creating onramp session with params:", {
-      ...sessionParams,
-      // Mask wallet address in logs
-      ...(sessionParams[`wallet_addresses[${network}]`] && {
-        [`wallet_addresses[${network}]`]: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
-      }),
-      has_source_amount: Boolean(normalizedSourceAmount),
-    });
-
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${stripeKey}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams(sessionParams),
+      body: new URLSearchParams({
+        ...(Object.keys(walletAddresses).length > 0 && {
+          [`wallet_addresses[${network}]`]: walletAddress,
+        }),
+        ...(destinationCurrency && { destination_currency: destinationCurrency }),
+        ...(destinationNetwork && { destination_network: destinationNetwork }),
+        ...(sourceAmount && { source_amount: sourceAmount.toString() }),
+        lock_wallet_address: "true",
+      }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("[STRIPE] API error:", {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData,
-      });
+      const errorData = await response.json();
+      console.error("Stripe API error:", errorData);
       throw new Error(errorData.error?.message || "Failed to create onramp session");
     }
 
