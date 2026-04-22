@@ -7,6 +7,8 @@ import { CoinbaseHeadlessOnramp } from "@/components/CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "@/components/CoinbaseOnrampWidget";
 import { StripeOnramp } from "@/components/StripeOnramp";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
+import { useGeoLocation } from "@/hooks/useGeoLocation";
+import { resolveInitialRamp, writeManualRamp } from "@/lib/rampSelection";
 import { Loader2, CreditCard, Wallet, Globe, DollarSign } from "lucide-react";
 import ezorLogo from "@/assets/ezor-crimson.png";
 
