@@ -162,11 +162,19 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount } = await req.json();
+    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount, sourceCurrency } = await req.json();
 
     if (!walletAddress) {
       throw new Error("Wallet address is required");
     }
+
+    // Stripe (US) onramp defaults: pre-fill amount to $0 USD so users must
+    // explicitly enter their desired purchase amount inside the Stripe UI.
+    // Users can still edit both fields in the hosted Stripe checkout.
+    // NOTE: This only affects the Stripe onramp; Coinbase flows are unaffected
+    // because they go through separate edge functions (coinbase-headless, etc.).
+    const effectiveSourceAmount = sourceAmount ?? "0";
+    const effectiveSourceCurrency = (sourceCurrency ?? "usd").toString().toLowerCase();
 
     // Build wallet addresses object based on network
     const walletAddresses: Record<string, string> = {};
@@ -200,7 +208,11 @@ serve(async (req) => {
         }),
         ...(destinationCurrency && { destination_currency: destinationCurrency }),
         ...(destinationNetwork && { destination_network: destinationNetwork }),
-        ...(sourceAmount && { source_amount: sourceAmount.toString() }),
+        // Always include source_amount + source_currency for Stripe (US).
+        // Defaults to "0" / "usd" so the widget loads with no pre-filled amount;
+        // users can still edit the amount inside the Stripe-hosted UI.
+        source_amount: effectiveSourceAmount.toString(),
+        source_currency: effectiveSourceCurrency,
         lock_wallet_address: "true",
       }),
     });
