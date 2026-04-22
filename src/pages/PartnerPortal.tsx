@@ -17,6 +17,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useAccount } from "@/hooks/useParticle";
+import { useGeoLocation } from "@/hooks/useGeoLocation";
+import { resolveInitialRamp, writeManualRamp } from "@/lib/rampSelection";
 import AccountModal from "@/components/AccountModal";
 
 const getTabIcon = (name: string) => {
@@ -30,6 +32,7 @@ const getTabIcon = (name: string) => {
 
 const PartnerPortal = () => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
+  const { data: geo, isLoading: geoLoading } = useGeoLocation();
   const [activeTab, setActiveTab] = useState<string>('');
   const [visible, setVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -50,16 +53,38 @@ const PartnerPortal = () => {
     requestAnimationFrame(() => setVisible(true));
   }, []);
 
-  useEffect(() => {
-    if (providers && providers.length > 0 && !activeTab) {
-      setActiveTab(providers[0].name);
-    }
-  }, [providers, activeTab]);
-
   // Filter to only supported partner portal providers
   const supportedProviders = providers?.filter(p =>
     ['stripe', 'coinbase', 'coinbase_global'].includes(p.name)
   ) || [];
+
+  // Resolve initial ramp once providers and geo have both loaded.
+  // Manual choices stored in localStorage win; otherwise we route US -> Stripe,
+  // non-US -> Coinbase Global. Geolocation is informational, never a hard gate.
+  useEffect(() => {
+    if (activeTab) return;
+    if (!supportedProviders.length) return;
+    if (geoLoading) return; // wait so we don't flicker provider on first paint
+    const available = supportedProviders.map(p => p.name);
+    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, available });
+    if (chosen) {
+      console.log('[PartnerPortal] initial ramp resolved', {
+        country: geo?.country_code,
+        is_us: geo?.is_us,
+        chosen,
+        available,
+      });
+      setActiveTab(chosen);
+    }
+  }, [supportedProviders, geo, geoLoading, activeTab]);
+
+  // Persist manual ramp choice so the user is not bounced back by geo on reload.
+  const handleTabChange = (name: string) => {
+    if (name === activeTab) return;
+    console.log('[PartnerPortal] manual ramp override', { from: activeTab, to: name });
+    writeManualRamp(name);
+    setActiveTab(name);
+  };
 
   return (
     <>
@@ -107,30 +132,35 @@ const PartnerPortal = () => {
               </h1>
             </div>
 
-            {/* Tab selector */}
-            {providersLoading ? (
+            {/* Tab selector — wait on geo so we don't flicker the wrong default */}
+            {providersLoading || (geoLoading && !activeTab) ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin pp-text-secondary" />
               </div>
             ) : supportedProviders.length > 1 ? (
-              <div className="flex justify-center mb-4">
-                <div className="pp-tab-bar">
-                  {supportedProviders.map((provider) => {
-                    const Icon = getTabIcon(provider.name);
-                    const isActive = activeTab === provider.name;
-                    return (
-                      <button
-                        key={provider.id}
-                        onClick={() => setActiveTab(provider.name)}
-                        className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
-                      >
-                        <Icon className="h-4 w-4 hidden md:block" />
-                        <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
-                      </button>
-                    );
-                  })}
+              <>
+                <div className="flex justify-center mb-2">
+                  <div className="pp-tab-bar">
+                    {supportedProviders.map((provider) => {
+                      const Icon = getTabIcon(provider.name);
+                      const isActive = activeTab === provider.name;
+                      return (
+                        <button
+                          key={provider.id}
+                          onClick={() => handleTabChange(provider.name)}
+                          className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
+                        >
+                          <Icon className="h-4 w-4 hidden md:block" />
+                          <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+                <p className="text-[11px] pp-text-secondary text-center mb-4">
+                  Payment options are selected based on your region and availability
+                </p>
+              </>
             ) : null}
 
             {/* Onramp card */}
