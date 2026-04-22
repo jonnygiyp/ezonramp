@@ -168,6 +168,36 @@ serve(async (req) => {
       throw new Error("Wallet address is required");
     }
 
+    // ------------------------------------------------------------------
+    // DEFAULT AMOUNT POLICY
+    // ------------------------------------------------------------------
+    // We intentionally DO NOT prefill source_amount on the Stripe Crypto
+    // Onramp session. Stripe's API requires source_amount to be a positive
+    // number (minimum 1.00) — passing 0 returns a 400 error such as:
+    //   "source_amount must be greater than or equal to 1"
+    // By omitting source_amount entirely, Stripe's hosted UI opens with an
+    // empty amount field that the user must fill in themselves, which is
+    // the closest supported equivalent to "$0 default".
+    //
+    // If a caller explicitly passes a sourceAmount > 0 we still honour it
+    // (preserves existing behaviour for any future caller), but we log and
+    // drop any value <= 0 so a bad client value can't break session
+    // creation.
+    // ------------------------------------------------------------------
+    let normalizedSourceAmount: string | null = null;
+    if (sourceAmount !== undefined && sourceAmount !== null && sourceAmount !== "") {
+      const numeric = Number(sourceAmount);
+      if (Number.isFinite(numeric) && numeric >= 1) {
+        normalizedSourceAmount = numeric.toString();
+      } else {
+        console.log(
+          `[STRIPE] Ignoring sourceAmount="${sourceAmount}" (must be >= 1). Opening onramp with no prefilled amount.`,
+        );
+      }
+    } else {
+      console.log("[STRIPE] No sourceAmount provided — opening onramp with empty amount field.");
+    }
+
     // Build wallet addresses object based on network
     const walletAddresses: Record<string, string> = {};
     const network = destinationNetwork || "solana";
