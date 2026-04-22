@@ -218,26 +218,41 @@ serve(async (req) => {
     }
 
     // Create crypto onramp session using direct API call
+    const sessionParams: Record<string, string> = {
+      ...(Object.keys(walletAddresses).length > 0 && {
+        [`wallet_addresses[${network}]`]: walletAddress,
+      }),
+      ...(destinationCurrency && { destination_currency: destinationCurrency }),
+      ...(destinationNetwork && { destination_network: destinationNetwork }),
+      ...(normalizedSourceAmount && { source_amount: normalizedSourceAmount }),
+      lock_wallet_address: "true",
+    };
+
+    console.log("[STRIPE] Creating onramp session with params:", {
+      ...sessionParams,
+      // Mask wallet address in logs
+      ...(sessionParams[`wallet_addresses[${network}]`] && {
+        [`wallet_addresses[${network}]`]: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+      }),
+      has_source_amount: Boolean(normalizedSourceAmount),
+    });
+
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${stripeKey}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        ...(Object.keys(walletAddresses).length > 0 && {
-          [`wallet_addresses[${network}]`]: walletAddress,
-        }),
-        ...(destinationCurrency && { destination_currency: destinationCurrency }),
-        ...(destinationNetwork && { destination_network: destinationNetwork }),
-        ...(sourceAmount && { source_amount: sourceAmount.toString() }),
-        lock_wallet_address: "true",
-      }),
+      body: new URLSearchParams(sessionParams),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Stripe API error:", errorData);
+      const errorData = await response.json().catch(() => ({}));
+      console.error("[STRIPE] API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
       throw new Error(errorData.error?.message || "Failed to create onramp session");
     }
 
