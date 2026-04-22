@@ -200,7 +200,11 @@ serve(async (req) => {
         }),
         ...(destinationCurrency && { destination_currency: destinationCurrency }),
         ...(destinationNetwork && { destination_network: destinationNetwork }),
-        ...(sourceAmount && { source_amount: sourceAmount.toString() }),
+        // Always send source_amount. Defaults to "0" if the client did not supply one,
+        // so the Stripe-hosted onramp UI shows $0 as the prefilled amount instead of leaving it blank.
+        // NOTE: Stripe may reject source_amount=0 with a minimum-amount validation error;
+        // if that happens, the client should pass a sourceAmount >= Stripe's minimum (typically $1).
+        source_amount: (sourceAmount ?? 0).toString(),
         lock_wallet_address: "true",
       }),
     });
