@@ -107,9 +107,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
             walletAddress: walletAddress.trim(),
             destinationCurrency: defaultAsset.toLowerCase(),
             destinationNetwork: defaultNetwork.toLowerCase(),
-            // Prefill the Stripe Onramp with $1 USD as the default source amount.
-            // Users can still edit this amount inside the Stripe-hosted UI.
-            sourceAmount: "1",
           },
           headers: { authorization: `Bearer ${accessToken}` },
         }),

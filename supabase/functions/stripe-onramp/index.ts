@@ -187,23 +187,6 @@ serve(async (req) => {
       walletAddresses[networkMapping[network]] = walletAddress;
     }
 
-    // Build the form-encoded body for the Stripe Crypto Onramp Sessions API.
-    // `source_amount` is sent in major units (e.g. "1" = $1.00 USD when source_currency
-    // defaults to USD). We forward whatever the client passed (currently "1").
-    const formBody = new URLSearchParams({
-      ...(Object.keys(walletAddresses).length > 0 && {
-        [`wallet_addresses[${network}]`]: walletAddress,
-      }),
-      ...(destinationCurrency && { destination_currency: destinationCurrency }),
-      ...(destinationNetwork && { destination_network: destinationNetwork }),
-      ...(sourceAmount && { source_amount: sourceAmount.toString() }),
-      lock_wallet_address: "true",
-    });
-
-    // [DEBUG TEMP] Log the exact params (excluding secrets) sent to Stripe so any
-    // 4xx from Stripe can be diagnosed quickly. Safe to remove once verified.
-    console.log("[DEBUG] Stripe onramp params:", Object.fromEntries(formBody.entries()));
-
     // Create crypto onramp session using direct API call
     const response = await fetch("https://api.stripe.com/v1/crypto/onramp_sessions", {
       method: "POST",
@@ -211,12 +194,20 @@ serve(async (req) => {
         "Authorization": `Bearer ${stripeKey}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: formBody,
+      body: new URLSearchParams({
+        ...(Object.keys(walletAddresses).length > 0 && {
+          [`wallet_addresses[${network}]`]: walletAddress,
+        }),
+        ...(destinationCurrency && { destination_currency: destinationCurrency }),
+        ...(destinationNetwork && { destination_network: destinationNetwork }),
+        ...(sourceAmount && { source_amount: sourceAmount.toString() }),
+        lock_wallet_address: "true",
+      }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("[DEBUG] Stripe API error response:", JSON.stringify(errorData));
+      console.error("Stripe API error:", errorData);
       throw new Error(errorData.error?.message || "Failed to create onramp session");
     }
 
