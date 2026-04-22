@@ -211,27 +211,32 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
     <div className="w-full min-h-[600px] flex flex-col items-center justify-start px-6 pt-4">
       {/* Tab Switcher - only show if multiple providers */}
       {providers.length > 1 && (
-        <div className="flex items-center justify-center mb-4">
-          <div className="flex flex-wrap justify-center gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
-            {providers.map((provider) => {
-              const Icon = getTabIcon(provider.name);
-              return (
-                <button
-                  key={provider.id}
-                  onClick={() => handleTabChange(provider.name)}
-                  className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-full transition-all ${
-                    activeTab === provider.name 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'hover:bg-muted-foreground/10'
-                  }`}
-                >
-                  <Icon className="hidden md:block h-4 w-4" />
-                  <span className="font-medium text-xs md:text-base">{provider.display_name}</span>
-                </button>
-              );
-            })}
+        <>
+          <div className="flex items-center justify-center mb-2">
+            <div className="flex flex-wrap justify-center gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
+              {providers.map((provider) => {
+                const Icon = getTabIcon(provider.name);
+                return (
+                  <button
+                    key={provider.id}
+                    onClick={() => handleTabChange(provider.name)}
+                    className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-full transition-all ${
+                      activeTab === provider.name 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'hover:bg-muted-foreground/10'
+                    }`}
+                  >
+                    <Icon className="hidden md:block h-4 w-4" />
+                    <span className="font-medium text-xs md:text-base">{provider.display_name}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+          <p className="text-xs text-muted-foreground text-center mb-4">
+            Payment options are selected based on your region and availability
+          </p>
+        </>
       )}
 
 
