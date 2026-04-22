@@ -56,7 +56,7 @@ export function CoinbaseOnrampWidget({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
   subtitle,
-  defaultAmount = "100",
+  defaultAmount = "0",
   hideHeader = false,
   checkoutDescription,
 }: CoinbaseOnrampWidgetProps) {

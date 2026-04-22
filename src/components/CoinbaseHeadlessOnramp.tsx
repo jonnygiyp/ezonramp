@@ -103,7 +103,7 @@ export function CoinbaseHeadlessOnramp({
   defaultAsset = "USDC",
   defaultNetwork = "solana",
   presetAmounts = ['50', '100', '250', '500'],
-  defaultAmount = "100",
+  defaultAmount = "0",
   hideHeader = false,
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
