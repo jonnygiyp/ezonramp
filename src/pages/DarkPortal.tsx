@@ -23,6 +23,7 @@ const getTabIcon = (name: string) => {
 
 const DarkPortal = () => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
+  const { data: geo, isLoading: geoLoading } = useGeoLocation();
   const [activeTab, setActiveTab] = useState<string>('');
   const [visible, setVisible] = useState(false);
 
@@ -30,15 +31,35 @@ const DarkPortal = () => {
     requestAnimationFrame(() => setVisible(true));
   }, []);
 
-  useEffect(() => {
-    if (providers && providers.length > 0 && !activeTab) {
-      setActiveTab(providers[0].name);
-    }
-  }, [providers, activeTab]);
-
   const supportedProviders = providers?.filter(p =>
     ['stripe', 'coinbase', 'coinbase_global'].includes(p.name)
   ) || [];
+
+  // Region-based default ramp resolution (Stripe for US, Coinbase Global elsewhere).
+  // Manual choices stored in localStorage win over the geo default.
+  useEffect(() => {
+    if (activeTab) return;
+    if (!supportedProviders.length) return;
+    if (geoLoading) return;
+    const available = supportedProviders.map(p => p.name);
+    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, available });
+    if (chosen) {
+      console.log('[DarkPortal] initial ramp resolved', {
+        country: geo?.country_code,
+        is_us: geo?.is_us,
+        chosen,
+        available,
+      });
+      setActiveTab(chosen);
+    }
+  }, [supportedProviders, geo, geoLoading, activeTab]);
+
+  const handleTabChange = (name: string) => {
+    if (name === activeTab) return;
+    console.log('[DarkPortal] manual ramp override', { from: activeTab, to: name });
+    writeManualRamp(name);
+    setActiveTab(name);
+  };
 
   return (
     <>
