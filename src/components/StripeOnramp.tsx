@@ -107,6 +107,9 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
             walletAddress: walletAddress.trim(),
             destinationCurrency: defaultAsset.toLowerCase(),
             destinationNetwork: defaultNetwork.toLowerCase(),
+            // Pre-fill the source (USD) amount in the Stripe onramp session.
+            // Stripe defaults to NULL; we set 1 so the widget loads with $1 prefilled.
+            sourceAmount: 1,
           },
           headers: { authorization: `Bearer ${accessToken}` },
         }),
