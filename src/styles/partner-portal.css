@@ -243,3 +243,108 @@
   background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
+/* ===== Account Modal — Dark variant (matches /express portal) ===== */
+.pp-account-modal {
+  background-color: #1C1C1C !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #FFFFFF !important;
+}
+.pp-account-modal .text-foreground,
+.pp-account-modal h1,
+.pp-account-modal h2,
+.pp-account-modal h3 {
+  color: #FFFFFF !important;
+}
+.pp-account-modal .text-muted-foreground {
+  color: #BABABA !important;
+}
+.pp-account-modal .bg-muted,
+.pp-account-modal .bg-muted\/50 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+.pp-account-modal .border,
+.pp-account-modal .border-input,
+.pp-account-modal .border-border {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Inputs */
+.pp-account-modal input,
+.pp-account-modal textarea,
+.pp-account-modal select {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #FFFFFF !important;
+}
+.pp-account-modal input::placeholder {
+  color: #BABABA !important;
+}
+.pp-account-modal input:focus,
+.pp-account-modal input:focus-visible {
+  border-color: #3AAD9A !important;
+  box-shadow: 0 0 0 2px rgba(58, 173, 154, 0.2) !important;
+  outline: none !important;
+}
+
+/* Labels */
+.pp-account-modal label {
+  color: #BABABA !important;
+}
+
+/* Code / mono text */
+.pp-account-modal code {
+  color: #FFFFFF !important;
+}
+
+/* Tabs */
+.pp-account-modal [role="tablist"] {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.pp-account-modal [role="tab"] {
+  color: #BABABA !important;
+}
+.pp-account-modal [role="tab"][data-state="active"] {
+  background-color: #3AAD9A !important;
+  color: #FFFFFF !important;
+}
+
+/* Primary buttons */
+.pp-account-modal button.bg-primary,
+.pp-account-modal button[class*="bg-primary"]:not([class*="bg-primary/"]) {
+  background-color: #3AAD9A !important;
+  color: #FFFFFF !important;
+  border: none !important;
+}
+.pp-account-modal button.bg-primary:hover,
+.pp-account-modal button[class*="bg-primary"]:not([class*="bg-primary/"]):hover {
+  background-color: #2E9484 !important;
+}
+
+/* Ghost / icon buttons */
+.pp-account-modal button[class*="ghost"] {
+  color: #BABABA !important;
+}
+.pp-account-modal button[class*="ghost"]:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #FFFFFF !important;
+}
+
+/* Outline buttons (Disconnect) */
+.pp-account-modal button[class*="outline"] {
+  background-color: transparent !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #FFFFFF !important;
+}
+.pp-account-modal button[class*="outline"]:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Close button (X) */
+.pp-account-modal > button[class*="absolute"] {
+  color: #BABABA !important;
+}
+.pp-account-modal > button[class*="absolute"]:hover {
+  color: #FFFFFF !important;
+}
+

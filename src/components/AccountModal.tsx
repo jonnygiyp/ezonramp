@@ -33,9 +33,10 @@ const SOLANA_RPCS: string[] = ENV_SOLANA_RPC
 interface AccountModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  variant?: 'default' | 'dark';
 }
 
-const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
+const AccountModal = ({ open, onOpenChange, variant = 'default' }: AccountModalProps) => {
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
   const [wallets] = useWallets();
@@ -201,7 +202,7 @@ const AccountModal = ({ open, onOpenChange }: AccountModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={`sm:max-w-md ${variant === 'dark' ? 'pp-account-modal' : ''}`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
