@@ -208,7 +208,11 @@ serve(async (req) => {
         }),
         ...(destinationCurrency && { destination_currency: destinationCurrency }),
         ...(destinationNetwork && { destination_network: destinationNetwork }),
-        ...(sourceAmount && { source_amount: sourceAmount.toString() }),
+        // Always include source_amount + source_currency for Stripe (US).
+        // Defaults to "0" / "usd" so the widget loads with no pre-filled amount;
+        // users can still edit the amount inside the Stripe-hosted UI.
+        source_amount: effectiveSourceAmount.toString(),
+        source_currency: effectiveSourceCurrency,
         lock_wallet_address: "true",
       }),
     });
