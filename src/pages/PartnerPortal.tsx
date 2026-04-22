@@ -132,30 +132,35 @@ const PartnerPortal = () => {
               </h1>
             </div>
 
-            {/* Tab selector */}
-            {providersLoading ? (
+            {/* Tab selector — wait on geo so we don't flicker the wrong default */}
+            {providersLoading || (geoLoading && !activeTab) ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin pp-text-secondary" />
               </div>
             ) : supportedProviders.length > 1 ? (
-              <div className="flex justify-center mb-4">
-                <div className="pp-tab-bar">
-                  {supportedProviders.map((provider) => {
-                    const Icon = getTabIcon(provider.name);
-                    const isActive = activeTab === provider.name;
-                    return (
-                      <button
-                        key={provider.id}
-                        onClick={() => setActiveTab(provider.name)}
-                        className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
-                      >
-                        <Icon className="h-4 w-4 hidden md:block" />
-                        <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
-                      </button>
-                    );
-                  })}
+              <>
+                <div className="flex justify-center mb-2">
+                  <div className="pp-tab-bar">
+                    {supportedProviders.map((provider) => {
+                      const Icon = getTabIcon(provider.name);
+                      const isActive = activeTab === provider.name;
+                      return (
+                        <button
+                          key={provider.id}
+                          onClick={() => handleTabChange(provider.name)}
+                          className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
+                        >
+                          <Icon className="h-4 w-4 hidden md:block" />
+                          <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+                <p className="text-[11px] pp-text-secondary text-center mb-4">
+                  Payment options are selected based on your region and availability
+                </p>
+              </>
             ) : null}
 
             {/* Onramp card */}
