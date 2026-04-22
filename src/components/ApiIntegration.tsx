@@ -185,7 +185,8 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
     }
   };
 
-  if (providersLoading) {
+  // Wait on geo too so we don't paint the wrong default ramp first
+  if (providersLoading || (geoLoading && !activeTab)) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
