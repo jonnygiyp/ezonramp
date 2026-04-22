@@ -108,30 +108,35 @@ const DarkPortal = () => {
               </p>
             </div>
 
-            {/* Tab selector */}
-            {providersLoading ? (
+            {/* Tab selector — wait for geo to avoid flicker on first paint */}
+            {providersLoading || (geoLoading && !activeTab) ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin dp-text-secondary" />
               </div>
             ) : supportedProviders.length > 1 ? (
-              <div className="flex justify-center mb-4">
-                <div className="dp-tab-bar">
-                  {supportedProviders.map((provider) => {
-                    const Icon = getTabIcon(provider.name);
-                    const isActive = activeTab === provider.name;
-                    return (
-                      <button
-                        key={provider.id}
-                        onClick={() => setActiveTab(provider.name)}
-                        className={`dp-tab ${isActive ? 'dp-tab-active' : 'dp-tab-inactive'}`}
-                      >
-                        <Icon className="h-4 w-4 hidden md:block" />
-                        <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
-                      </button>
-                    );
-                  })}
+              <>
+                <div className="flex justify-center mb-2">
+                  <div className="dp-tab-bar">
+                    {supportedProviders.map((provider) => {
+                      const Icon = getTabIcon(provider.name);
+                      const isActive = activeTab === provider.name;
+                      return (
+                        <button
+                          key={provider.id}
+                          onClick={() => handleTabChange(provider.name)}
+                          className={`dp-tab ${isActive ? 'dp-tab-active' : 'dp-tab-inactive'}`}
+                        >
+                          <Icon className="h-4 w-4 hidden md:block" />
+                          <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+                <p className="text-[11px] dp-text-secondary text-center mb-4">
+                  Payment options are selected based on your region and availability
+                </p>
+              </>
             ) : null}
 
             {/* Onramp card */}
