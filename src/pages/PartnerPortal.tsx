@@ -17,6 +17,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useAccount } from "@/hooks/useParticle";
+import { useGeoLocation } from "@/hooks/useGeoLocation";
+import { resolveInitialRamp, writeManualRamp } from "@/lib/rampSelection";
 import AccountModal from "@/components/AccountModal";
 
 const getTabIcon = (name: string) => {
@@ -30,6 +32,7 @@ const getTabIcon = (name: string) => {
 
 const PartnerPortal = () => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
+  const { data: geo, isLoading: geoLoading } = useGeoLocation();
   const [activeTab, setActiveTab] = useState<string>('');
   const [visible, setVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
