@@ -200,9 +200,7 @@ serve(async (req) => {
         }),
         ...(destinationCurrency && { destination_currency: destinationCurrency }),
         ...(destinationNetwork && { destination_network: destinationNetwork }),
-        // Always send source_amount. Defaults to "1" (Stripe's minimum) if the client
-        // did not supply one, so the embedded onramp UI shows $1 as the prefilled amount.
-        source_amount: (sourceAmount ?? 1).toString(),
+        ...(sourceAmount && { source_amount: sourceAmount.toString() }),
         lock_wallet_address: "true",
       }),
     });
