@@ -32,3 +32,7 @@ verify_jwt = false
 
 [functions.process-email-queue]
 verify_jwt = true
+
+[functions.geo-detect]
+verify_jwt = false
+
