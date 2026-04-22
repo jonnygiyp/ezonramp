@@ -12,6 +12,8 @@ import { StripeOnramp } from "./StripeOnramp";
 import { MoonPayOnramp } from "./MoonPayOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
+import { useGeoLocation } from "@/hooks/useGeoLocation";
+import { resolveInitialRamp, writeManualRamp } from "@/lib/rampSelection";
 import { AuthGatedButton } from "./AuthGatedButton";
 
 // Input validation schemas
@@ -64,6 +66,7 @@ const getTabIcon = (name: string) => {
 const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   const { toast } = useToast();
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
+  const { data: geo, isLoading: geoLoading } = useGeoLocation();
   const [activeTab, setActiveTab] = useState<string>('');
   
   // Card2Crypto state
@@ -72,16 +75,35 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   const [selectedProvider, setSelectedProvider] = useState('moonpay');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Set initial tab when providers load
+  // Region-aware initial ramp.
+  // - Stripe (US) for US visitors, Coinbase Global elsewhere
+  // - A previously-stored manual choice always wins
+  // - Wait on geo so the UI doesn't flash the wrong tab
   useEffect(() => {
-    if (providers && providers.length > 0 && !activeTab) {
-      setActiveTab(providers[0].name);
-      onProviderChange?.(providers[0].name);
+    if (activeTab) return;
+    if (!providers || providers.length === 0) return;
+    if (geoLoading) return;
+    const available = providers.map(p => p.name);
+    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, available });
+    if (chosen) {
+      console.log('[ApiIntegration] initial ramp resolved', {
+        country: geo?.country_code,
+        is_us: geo?.is_us,
+        chosen,
+        available,
+      });
+      setActiveTab(chosen);
+      onProviderChange?.(chosen);
     }
-  }, [providers, activeTab, onProviderChange]);
+  }, [providers, geo, geoLoading, activeTab, onProviderChange]);
 
-  // Notify parent when active tab changes
+  // Notify parent when active tab changes; persist manual overrides locally
+  // so geo doesn't bounce the user back to the regional default on reload.
   const handleTabChange = (tab: string) => {
+    if (tab !== activeTab) {
+      console.log('[ApiIntegration] manual ramp override', { from: activeTab, to: tab });
+      writeManualRamp(tab);
+    }
     setActiveTab(tab);
     onProviderChange?.(tab);
   };
