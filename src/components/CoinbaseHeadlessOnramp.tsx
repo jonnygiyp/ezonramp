@@ -664,7 +664,8 @@ export function CoinbaseHeadlessOnramp({
     setQuoteError(null);
     setPurchaseAttemptId(null);
     setCoinbaseTxId(null);
-    updateTxState('waiting');
+    txStateRef.current = 'waiting';
+    setTxState('waiting');
   };
 
   // Amount validation
