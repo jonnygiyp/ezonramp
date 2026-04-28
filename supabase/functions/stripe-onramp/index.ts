@@ -219,14 +219,28 @@ serve(async (req) => {
         ...(destinationCurrency && { destination_currency: destinationCurrency }),
         ...(destinationNetwork && { destination_network: destinationNetwork }),
         ...(sourceAmount && { source_amount: sourceAmount.toString() }),
+        // source_currency MUST accompany source_amount per Stripe API.
+        ...(resolvedSourceCurrency && { source_currency: resolvedSourceCurrency }),
         lock_wallet_address: "true",
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Stripe API error:", errorData);
-      throw new Error(errorData.error?.message || "Failed to create onramp session");
+      const errorData = await response.json().catch(() => ({}));
+      console.error("[STRIPE-ONRAMP] Stripe API error:", {
+        status: response.status,
+        code: errorData?.error?.code,
+        type: errorData?.error?.type,
+        message: errorData?.error?.message,
+      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorData?.error?.message || "Failed to create onramp session",
+          code: errorData?.error?.code || "STRIPE_API_ERROR",
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const session = await response.json();
