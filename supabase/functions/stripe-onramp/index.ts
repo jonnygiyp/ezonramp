@@ -66,10 +66,19 @@ serve(async (req) => {
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
 
   // ========================================
-  // DEBUG LOGGING (temporary)
+  // REQUEST + ENV DIAGNOSTICS (no secret values)
   // ========================================
-  console.log(`[DEBUG] Origin: ${origin || "none"}`);
-  console.log(`[DEBUG] Authorization header present: ${authHeader ? "yes" : "no"}`);
+  console.log("[STRIPE-ONRAMP] request", {
+    method: req.method,
+    origin: origin || "none",
+    hasAuthHeader: !!authHeader,
+    env: {
+      SUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
+      SUPABASE_ANON_KEY: !!Deno.env.get("SUPABASE_ANON_KEY"),
+      SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      STRIPE_SECRET_KEY: !!Deno.env.get("STRIPE_SECRET_KEY"),
+    },
+  });
 
   // ========================================
   // EXPLICIT JWT AUTHENTICATION
