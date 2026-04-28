@@ -511,7 +511,7 @@ export function CoinbaseHeadlessOnramp({
 
       // Set state and switch to result view
       setPurchaseAttemptId(attemptId);
-      updateTxState('waiting');
+      updateTxState('waiting', 'continueToPurchase');
       setStep('result');
 
       // Insert purchase attempt record
@@ -530,7 +530,13 @@ export function CoinbaseHeadlessOnramp({
         console.error('[COINBASE] Failed to create purchase attempt:', err);
       }
 
+      // Subscribe to realtime updates immediately so webhook-driven status
+      // changes reach the UI even if Coinbase postMessage events never fire
+      // (e.g. user closes the popup right after a successful payment).
+      subscribeToAttempt(attemptId);
+
       // Open payment window
+      console.log('[COINBASE-FLOW] opening payment window', { attemptId });
       const paymentWindow = window.open(buyUrl, '_blank', 'width=500,height=700');
 
       if (!paymentWindow) {
@@ -551,9 +557,9 @@ export function CoinbaseHeadlessOnramp({
 
         switch (eventName) {
           case 'onramp_api.commit_success': {
-            updateTxState('initialized');
             const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
             if (txId) setCoinbaseTxId(txId);
+            updateTxState('initialized', 'postMessage:commit_success');
             startPolling(attemptId);
             (supabase as any).from('purchase_attempts')
               .update({ status: 'initialized', coinbase_transaction_id: txId || null })
@@ -561,19 +567,21 @@ export function CoinbaseHeadlessOnramp({
             break;
           }
           case 'onramp_api.cancel':
-            updateTxState('incomplete');
+            // Cancel from Coinbase's UI is authoritative for non-success states,
+            // but updateTxState() will refuse to downgrade a completed status.
+            updateTxState('incomplete', 'postMessage:cancel');
             (supabase as any).from('purchase_attempts')
               .update({ status: 'incomplete' })
               .eq('partner_user_ref', attemptId);
             break;
           case 'onramp_api.polling_success':
-            updateTxState('completed');
+            updateTxState('completed', 'postMessage:polling_success');
             (supabase as any).from('purchase_attempts')
               .update({ status: 'completed' })
               .eq('partner_user_ref', attemptId);
             break;
           case 'onramp_api.polling_error':
-            updateTxState('failed');
+            updateTxState('failed', 'postMessage:polling_error');
             (supabase as any).from('purchase_attempts')
               .update({ status: 'failed' })
               .eq('partner_user_ref', attemptId);
@@ -584,22 +592,31 @@ export function CoinbaseHeadlessOnramp({
       messageHandlerRef.current = handleMessage;
       window.addEventListener('message', handleMessage);
 
-      // Monitor window close
+      // Monitor window close. Closing the popup is NOT proof the user abandoned
+      // payment — Coinbase often closes itself after a successful purchase before
+      // the success postMessage reaches us. We therefore:
+      //   1. Never overwrite a terminal success status (guarded in updateTxState).
+      //   2. Move to 'processing' (a neutral pending state) instead of 'incomplete'.
+      //   3. Re-fetch the latest DB status (webhook may have already landed).
+      //   4. Start polling so we converge on Coinbase's reported status.
+      // The 30-minute polling timeout will eventually fall back to 'delayed' if
+      // no confirmation ever arrives.
       windowCheckRef.current = setInterval(() => {
         if (paymentWindow.closed) {
           if (windowCheckRef.current) clearInterval(windowCheckRef.current);
           windowCheckRef.current = null;
+          console.log('[COINBASE-FLOW] payment window closed', { attemptId, currentState: txStateRef.current });
           setTimeout(async () => {
             const current = txStateRef.current;
+            // Only nudge into a neutral pending state — never mark incomplete here.
             if (current === 'waiting') {
-              updateTxState('incomplete');
-              try {
-                await (supabase as any).from('purchase_attempts')
-                  .update({ status: 'incomplete' })
-                  .eq('partner_user_ref', attemptId);
-              } catch {}
+              updateTxState('processing', 'window-close');
             }
-          }, 3000);
+            // Always check the DB in case the webhook beat us.
+            await fetchAttemptStatus(attemptId);
+            // Make sure polling is running even if commit_success never fired.
+            startPolling(attemptId);
+          }, 1500);
         }
       }, 1000);
     } catch (err) {
