@@ -162,11 +162,29 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount } = await req.json();
+    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount, sourceCurrency } = await req.json();
+
+    // Safe payload logging - no secrets
+    console.log("[STRIPE-ONRAMP] payload", {
+      hasWallet: !!walletAddress,
+      destinationCurrency,
+      destinationNetwork,
+      sourceAmount: sourceAmount ?? null,
+      sourceCurrency: sourceCurrency ?? null,
+    });
 
     if (!walletAddress) {
-      throw new Error("Wallet address is required");
+      return new Response(
+        JSON.stringify({ success: false, error: "Wallet address is required", code: "MISSING_WALLET" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    // Stripe requires source_currency whenever source_amount is set.
+    // Default to USD if the caller didn't specify one.
+    const resolvedSourceCurrency = sourceAmount
+      ? (sourceCurrency || "usd").toLowerCase()
+      : undefined;
 
     // Build wallet addresses object based on network
     const walletAddresses: Record<string, string> = {};
