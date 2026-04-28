@@ -172,6 +172,9 @@ export function CoinbaseHeadlessOnramp({
     return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
   }, [storedVerification]);
 
+  // Realtime subscription cleanup
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
   // --- Polling & cleanup ---
   const stopPolling = useCallback(() => {
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
@@ -179,13 +182,125 @@ export function CoinbaseHeadlessOnramp({
     if (windowCheckRef.current) { clearInterval(windowCheckRef.current); windowCheckRef.current = null; }
   }, []);
 
-  const updateTxState = useCallback((state: TxState) => {
-    txStateRef.current = state;
-    setTxState(state);
-    if (['completed', 'failed', 'delayed', 'incomplete'].includes(state)) {
+  // State priority — higher wins. Terminal success cannot be downgraded.
+  // 0: unknown, 1: pending-ish, 2: non-success terminal, 3: success terminal
+  const STATE_PRIORITY: Record<TxState, number> = {
+    waiting: 1,
+    initialized: 1,
+    processing: 1,
+    delayed: 1,        // delayed is informational, can still be upgraded by webhook
+    incomplete: 2,
+    failed: 2,
+    completed: 3,
+  };
+
+  const updateTxState = useCallback((next: TxState, source: string = 'unknown') => {
+    const current = txStateRef.current;
+    const currentP = STATE_PRIORITY[current] ?? 0;
+    const nextP = STATE_PRIORITY[next] ?? 0;
+
+    // Never downgrade a terminal success state.
+    if (currentP === 3 && next !== 'completed') {
+      console.log('[COINBASE-STATE] blocked downgrade', { from: current, to: next, source });
+      return;
+    }
+    // Don't move backward into "incomplete" once we've moved into initialized/processing.
+    if (next === 'incomplete' && (current === 'initialized' || current === 'processing')) {
+      console.log('[COINBASE-STATE] blocked incomplete after init', { from: current, source });
+      return;
+    }
+    if (next === current) return;
+    // Allow upgrades, allow lateral moves within same priority only if going forward.
+    if (nextP < currentP) {
+      console.log('[COINBASE-STATE] blocked lower-priority transition', { from: current, to: next, source });
+      return;
+    }
+
+    console.log('[COINBASE-STATE] transition', { from: current, to: next, source });
+    txStateRef.current = next;
+    setTxState(next);
+    if (next === 'completed' || next === 'failed') {
       stopPolling();
     }
   }, [stopPolling]);
+
+  // Map DB status string -> TxState
+  const mapDbStatus = (s: string | null | undefined): TxState | null => {
+    if (!s) return null;
+    switch (s) {
+      case 'completed':
+      case 'success':
+      case 'fulfilled':
+        return 'completed';
+      case 'failed':
+      case 'canceled':
+      case 'expired':
+        return 'failed';
+      case 'incomplete':
+        return 'incomplete';
+      case 'processing':
+        return 'processing';
+      case 'initialized':
+      case 'idle':
+        return 'initialized';
+      case 'delayed':
+        return 'delayed';
+      default:
+        return null;
+    }
+  };
+
+  // Subscribe to realtime updates on the purchase attempt so webhook-driven
+  // status changes flow into the UI even after the Coinbase popup closes.
+  const subscribeToAttempt = useCallback((attemptId: string) => {
+    if (realtimeChannelRef.current) return;
+    console.log('[COINBASE-RT] subscribing to attempt', attemptId);
+    const channel = supabase
+      .channel(`purchase_attempt_${attemptId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'purchase_attempts',
+          filter: `partner_user_ref=eq.${attemptId}`,
+        },
+        (payload: any) => {
+          const newRow = payload?.new || {};
+          console.log('[COINBASE-RT] update received', { status: newRow.status, txId: newRow.coinbase_transaction_id });
+          if (newRow.coinbase_transaction_id) {
+            setCoinbaseTxId((prev) => prev || newRow.coinbase_transaction_id);
+          }
+          const mapped = mapDbStatus(newRow.status);
+          if (mapped) updateTxState(mapped, 'realtime');
+        }
+      )
+      .subscribe((status) => {
+        console.log('[COINBASE-RT] channel status', status);
+      });
+    realtimeChannelRef.current = channel;
+  }, [updateTxState]);
+
+  // One-shot fetch in case we missed the realtime event (e.g. subscription
+  // hadn't connected when webhook landed).
+  const fetchAttemptStatus = useCallback(async (attemptId: string) => {
+    try {
+      const { data } = await (supabase as any)
+        .from('purchase_attempts')
+        .select('status, coinbase_transaction_id')
+        .eq('partner_user_ref', attemptId)
+        .maybeSingle();
+      if (data) {
+        if (data.coinbase_transaction_id) {
+          setCoinbaseTxId((prev) => prev || data.coinbase_transaction_id);
+        }
+        const mapped = mapDbStatus(data.status);
+        if (mapped) updateTxState(mapped, 'fetch');
+      }
+    } catch (err) {
+      console.error('[COINBASE-RT] fetchAttemptStatus error', err);
+    }
+  }, [updateTxState]);
 
   const startPolling = useCallback((attemptId: string) => {
     if (pollingRef.current) return;
