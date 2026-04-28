@@ -634,6 +634,10 @@ export function CoinbaseHeadlessOnramp({
       window.removeEventListener('message', messageHandlerRef.current);
       messageHandlerRef.current = null;
     }
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current);
+      realtimeChannelRef.current = null;
+    }
     setStep(isVerified ? 'amount' : 'identity');
     setVerificationCode("");
     setCodeSent(false);
@@ -642,7 +646,9 @@ export function CoinbaseHeadlessOnramp({
     setQuoteError(null);
     setPurchaseAttemptId(null);
     setCoinbaseTxId(null);
-    updateTxState('waiting');
+    // Reset must clear terminal status — bypass priority guard.
+    txStateRef.current = 'waiting';
+    setTxState('waiting');
   };
 
   const resetVerification = () => {
