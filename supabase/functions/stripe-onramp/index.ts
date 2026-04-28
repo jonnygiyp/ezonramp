@@ -268,7 +268,8 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
+        success: true,
         clientSecret: session.client_secret,
         sessionId: session.id,
       }),
@@ -278,9 +279,13 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error creating onramp session:", error);
+    console.error("[STRIPE-ONRAMP] Unhandled error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        code: "INTERNAL_ERROR",
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
