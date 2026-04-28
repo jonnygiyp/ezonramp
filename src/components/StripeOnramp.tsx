@@ -118,7 +118,17 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
 
       if (!mountedRef.current) { initLockRef.current = false; return; }
 
-      if (sessionResult.error) throw sessionResult.error;
+      // Supabase wraps non-2xx as FunctionsHttpError. Pull the structured JSON body
+      // ({ success, error, code }) out of context.json() so users see Stripe's message.
+      if (sessionResult.error) {
+        let detailedMsg: string | null = null;
+        try {
+          const ctx: any = (sessionResult.error as any).context;
+          const body = ctx && typeof ctx.json === 'function' ? await ctx.json() : null;
+          if (body?.error) detailedMsg = body.error;
+        } catch { /* ignore parse errors */ }
+        throw new Error(detailedMsg || sessionResult.error.message || "Failed to create Stripe session");
+      }
       if (sessionResult.data?.error) throw new Error(sessionResult.data.error);
       if (configResult.error) throw configResult.error;
 
