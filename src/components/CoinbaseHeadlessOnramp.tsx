@@ -304,6 +304,7 @@ export function CoinbaseHeadlessOnramp({
 
   const startPolling = useCallback((attemptId: string) => {
     if (pollingRef.current) return;
+    console.log('[COINBASE-POLL] starting polling for', attemptId);
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -312,17 +313,16 @@ export function CoinbaseHeadlessOnramp({
         });
         if (error) { console.error('[COINBASE-POLL] Error:', error); return; }
         if (data?.status) {
-          const current = txStateRef.current;
-          if (['completed', 'failed', 'delayed'].includes(current)) return;
-          if (data.status !== current) updateTxState(data.status as TxState);
+          const mapped = mapDbStatus(data.status);
+          if (mapped) updateTxState(mapped, 'poll');
         }
       } catch (err) { console.error('[COINBASE-POLL] Error:', err); }
     }, 10000);
 
     timeoutRef.current = setTimeout(() => {
       const current = txStateRef.current;
-      if (current === 'initialized' || current === 'processing') {
-        updateTxState('delayed');
+      if (current === 'initialized' || current === 'processing' || current === 'waiting') {
+        updateTxState('delayed', 'timeout');
         (supabase as any).from('purchase_attempts')
           .update({ status: 'delayed' })
           .eq('partner_user_ref', attemptId);
@@ -335,6 +335,10 @@ export function CoinbaseHeadlessOnramp({
       stopPolling();
       if (messageHandlerRef.current) window.removeEventListener('message', messageHandlerRef.current);
       if (quoteDebounceRef.current) clearTimeout(quoteDebounceRef.current);
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+        realtimeChannelRef.current = null;
+      }
     };
   }, [stopPolling]);
 
