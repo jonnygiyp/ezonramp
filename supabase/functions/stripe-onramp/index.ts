@@ -66,10 +66,19 @@ serve(async (req) => {
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
 
   // ========================================
-  // DEBUG LOGGING (temporary)
+  // REQUEST + ENV DIAGNOSTICS (no secret values)
   // ========================================
-  console.log(`[DEBUG] Origin: ${origin || "none"}`);
-  console.log(`[DEBUG] Authorization header present: ${authHeader ? "yes" : "no"}`);
+  console.log("[STRIPE-ONRAMP] request", {
+    method: req.method,
+    origin: origin || "none",
+    hasAuthHeader: !!authHeader,
+    env: {
+      SUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
+      SUPABASE_ANON_KEY: !!Deno.env.get("SUPABASE_ANON_KEY"),
+      SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      STRIPE_SECRET_KEY: !!Deno.env.get("STRIPE_SECRET_KEY"),
+    },
+  });
 
   // ========================================
   // EXPLICIT JWT AUTHENTICATION
@@ -162,11 +171,29 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount } = await req.json();
+    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount, sourceCurrency } = await req.json();
+
+    // Safe payload logging - no secrets
+    console.log("[STRIPE-ONRAMP] payload", {
+      hasWallet: !!walletAddress,
+      destinationCurrency,
+      destinationNetwork,
+      sourceAmount: sourceAmount ?? null,
+      sourceCurrency: sourceCurrency ?? null,
+    });
 
     if (!walletAddress) {
-      throw new Error("Wallet address is required");
+      return new Response(
+        JSON.stringify({ success: false, error: "Wallet address is required", code: "MISSING_WALLET" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    // Stripe requires source_currency whenever source_amount is set.
+    // Default to USD if the caller didn't specify one.
+    const resolvedSourceCurrency = sourceAmount
+      ? (sourceCurrency || "usd").toLowerCase()
+      : undefined;
 
     // Build wallet addresses object based on network
     const walletAddresses: Record<string, string> = {};
@@ -201,14 +228,28 @@ serve(async (req) => {
         ...(destinationCurrency && { destination_currency: destinationCurrency }),
         ...(destinationNetwork && { destination_network: destinationNetwork }),
         ...(sourceAmount && { source_amount: sourceAmount.toString() }),
+        // source_currency MUST accompany source_amount per Stripe API.
+        ...(resolvedSourceCurrency && { source_currency: resolvedSourceCurrency }),
         lock_wallet_address: "true",
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Stripe API error:", errorData);
-      throw new Error(errorData.error?.message || "Failed to create onramp session");
+      const errorData = await response.json().catch(() => ({}));
+      console.error("[STRIPE-ONRAMP] Stripe API error:", {
+        status: response.status,
+        code: errorData?.error?.code,
+        type: errorData?.error?.type,
+        message: errorData?.error?.message,
+      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorData?.error?.message || "Failed to create onramp session",
+          code: errorData?.error?.code || "STRIPE_API_ERROR",
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const session = await response.json();
@@ -236,7 +277,8 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
+        success: true,
         clientSecret: session.client_secret,
         sessionId: session.id,
       }),
@@ -246,9 +288,13 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error creating onramp session:", error);
+    console.error("[STRIPE-ONRAMP] Unhandled error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        code: "INTERNAL_ERROR",
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
