@@ -88,9 +88,9 @@ async function loadParticleSDK(): Promise<void> {
 
       // Step 8: Create config only after all modules are loaded
       particleConfig = createConfig({
-        projectId: '9c0f2e6c-bd26-44a9-8401-1114d7981b61',
-        clientKey: 'cZy9X0IqAUpItuUzeBihx7aNGK4n9iO7QNYuW4ZB',
-        appId: 'feaa6188-a1f1-4b28-a97a-ebea87286966',
+        projectId: 'e7041872-c6f2-4de1-826a-8c20f4d26e7f',
+        clientKey: 'cQYG1BDRMOjRHHfoifZ10kiAXuHGbe5ypVetw2LV',
+        appId: '63ee90ef-4426-44ad-9a67-d6984fc92706',
         initialChainId: {
           solana: 101,
         },
