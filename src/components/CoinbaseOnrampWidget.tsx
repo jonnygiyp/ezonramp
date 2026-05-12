@@ -172,14 +172,14 @@ export function CoinbaseOnrampWidget({
     }, TIMEOUT_MS);
   }, [updateTxState]);
 
-  const stopPollingAndLog = stopPolling;
-
   // Cleanup on unmount
   useEffect(() => {
     return () => stopPolling();
   }, [stopPolling]);
 
-  // Resume polling if user returns mid-flow with a non-terminal attempt for this session
+  // Resume polling if user returns mid-flow with a non-terminal attempt for this session.
+  // Older-than-15-min sessions are expired (marked incomplete) instead of resumed,
+  // so the spinner cannot persist forever across logout/login.
   useEffect(() => {
     if (!session?.user?.id) return;
     let cancelled = false;
@@ -192,20 +192,52 @@ export function CoinbaseOnrampWidget({
           .eq("provider", "coinbase")
           .in("status", ["idle", "waiting", "initialized", "processing"])
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(5);
 
         if (cancelled || !data || data.length === 0) return;
-        const row = data[0];
-        // Only resume if recent (within timeout window)
-        const ageMs = Date.now() - new Date(row.created_at).getTime();
-        if (ageMs > TIMEOUT_MS) return;
+
+        // Expire any pending attempts older than the resume window. We never
+        // revive these as active spinners.
+        const now = Date.now();
+        const stale = data.filter((r: any) => now - new Date(r.created_at).getTime() > RESUME_MAX_AGE_MS);
+        if (stale.length > 0) {
+          console.log("[COINBASE-GLOBAL] old pending session(s) expired:", stale.map((r: any) => r.partner_user_ref));
+          await (supabase as any)
+            .from("purchase_attempts")
+            .update({ status: "incomplete" })
+            .in("partner_user_ref", stale.map((r: any) => r.partner_user_ref));
+        }
+
+        const fresh = data.find((r: any) => now - new Date(r.created_at).getTime() <= RESUME_MAX_AGE_MS);
+        if (!fresh) return;
         if (txStateRef.current !== "idle") return; // user already started a new flow
 
-        console.log("[COINBASE-GLOBAL] Resuming polling for in-flight attempt", row.partner_user_ref);
-        setPartnerUserRef(row.partner_user_ref);
-        if (row.coinbase_transaction_id) setCoinbaseTxId(row.coinbase_transaction_id);
-        updateTxState((row.status as TxState) === "idle" ? "waiting" : (row.status as TxState));
-        startPolling(row.partner_user_ref);
+        console.log("[COINBASE-GLOBAL] old pending session found on login, resuming:", fresh.partner_user_ref);
+        setPartnerUserRef(fresh.partner_user_ref);
+        if (fresh.coinbase_transaction_id) setCoinbaseTxId(fresh.coinbase_transaction_id);
+        // On resume the popup is already gone — surface as "checking" rather than a
+        // forever "Complete your purchase" spinner.
+        const resumed: TxState = fresh.status === "idle" || fresh.status === "waiting"
+          ? "checking"
+          : (fresh.status as TxState);
+        updateTxState(resumed);
+        startPolling(fresh.partner_user_ref);
+
+        // Bound the resumed "checking" window — if no progress arrives soon, mark incomplete.
+        if (resumed === "checking") {
+          setTimeout(async () => {
+            if (txStateRef.current === "checking") {
+              console.log("[COINBASE-GLOBAL] resumed pending session marked incomplete after grace window");
+              updateTxState("incomplete");
+              try {
+                await (supabase as any)
+                  .from("purchase_attempts")
+                  .update({ status: "incomplete" })
+                  .eq("partner_user_ref", fresh.partner_user_ref);
+              } catch {}
+            }
+          }, CLOSE_GRACE_MS);
+        }
       } catch (err) {
         console.error("[COINBASE-GLOBAL] Resume check failed:", err);
       }
