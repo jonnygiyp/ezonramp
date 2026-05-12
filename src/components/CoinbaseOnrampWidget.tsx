@@ -115,16 +115,23 @@ export function CoinbaseOnrampWidget({
   }, []);
 
   const updateTxState = useCallback((state: TxState) => {
+    const current = txStateRef.current;
+    // Never downgrade a terminal state. Completed/success is sticky.
+    if (TERMINAL.includes(current)) {
+      if (current === "completed") return;
+      // Allow other terminals to be replaced only by "completed".
+      if (state !== "completed") return;
+    }
     txStateRef.current = state;
     setTxState(state);
-    if (["completed", "failed", "delayed", "incomplete"].includes(state)) {
+    if (TERMINAL.includes(state)) {
       stopPolling();
     }
   }, [stopPolling]);
 
   const startPolling = useCallback((attemptId: string) => {
     if (pollingRef.current) return;
-    console.log("[COINBASE-GLOBAL] Starting status polling for", attemptId);
+    console.log("[COINBASE-GLOBAL] polling started for", attemptId);
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -137,11 +144,13 @@ export function CoinbaseOnrampWidget({
         }
         if (data?.status) {
           const current = txStateRef.current;
-          if (["completed", "failed", "delayed"].includes(current)) return;
-          // Map "idle"/"waiting" DB status to our local "waiting" — only advance forward
+          if (TERMINAL.includes(current) && current !== "completed") {
+            // Allow webhook-confirmed completion to override prior incomplete/failed/delayed.
+            if (data.status !== "completed") return;
+          }
           const next = data.status as TxState;
           if (next !== current && next !== "idle") {
-            console.log("[COINBASE-GLOBAL] Status update:", current, "->", next);
+            console.log("[COINBASE-GLOBAL] webhook/status update received:", current, "->", next);
             updateTxState(next);
           }
         }
@@ -152,8 +161,8 @@ export function CoinbaseOnrampWidget({
 
     timeoutRef.current = setTimeout(() => {
       const current = txStateRef.current;
-      if (["waiting", "initialized", "processing"].includes(current)) {
-        console.log("[COINBASE-GLOBAL] Timeout reached, marking as delayed");
+      if (IN_PROGRESS.includes(current)) {
+        console.log("[COINBASE-GLOBAL] timeout reached, marking as delayed");
         updateTxState("delayed");
         (supabase as any)
           .from("purchase_attempts")
@@ -162,6 +171,8 @@ export function CoinbaseOnrampWidget({
       }
     }, TIMEOUT_MS);
   }, [updateTxState]);
+
+  const stopPollingAndLog = stopPolling;
 
   // Cleanup on unmount
   useEffect(() => {
