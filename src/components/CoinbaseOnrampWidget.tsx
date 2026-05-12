@@ -257,6 +257,31 @@ export function CoinbaseOnrampWidget({
     updateTxState("idle");
   }, [stopPolling, updateTxState]);
 
+  const handleStartAgain = useCallback(async () => {
+    console.log("[COINBASE-GLOBAL] Start Again clicked");
+    const attemptId = partnerUserRef;
+    const current = txStateRef.current;
+
+    if (attemptId && (current === "waiting" || current === "checking" || current === "pending")) {
+      console.log("[COINBASE-GLOBAL] pending attempt marked abandoned/incomplete before reset");
+      try {
+        await (supabase as any)
+          .from("purchase_attempts")
+          .update({ status: "abandoned" })
+          .eq("partner_user_ref", attemptId);
+      } catch {}
+    }
+
+    console.log("[COINBASE-GLOBAL] active Coinbase Global attempt reset");
+    console.log("[COINBASE-GLOBAL] polling stopped");
+    console.log("[COINBASE-GLOBAL] Coinbase Global returned to initial state");
+    stopPolling();
+    setPartnerUserRef(null);
+    setCoinbaseTxId(null);
+    txStateRef.current = "idle";
+    setTxState("idle");
+  }, [partnerUserRef, stopPolling]);
+
   // Handle the buy action - get session token and open URL with partnerUserId tracking
   const handleBuy = useCallback(async () => {
     if (!session) {
