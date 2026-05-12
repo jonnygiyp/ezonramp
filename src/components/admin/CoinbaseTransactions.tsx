@@ -99,7 +99,7 @@ export default function CoinbaseTransactions() {
           <CardTitle>Coinbase Transactions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-3 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_120px_auto] gap-3 items-end">
             <div className="space-y-1">
               <Label htmlFor="puref">Partner User Ref</Label>
               <Input
@@ -109,6 +109,19 @@ export default function CoinbaseTransactions() {
                 placeholder="u12345678_a... (optional)"
                 onKeyDown={(e) => e.key === "Enter" && onSearch()}
               />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="status">Status</Label>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="ONRAMP_TRANSACTION_STATUS_SUCCESS">Success</SelectItem>
+                  <SelectItem value="ONRAMP_TRANSACTION_STATUS_FAILED">Failed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="psize">Page size</Label>
