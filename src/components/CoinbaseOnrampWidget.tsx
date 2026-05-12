@@ -305,9 +305,13 @@ export function CoinbaseOnrampWidget({
     setIsLoading(true);
 
     try {
-      // Generate a stable, unique partnerUserRef tied to this attempt.
-      // Format: coinbase_global_<uuid> — kept under Coinbase's 49-char partnerUserId limit.
-      const attemptId = `cbg_${crypto.randomUUID()}`;
+      // Stable, unique partnerUserRef tied to the authenticated Supabase user
+      // and this attempt. Format: u<userIdShort>_a<uuidNoDashes> — kept under
+      // Coinbase's 49-char partnerUserId limit so admin tooling can reconcile
+      // a transaction back to a Supabase user + purchase_attempt row.
+      const userIdShort = session.user.id.replace(/-/g, "").slice(0, 8);
+      const attemptShort = crypto.randomUUID().replace(/-/g, "");
+      const attemptId = `u${userIdShort}_a${attemptShort}`;
 
       console.log("[COINBASE-GLOBAL] Creating session for", destinationAddress.slice(0, 10) + "...", "ref:", attemptId);
 

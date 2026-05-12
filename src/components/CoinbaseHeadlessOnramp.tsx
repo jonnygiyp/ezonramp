@@ -485,8 +485,11 @@ export function CoinbaseHeadlessOnramp({
     setIsLoadingBuy(true);
 
     try {
-      // Generate unique purchase attempt ID
-      const attemptId = crypto.randomUUID();
+      // partnerUserRef tied to the authenticated Supabase user + this attempt.
+      // Format: u<userIdShort>_a<uuidNoDashes> (<= 49 chars for Coinbase).
+      const userIdShort = session.user.id.replace(/-/g, "").slice(0, 8);
+      const attemptShort = crypto.randomUUID().replace(/-/g, "");
+      const attemptId = `u${userIdShort}_a${attemptShort}`;
 
       const { data, error } = await supabase.functions.invoke("coinbase-headless", {
         body: {
