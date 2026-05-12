@@ -157,7 +157,7 @@ export default function CoinbaseTransactions() {
                   const network = (tx.network as string) || tx.purchase_network || "";
                   const txId = (tx.transaction_id as string) || (tx as any).id || "—";
                   return (
-                    <>
+                    <Fragment key={`${txId}-${idx}`}>
                       <TableRow key={`${txId}-${idx}`}>
                         <TableCell className="font-mono text-xs">{txId}</TableCell>
                         <TableCell>{tx.status || "—"}</TableCell>
