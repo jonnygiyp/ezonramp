@@ -567,6 +567,7 @@ export function CoinbaseOnrampWidget({
                   <p className="text-muted-foreground">Please complete your payment in the Coinbase window.</p>
                   <p className="text-xs text-muted-foreground">Status will update automatically every 10 seconds.</p>
                 </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
               </>
             )}
 
@@ -577,6 +578,18 @@ export function CoinbaseOnrampWidget({
                   <h2 className="text-xl font-semibold">Checking transaction status...</h2>
                   <p className="text-muted-foreground">Confirming whether your purchase went through.</p>
                 </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
+              </>
+            )}
+
+            {txState === "pending" && (
+              <>
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-muted-foreground" />
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Transaction Pending</h2>
+                  <p className="text-muted-foreground">Your purchase is being processed by Coinbase.</p>
+                </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
               </>
             )}
 
@@ -589,7 +602,33 @@ export function CoinbaseOnrampWidget({
                   <h2 className="text-xl font-semibold">Incomplete Transaction!</h2>
                   <p className="text-muted-foreground">You exited the process before completing your purchase.</p>
                 </div>
-                <Button onClick={resetFlow} className="w-full">Try Again</Button>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
+              </>
+            )}
+
+            {txState === "abandoned" && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
+                  <X className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Transaction Abandoned</h2>
+                  <p className="text-muted-foreground">You exited the process before completing your purchase.</p>
+                </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
+              </>
+            )}
+
+            {txState === "expired" && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent">
+                  <Clock className="h-8 w-8 text-accent-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Session Expired</h2>
+                  <p className="text-muted-foreground">Your session timed out. Please start again.</p>
+                </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
               </>
             )}
 
