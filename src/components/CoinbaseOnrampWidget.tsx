@@ -183,7 +183,7 @@ export function CoinbaseOnrampWidget({
   }, [stopPolling]);
 
   // Resume polling if user returns mid-flow with a non-terminal attempt for this session.
-  // Older-than-15-min sessions are expired (marked incomplete) instead of resumed,
+  // Older-than-5-min sessions are expired (marked incomplete) instead of resumed,
   // so the spinner cannot persist forever across logout/login.
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -195,7 +195,7 @@ export function CoinbaseOnrampWidget({
           .select("partner_user_ref, status, coinbase_transaction_id, created_at")
           .eq("user_id", session.user.id)
           .eq("provider", "coinbase")
-          .in("status", ["idle", "waiting", "initialized", "processing"])
+          .in("status", ["idle", "waiting", "checking", "pending", "initialized", "processing"])
           .order("created_at", { ascending: false })
           .limit(5);
 
