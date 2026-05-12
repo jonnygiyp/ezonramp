@@ -196,7 +196,7 @@ export default function CoinbaseTransactions() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </TableBody>
