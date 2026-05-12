@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, ChevronDown } from "lucide-react";
+
+type StatusFilter = "all" | "ONRAMP_TRANSACTION_STATUS_SUCCESS" | "ONRAMP_TRANSACTION_STATUS_FAILED";
 import { useToast } from "@/hooks/use-toast";
 
 interface CbTx {
@@ -30,6 +33,7 @@ export default function CoinbaseTransactions() {
   const { toast } = useToast();
   const [partnerUserRef, setPartnerUserRef] = useState("");
   const [pageSize, setPageSize] = useState("25");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<CbTx[]>([]);
   const [nextPageKey, setNextPageKey] = useState<string | null>(null);
@@ -95,7 +99,7 @@ export default function CoinbaseTransactions() {
           <CardTitle>Coinbase Transactions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-3 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_120px_auto] gap-3 items-end">
             <div className="space-y-1">
               <Label htmlFor="puref">Partner User Ref</Label>
               <Input
@@ -105,6 +109,19 @@ export default function CoinbaseTransactions() {
                 placeholder="u12345678_a... (optional)"
                 onKeyDown={(e) => e.key === "Enter" && onSearch()}
               />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="status">Status</Label>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="ONRAMP_TRANSACTION_STATUS_SUCCESS">Success</SelectItem>
+                  <SelectItem value="ONRAMP_TRANSACTION_STATUS_FAILED">Failed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="psize">Page size</Label>
@@ -143,14 +160,20 @@ export default function CoinbaseTransactions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.length === 0 && !loading && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                      No transactions to display.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {transactions.map((tx, idx) => {
+                {(() => {
+                  const filtered = statusFilter === "all"
+                    ? transactions
+                    : transactions.filter((t) => t.status === statusFilter);
+                  if (filtered.length === 0 && !loading) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                          No transactions to display.
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  return filtered.map((tx, idx) => {
                   const fiat = tx.payment_total || tx.source_amount || tx.purchase_amount;
                   const crypto = tx.destination_amount || tx.purchase_amount;
                   const asset = (tx.asset as string) || tx.purchase_currency || crypto?.currency || "";
@@ -198,7 +221,8 @@ export default function CoinbaseTransactions() {
                       )}
                     </Fragment>
                   );
-                })}
+                  });
+                })()}
               </TableBody>
             </Table>
           </div>
