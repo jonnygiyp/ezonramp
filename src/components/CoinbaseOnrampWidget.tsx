@@ -42,6 +42,7 @@ interface CoinbaseOnrampWidgetProps {
 type TxState =
   | "idle"
   | "waiting"
+  | "checking"
   | "incomplete"
   | "initialized"
   | "processing"
@@ -50,7 +51,14 @@ type TxState =
   | "delayed";
 
 const POLL_INTERVAL_MS = 10_000;
-const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — overall delayed cutoff
+const CLOSE_GRACE_MS = 90_000; // 90s after popup close to confirm via webhook/poll
+const RESUME_MAX_AGE_MS = 15 * 60 * 1000; // 15 min — older pending sessions are expired
+
+// Terminal states cannot be downgraded.
+const TERMINAL: TxState[] = ["completed", "failed", "delayed", "incomplete"];
+// States considered "in progress" that should advance forward only.
+const IN_PROGRESS: TxState[] = ["waiting", "checking", "initialized", "processing"];
 
 export function CoinbaseOnrampWidget({
   defaultAsset = "USDC",
@@ -107,16 +115,23 @@ export function CoinbaseOnrampWidget({
   }, []);
 
   const updateTxState = useCallback((state: TxState) => {
+    const current = txStateRef.current;
+    // Never downgrade a terminal state. Completed/success is sticky.
+    if (TERMINAL.includes(current)) {
+      if (current === "completed") return;
+      // Allow other terminals to be replaced only by "completed".
+      if (state !== "completed") return;
+    }
     txStateRef.current = state;
     setTxState(state);
-    if (["completed", "failed", "delayed", "incomplete"].includes(state)) {
+    if (TERMINAL.includes(state)) {
       stopPolling();
     }
   }, [stopPolling]);
 
   const startPolling = useCallback((attemptId: string) => {
     if (pollingRef.current) return;
-    console.log("[COINBASE-GLOBAL] Starting status polling for", attemptId);
+    console.log("[COINBASE-GLOBAL] polling started for", attemptId);
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -129,11 +144,13 @@ export function CoinbaseOnrampWidget({
         }
         if (data?.status) {
           const current = txStateRef.current;
-          if (["completed", "failed", "delayed"].includes(current)) return;
-          // Map "idle"/"waiting" DB status to our local "waiting" — only advance forward
+          if (TERMINAL.includes(current) && current !== "completed") {
+            // Allow webhook-confirmed completion to override prior incomplete/failed/delayed.
+            if (data.status !== "completed") return;
+          }
           const next = data.status as TxState;
           if (next !== current && next !== "idle") {
-            console.log("[COINBASE-GLOBAL] Status update:", current, "->", next);
+            console.log("[COINBASE-GLOBAL] webhook/status update received:", current, "->", next);
             updateTxState(next);
           }
         }
@@ -144,8 +161,8 @@ export function CoinbaseOnrampWidget({
 
     timeoutRef.current = setTimeout(() => {
       const current = txStateRef.current;
-      if (["waiting", "initialized", "processing"].includes(current)) {
-        console.log("[COINBASE-GLOBAL] Timeout reached, marking as delayed");
+      if (IN_PROGRESS.includes(current)) {
+        console.log("[COINBASE-GLOBAL] timeout reached, marking as delayed");
         updateTxState("delayed");
         (supabase as any)
           .from("purchase_attempts")
@@ -160,7 +177,9 @@ export function CoinbaseOnrampWidget({
     return () => stopPolling();
   }, [stopPolling]);
 
-  // Resume polling if user returns mid-flow with a non-terminal attempt for this session
+  // Resume polling if user returns mid-flow with a non-terminal attempt for this session.
+  // Older-than-15-min sessions are expired (marked incomplete) instead of resumed,
+  // so the spinner cannot persist forever across logout/login.
   useEffect(() => {
     if (!session?.user?.id) return;
     let cancelled = false;
@@ -173,20 +192,52 @@ export function CoinbaseOnrampWidget({
           .eq("provider", "coinbase")
           .in("status", ["idle", "waiting", "initialized", "processing"])
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(5);
 
         if (cancelled || !data || data.length === 0) return;
-        const row = data[0];
-        // Only resume if recent (within timeout window)
-        const ageMs = Date.now() - new Date(row.created_at).getTime();
-        if (ageMs > TIMEOUT_MS) return;
+
+        // Expire any pending attempts older than the resume window. We never
+        // revive these as active spinners.
+        const now = Date.now();
+        const stale = data.filter((r: any) => now - new Date(r.created_at).getTime() > RESUME_MAX_AGE_MS);
+        if (stale.length > 0) {
+          console.log("[COINBASE-GLOBAL] old pending session(s) expired:", stale.map((r: any) => r.partner_user_ref));
+          await (supabase as any)
+            .from("purchase_attempts")
+            .update({ status: "incomplete" })
+            .in("partner_user_ref", stale.map((r: any) => r.partner_user_ref));
+        }
+
+        const fresh = data.find((r: any) => now - new Date(r.created_at).getTime() <= RESUME_MAX_AGE_MS);
+        if (!fresh) return;
         if (txStateRef.current !== "idle") return; // user already started a new flow
 
-        console.log("[COINBASE-GLOBAL] Resuming polling for in-flight attempt", row.partner_user_ref);
-        setPartnerUserRef(row.partner_user_ref);
-        if (row.coinbase_transaction_id) setCoinbaseTxId(row.coinbase_transaction_id);
-        updateTxState((row.status as TxState) === "idle" ? "waiting" : (row.status as TxState));
-        startPolling(row.partner_user_ref);
+        console.log("[COINBASE-GLOBAL] old pending session found on login, resuming:", fresh.partner_user_ref);
+        setPartnerUserRef(fresh.partner_user_ref);
+        if (fresh.coinbase_transaction_id) setCoinbaseTxId(fresh.coinbase_transaction_id);
+        // On resume the popup is already gone — surface as "checking" rather than a
+        // forever "Complete your purchase" spinner.
+        const resumed: TxState = fresh.status === "idle" || fresh.status === "waiting"
+          ? "checking"
+          : (fresh.status as TxState);
+        updateTxState(resumed);
+        startPolling(fresh.partner_user_ref);
+
+        // Bound the resumed "checking" window — if no progress arrives soon, mark incomplete.
+        if (resumed === "checking") {
+          setTimeout(async () => {
+            if (txStateRef.current === "checking") {
+              console.log("[COINBASE-GLOBAL] resumed pending session marked incomplete after grace window");
+              updateTxState("incomplete");
+              try {
+                await (supabase as any)
+                  .from("purchase_attempts")
+                  .update({ status: "incomplete" })
+                  .eq("partner_user_ref", fresh.partner_user_ref);
+              } catch {}
+            }
+          }, CLOSE_GRACE_MS);
+        }
       } catch (err) {
         console.error("[COINBASE-GLOBAL] Resume check failed:", err);
       }
@@ -283,7 +334,7 @@ export function CoinbaseOnrampWidget({
       setPartnerUserRef(attemptId);
       updateTxState("waiting");
 
-      console.log("[COINBASE-GLOBAL] Opening Coinbase Onramp popup");
+      console.log("[COINBASE-GLOBAL] Coinbase Global opened");
       const popup = window.open(onrampURL, "_blank", "width=460,height=700");
 
       if (!popup) {
@@ -295,25 +346,36 @@ export function CoinbaseOnrampWidget({
       // Start polling immediately — webhook + Coinbase status API drives state changes
       startPolling(attemptId);
 
-      // Detect early popup close (treat as incomplete only if no progress was made)
+      // Detect popup close. As soon as it closes, surface a neutral "checking"
+      // state and bound the wait — never leave the spinner forever.
       windowCheckRef.current = setInterval(() => {
-        if (popup.closed) {
-          if (windowCheckRef.current) clearInterval(windowCheckRef.current);
-          windowCheckRef.current = null;
-          // Give webhooks ~5s grace, then if still in waiting state, mark incomplete
-          setTimeout(async () => {
-            if (txStateRef.current === "waiting") {
-              console.log("[COINBASE-GLOBAL] Popup closed with no progress, marking incomplete");
-              updateTxState("incomplete");
-              try {
-                await (supabase as any)
-                  .from("purchase_attempts")
-                  .update({ status: "incomplete" })
-                  .eq("partner_user_ref", attemptId);
-              } catch {}
-            }
-          }, 5000);
+        if (!popup.closed) return;
+        if (windowCheckRef.current) clearInterval(windowCheckRef.current);
+        windowCheckRef.current = null;
+        console.log("[COINBASE-GLOBAL] Coinbase Global closed");
+
+        // If the user closed the window while still in waiting (no Coinbase
+        // order yet), flip to a brief "checking" state so the UI stops saying
+        // "Complete your purchase".
+        if (txStateRef.current === "waiting") {
+          updateTxState("checking");
         }
+
+        // After the grace window, if no webhook/poll progressed us past the
+        // checking/waiting state, mark this attempt incomplete.
+        setTimeout(async () => {
+          const s = txStateRef.current;
+          if (s === "waiting" || s === "checking") {
+            console.log("[COINBASE-GLOBAL] pending session marked incomplete after close grace");
+            updateTxState("incomplete");
+            try {
+              await (supabase as any)
+                .from("purchase_attempts")
+                .update({ status: "incomplete" })
+                .eq("partner_user_ref", attemptId);
+            } catch {}
+          }
+        }, CLOSE_GRACE_MS);
       }, 1000);
 
       toast({
@@ -474,6 +536,16 @@ export function CoinbaseOnrampWidget({
                   <h2 className="text-xl font-semibold">Complete Your Purchase</h2>
                   <p className="text-muted-foreground">Please complete your payment in the Coinbase window.</p>
                   <p className="text-xs text-muted-foreground">Status will update automatically every 10 seconds.</p>
+                </div>
+              </>
+            )}
+
+            {txState === "checking" && (
+              <>
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-muted-foreground" />
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Checking transaction status...</h2>
+                  <p className="text-muted-foreground">Confirming whether your purchase went through.</p>
                 </div>
               </>
             )}
