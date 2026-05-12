@@ -43,7 +43,10 @@ type TxState =
   | "idle"
   | "waiting"
   | "checking"
+  | "pending"
   | "incomplete"
+  | "abandoned"
+  | "expired"
   | "initialized"
   | "processing"
   | "completed"
@@ -53,12 +56,14 @@ type TxState =
 const POLL_INTERVAL_MS = 10_000;
 const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — overall delayed cutoff
 const CLOSE_GRACE_MS = 90_000; // 90s after popup close to confirm via webhook/poll
-const RESUME_MAX_AGE_MS = 15 * 60 * 1000; // 15 min — older pending sessions are expired
+const RESUME_MAX_AGE_MS = 5 * 60 * 1000; // 5 min — older pending sessions are expired
 
 // Terminal states cannot be downgraded.
-const TERMINAL: TxState[] = ["completed", "failed", "delayed", "incomplete"];
+const TERMINAL: TxState[] = ["completed", "failed", "delayed", "incomplete", "abandoned", "expired"];
 // States considered "in progress" that should advance forward only.
-const IN_PROGRESS: TxState[] = ["waiting", "checking", "initialized", "processing"];
+const IN_PROGRESS: TxState[] = ["waiting", "checking", "pending", "initialized", "processing"];
+
+const START_AGAIN_STATES: TxState[] = ["waiting", "checking", "pending", "incomplete", "abandoned", "expired"];
 
 export function CoinbaseOnrampWidget({
   defaultAsset = "USDC",
