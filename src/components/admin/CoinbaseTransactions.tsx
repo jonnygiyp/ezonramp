@@ -33,6 +33,7 @@ export default function CoinbaseTransactions() {
   const { toast } = useToast();
   const [partnerUserRef, setPartnerUserRef] = useState("");
   const [pageSize, setPageSize] = useState("25");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<CbTx[]>([]);
   const [nextPageKey, setNextPageKey] = useState<string | null>(null);
