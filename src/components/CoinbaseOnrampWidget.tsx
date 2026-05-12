@@ -334,7 +334,7 @@ export function CoinbaseOnrampWidget({
       setPartnerUserRef(attemptId);
       updateTxState("waiting");
 
-      console.log("[COINBASE-GLOBAL] Opening Coinbase Onramp popup");
+      console.log("[COINBASE-GLOBAL] Coinbase Global opened");
       const popup = window.open(onrampURL, "_blank", "width=460,height=700");
 
       if (!popup) {
@@ -346,25 +346,36 @@ export function CoinbaseOnrampWidget({
       // Start polling immediately — webhook + Coinbase status API drives state changes
       startPolling(attemptId);
 
-      // Detect early popup close (treat as incomplete only if no progress was made)
+      // Detect popup close. As soon as it closes, surface a neutral "checking"
+      // state and bound the wait — never leave the spinner forever.
       windowCheckRef.current = setInterval(() => {
-        if (popup.closed) {
-          if (windowCheckRef.current) clearInterval(windowCheckRef.current);
-          windowCheckRef.current = null;
-          // Give webhooks ~5s grace, then if still in waiting state, mark incomplete
-          setTimeout(async () => {
-            if (txStateRef.current === "waiting") {
-              console.log("[COINBASE-GLOBAL] Popup closed with no progress, marking incomplete");
-              updateTxState("incomplete");
-              try {
-                await (supabase as any)
-                  .from("purchase_attempts")
-                  .update({ status: "incomplete" })
-                  .eq("partner_user_ref", attemptId);
-              } catch {}
-            }
-          }, 5000);
+        if (!popup.closed) return;
+        if (windowCheckRef.current) clearInterval(windowCheckRef.current);
+        windowCheckRef.current = null;
+        console.log("[COINBASE-GLOBAL] Coinbase Global closed");
+
+        // If the user closed the window while still in waiting (no Coinbase
+        // order yet), flip to a brief "checking" state so the UI stops saying
+        // "Complete your purchase".
+        if (txStateRef.current === "waiting") {
+          updateTxState("checking");
         }
+
+        // After the grace window, if no webhook/poll progressed us past the
+        // checking/waiting state, mark this attempt incomplete.
+        setTimeout(async () => {
+          const s = txStateRef.current;
+          if (s === "waiting" || s === "checking") {
+            console.log("[COINBASE-GLOBAL] pending session marked incomplete after close grace");
+            updateTxState("incomplete");
+            try {
+              await (supabase as any)
+                .from("purchase_attempts")
+                .update({ status: "incomplete" })
+                .eq("partner_user_ref", attemptId);
+            } catch {}
+          }
+        }, CLOSE_GRACE_MS);
       }, 1000);
 
       toast({
