@@ -221,7 +221,8 @@ export default function CoinbaseTransactions() {
                       )}
                     </Fragment>
                   );
-                })}
+                  });
+                })()}
               </TableBody>
             </Table>
           </div>
