@@ -43,7 +43,10 @@ type TxState =
   | "idle"
   | "waiting"
   | "checking"
+  | "pending"
   | "incomplete"
+  | "abandoned"
+  | "expired"
   | "initialized"
   | "processing"
   | "completed"
@@ -53,12 +56,14 @@ type TxState =
 const POLL_INTERVAL_MS = 10_000;
 const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — overall delayed cutoff
 const CLOSE_GRACE_MS = 90_000; // 90s after popup close to confirm via webhook/poll
-const RESUME_MAX_AGE_MS = 15 * 60 * 1000; // 15 min — older pending sessions are expired
+const RESUME_MAX_AGE_MS = 5 * 60 * 1000; // 5 min — older pending sessions are expired
 
 // Terminal states cannot be downgraded.
-const TERMINAL: TxState[] = ["completed", "failed", "delayed", "incomplete"];
+const TERMINAL: TxState[] = ["completed", "failed", "delayed", "incomplete", "abandoned", "expired"];
 // States considered "in progress" that should advance forward only.
-const IN_PROGRESS: TxState[] = ["waiting", "checking", "initialized", "processing"];
+const IN_PROGRESS: TxState[] = ["waiting", "checking", "pending", "initialized", "processing"];
+
+const START_AGAIN_STATES: TxState[] = ["waiting", "checking", "pending", "incomplete", "abandoned", "expired"];
 
 export function CoinbaseOnrampWidget({
   defaultAsset = "USDC",
@@ -178,7 +183,7 @@ export function CoinbaseOnrampWidget({
   }, [stopPolling]);
 
   // Resume polling if user returns mid-flow with a non-terminal attempt for this session.
-  // Older-than-15-min sessions are expired (marked incomplete) instead of resumed,
+  // Older-than-5-min sessions are expired (marked incomplete) instead of resumed,
   // so the spinner cannot persist forever across logout/login.
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -190,7 +195,7 @@ export function CoinbaseOnrampWidget({
           .select("partner_user_ref, status, coinbase_transaction_id, created_at")
           .eq("user_id", session.user.id)
           .eq("provider", "coinbase")
-          .in("status", ["idle", "waiting", "initialized", "processing"])
+          .in("status", ["idle", "waiting", "checking", "pending", "initialized", "processing"])
           .order("created_at", { ascending: false })
           .limit(5);
 
@@ -251,6 +256,31 @@ export function CoinbaseOnrampWidget({
     setCoinbaseTxId(null);
     updateTxState("idle");
   }, [stopPolling, updateTxState]);
+
+  const handleStartAgain = useCallback(async () => {
+    console.log("[COINBASE-GLOBAL] Start Again clicked");
+    const attemptId = partnerUserRef;
+    const current = txStateRef.current;
+
+    if (attemptId && (current === "waiting" || current === "checking" || current === "pending")) {
+      console.log("[COINBASE-GLOBAL] pending attempt marked abandoned/incomplete before reset");
+      try {
+        await (supabase as any)
+          .from("purchase_attempts")
+          .update({ status: "abandoned" })
+          .eq("partner_user_ref", attemptId);
+      } catch {}
+    }
+
+    console.log("[COINBASE-GLOBAL] active Coinbase Global attempt reset");
+    console.log("[COINBASE-GLOBAL] polling stopped");
+    console.log("[COINBASE-GLOBAL] Coinbase Global returned to initial state");
+    stopPolling();
+    setPartnerUserRef(null);
+    setCoinbaseTxId(null);
+    txStateRef.current = "idle";
+    setTxState("idle");
+  }, [partnerUserRef, stopPolling]);
 
   // Handle the buy action - get session token and open URL with partnerUserId tracking
   const handleBuy = useCallback(async () => {
@@ -537,6 +567,7 @@ export function CoinbaseOnrampWidget({
                   <p className="text-muted-foreground">Please complete your payment in the Coinbase window.</p>
                   <p className="text-xs text-muted-foreground">Status will update automatically every 10 seconds.</p>
                 </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
               </>
             )}
 
@@ -547,6 +578,18 @@ export function CoinbaseOnrampWidget({
                   <h2 className="text-xl font-semibold">Checking transaction status...</h2>
                   <p className="text-muted-foreground">Confirming whether your purchase went through.</p>
                 </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
+              </>
+            )}
+
+            {txState === "pending" && (
+              <>
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-muted-foreground" />
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Transaction Pending</h2>
+                  <p className="text-muted-foreground">Your purchase is being processed by Coinbase.</p>
+                </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
               </>
             )}
 
@@ -559,7 +602,33 @@ export function CoinbaseOnrampWidget({
                   <h2 className="text-xl font-semibold">Incomplete Transaction!</h2>
                   <p className="text-muted-foreground">You exited the process before completing your purchase.</p>
                 </div>
-                <Button onClick={resetFlow} className="w-full">Try Again</Button>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
+              </>
+            )}
+
+            {txState === "abandoned" && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
+                  <X className="h-8 w-8 text-destructive" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Transaction Abandoned</h2>
+                  <p className="text-muted-foreground">You exited the process before completing your purchase.</p>
+                </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
+              </>
+            )}
+
+            {txState === "expired" && (
+              <>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent">
+                  <Clock className="h-8 w-8 text-accent-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Session Expired</h2>
+                  <p className="text-muted-foreground">Your session timed out. Please start again.</p>
+                </div>
+                <Button onClick={handleStartAgain} variant="outline" size="sm">Start Again</Button>
               </>
             )}
 
