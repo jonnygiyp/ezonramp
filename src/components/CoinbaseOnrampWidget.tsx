@@ -540,6 +540,16 @@ export function CoinbaseOnrampWidget({
               </>
             )}
 
+            {txState === "checking" && (
+              <>
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-muted-foreground" />
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">Checking transaction status...</h2>
+                  <p className="text-muted-foreground">Confirming whether your purchase went through.</p>
+                </div>
+              </>
+            )}
+
             {txState === "incomplete" && (
               <>
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
