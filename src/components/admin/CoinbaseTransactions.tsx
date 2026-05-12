@@ -160,14 +160,20 @@ export default function CoinbaseTransactions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.length === 0 && !loading && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                      No transactions to display.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {transactions.map((tx, idx) => {
+                {(() => {
+                  const filtered = statusFilter === "all"
+                    ? transactions
+                    : transactions.filter((t) => t.status === statusFilter);
+                  if (filtered.length === 0 && !loading) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                          No transactions to display.
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  return filtered.map((tx, idx) => {
                   const fiat = tx.payment_total || tx.source_amount || tx.purchase_amount;
                   const crypto = tx.destination_amount || tx.purchase_amount;
                   const asset = (tx.asset as string) || tx.purchase_currency || crypto?.currency || "";
