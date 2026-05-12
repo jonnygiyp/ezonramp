@@ -10,6 +10,7 @@ import ContactEditor from '@/components/admin/ContactEditor';
 import OnrampManager from '@/components/admin/OnrampManager';
 import TermsEditor from '@/components/admin/TermsEditor';
 import PrivacyEditor from '@/components/admin/PrivacyEditor';
+import CoinbaseTransactions from '@/components/admin/CoinbaseTransactions';
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading, signOut } = useAuth();
