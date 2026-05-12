@@ -107,6 +107,10 @@ export default function AdminDashboard() {
           <TabsContent value="onramps">
             <OnrampManager />
           </TabsContent>
+
+          <TabsContent value="transactions">
+            <CoinbaseTransactions />
+          </TabsContent>
         </Tabs>
       </main>
     </div>
