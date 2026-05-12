@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, ChevronDown } from "lucide-react";
+
+type StatusFilter = "all" | "ONRAMP_TRANSACTION_STATUS_SUCCESS" | "ONRAMP_TRANSACTION_STATUS_FAILED";
 import { useToast } from "@/hooks/use-toast";
 
 interface CbTx {
