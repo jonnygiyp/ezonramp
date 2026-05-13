@@ -52,6 +52,31 @@ function normalizeCoinbase(tx: any): UnifiedTx {
   };
 }
 
+// Normalize a row from the persistent `coinbase_transactions` table
+function normalizeCoinbaseDb(row: any): UnifiedTx {
+  return {
+    provider: "coinbase",
+    id: row.transaction_id || row.id || "—",
+    status: row.status || "—",
+    fiat:
+      row.fiat_value != null
+        ? { value: String(row.fiat_value), currency: row.fiat_currency || "USD" }
+        : undefined,
+    crypto:
+      row.crypto_value != null
+        ? { value: String(row.crypto_value), currency: row.crypto_currency || "USDC" }
+        : undefined,
+    asset: row.asset || row.crypto_currency || undefined,
+    network: row.network || undefined,
+    partner_user_ref: row.partner_user_ref || undefined,
+    user_id: row.user_id || undefined,
+    wallet_address: row.wallet_address || null,
+    created_at: row.tx_created_at || row.created_at,
+    updated_at: row.tx_updated_at || row.updated_at,
+    raw: row.payload || row,
+  };
+}
+
 function normalizeStripe(row: any): UnifiedTx {
   const cb = (row.callback_data || {}) as any;
   const td = (cb.transaction_details || {}) as any;
@@ -119,16 +144,15 @@ export default function CoinbaseTransactions() {
   const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<UnifiedTx[]>([]);
-  const [cbNextKey, setCbNextKey] = useState<string | null>(null);
+  const [cbOffset, setCbOffset] = useState(0);
   const [stripeOffset, setStripeOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [cbStack, setCbStack] = useState<(string | null)[]>([null]);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const fromTs = fromDate ? new Date(fromDate + "T00:00:00").getTime() : null;
   const toTs = toDate ? new Date(toDate + "T23:59:59.999").getTime() : null;
 
-  const fetchData = async (opts: { cbKey?: string | null; stripeOff?: number; reset?: boolean }) => {
+  const fetchData = async (opts: { cbOff?: number; stripeOff?: number; reset?: boolean }) => {
     setLoading(true);
     try {
       const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
@@ -151,11 +175,8 @@ export default function CoinbaseTransactions() {
             console.warn("[ADMIN-TX] wallet search lookup failed", err);
           }
           if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) {
-            toast({ title: "No matches", description: "No transactions found for that wallet." });
-            setTransactions([]);
-            setCbNextKey(null);
-            setLoading(false);
-            return;
+            // Wallet might still match coinbase_transactions.wallet_address directly — don't bail early.
+            // Allow query to continue with rawRef as wallet filter.
           }
         } else {
           directRef = rawRef;
@@ -167,29 +188,44 @@ export default function CoinbaseTransactions() {
       if (providerFilter === "all" || providerFilter === "coinbase") {
         tasks.push(
           (async () => {
-            // For wallet search with multiple refs, fan out and merge
-            const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
-            const all: any[] = [];
-            let lastNextKey: string | null = null;
-            for (const r of refsToQuery) {
-              const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-                body: {
-                  partnerUserRef: r || undefined,
-                  page_key: opts.cbKey || undefined,
-                  page_size: String(size),
-                },
-              });
-              if (error) throw error;
-              if (data?.error) throw new Error(data.error);
-              if (data?.next_page_key) lastNextKey = data.next_page_key;
-              if (Array.isArray(data?.transactions)) all.push(...data.transactions);
+            // Fire-and-forget sync: refresh the last 30 days of Coinbase data into the DB.
+            // We don't await for big payloads — only awaited when wallet search needs the freshest data.
+            const refsToSync = isWalletSearch ? cbRefsForSearch : [directRef];
+            for (const r of refsToSync) {
+              try {
+                await supabase.functions.invoke("coinbase-transactions", {
+                  body: {
+                    partnerUserRef: r || undefined,
+                    page_size: "100",
+                  },
+                });
+              } catch (syncErr) {
+                console.warn("[ADMIN-TX] coinbase live sync failed (continuing with DB)", syncErr);
+              }
             }
-            setCbNextKey(isWalletSearch ? null : lastNextKey);
-            return all.map(normalizeCoinbase);
+
+            const offset = opts.cbOff ?? 0;
+            let q = supabase
+              .from("coinbase_transactions")
+              .select("*")
+              .order("tx_created_at", { ascending: false, nullsFirst: false })
+              .range(offset, offset + size - 1);
+            if (isWalletSearch) {
+              const orParts: string[] = [];
+              if (cbRefsForSearch.length > 0)
+                orParts.push(`partner_user_ref.in.(${cbRefsForSearch.map((s) => `"${s}"`).join(",")})`);
+              orParts.push(`wallet_address.eq.${rawRef}`);
+              q = q.or(orParts.join(","));
+            } else if (directRef) {
+              q = q.eq("partner_user_ref", directRef);
+            }
+            if (fromDate) q = q.gte("tx_created_at", new Date(fromDate + "T00:00:00").toISOString());
+            if (toDate) q = q.lte("tx_created_at", new Date(toDate + "T23:59:59.999").toISOString());
+            const { data, error } = await q;
+            if (error) throw error;
+            return (data ?? []).map(normalizeCoinbaseDb);
           })()
         );
-      } else {
-        setCbNextKey(null);
       }
 
       if (providerFilter === "all" || providerFilter === "stripe") {
@@ -254,7 +290,7 @@ export default function CoinbaseTransactions() {
 
       setTransactions(merged);
       if (opts.reset) {
-        setCbStack([null]);
+        setCbOffset(0);
         setStripeOffset(0);
         setPage(1);
       }
@@ -266,7 +302,6 @@ export default function CoinbaseTransactions() {
         variant: "destructive",
       });
       setTransactions([]);
-      setCbNextKey(null);
     } finally {
       setLoading(false);
     }
@@ -274,44 +309,30 @@ export default function CoinbaseTransactions() {
 
   const onSearch = () => {
     setExpandedIdx(null);
-    fetchData({ cbKey: null, stripeOff: 0, reset: true });
+    fetchData({ cbOff: 0, stripeOff: 0, reset: true });
   };
 
   const onNext = () => {
     const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+    const newCbOff = cbOffset + size;
     const newStripeOff = stripeOffset + size;
     setExpandedIdx(null);
-    if (providerFilter === "stripe") {
-      setStripeOffset(newStripeOff);
-      setPage((p) => p + 1);
-      fetchData({ stripeOff: newStripeOff });
-    } else {
-      if (!cbNextKey && providerFilter === "coinbase") return;
-      setCbStack((s) => [...s, cbNextKey]);
-      if (providerFilter === "all") setStripeOffset(newStripeOff);
-      setPage((p) => p + 1);
-      fetchData({ cbKey: cbNextKey, stripeOff: providerFilter === "all" ? newStripeOff : undefined });
-    }
+    setCbOffset(newCbOff);
+    setStripeOffset(newStripeOff);
+    setPage((p) => p + 1);
+    fetchData({ cbOff: newCbOff, stripeOff: newStripeOff });
   };
 
   const onPrev = () => {
     if (page <= 1) return;
     const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+    const newCbOff = Math.max(0, cbOffset - size);
+    const newStripeOff = Math.max(0, stripeOffset - size);
     setExpandedIdx(null);
-    if (providerFilter === "stripe") {
-      const newOff = Math.max(0, stripeOffset - size);
-      setStripeOffset(newOff);
-      setPage((p) => p - 1);
-      fetchData({ stripeOff: newOff });
-    } else {
-      const newStack = cbStack.slice(0, -1);
-      const prevKey = newStack[newStack.length - 1];
-      setCbStack(newStack);
-      const newOff = Math.max(0, stripeOffset - size);
-      if (providerFilter === "all") setStripeOffset(newOff);
-      setPage((p) => p - 1);
-      fetchData({ cbKey: prevKey, stripeOff: providerFilter === "all" ? newOff : undefined });
-    }
+    setCbOffset(newCbOff);
+    setStripeOffset(newStripeOff);
+    setPage((p) => p - 1);
+    fetchData({ cbOff: newCbOff, stripeOff: newStripeOff });
   };
 
   const filtered = transactions.filter((t) => {
@@ -341,7 +362,7 @@ export default function CoinbaseTransactions() {
         });
         cbRefsForSearch = lookup?.wallet_search?.partner_user_refs || [];
         stripeUserIdsForSearch = lookup?.wallet_search?.user_ids || [];
-        if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) return [];
+        // Don't bail — coinbase_transactions may have wallet_address matches even if no profile linked.
       } else {
         directRef = rawRef;
       }
@@ -350,24 +371,41 @@ export default function CoinbaseTransactions() {
     const all: UnifiedTx[] = [];
 
     if (providerFilter === "all" || providerFilter === "coinbase") {
-      const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
-      for (const r of refsToQuery) {
-        let pageKey: string | undefined = undefined;
-        // Safety cap to avoid infinite loops
-        for (let i = 0; i < 200; i++) {
-          const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-            body: {
-              partnerUserRef: r || undefined,
-              page_key: pageKey,
-              page_size: String(PAGE),
-            },
+      // Refresh the last 30 days of Coinbase data into our DB before exporting.
+      const refsToSync = isWalletSearch ? cbRefsForSearch : [directRef];
+      for (const r of refsToSync) {
+        try {
+          await supabase.functions.invoke("coinbase-transactions", {
+            body: { partnerUserRef: r || undefined, page_size: "100" },
           });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-          if (Array.isArray(data?.transactions)) all.push(...data.transactions.map(normalizeCoinbase));
-          if (data?.next_page_key) pageKey = data.next_page_key;
-          else break;
+        } catch (e) {
+          console.warn("[ADMIN-TX] export sync failed", e);
         }
+      }
+      let offset = 0;
+      for (let i = 0; i < 200; i++) {
+        let q = supabase
+          .from("coinbase_transactions")
+          .select("*")
+          .order("tx_created_at", { ascending: false, nullsFirst: false })
+          .range(offset, offset + PAGE - 1);
+        if (isWalletSearch) {
+          const orParts: string[] = [];
+          if (cbRefsForSearch.length > 0)
+            orParts.push(`partner_user_ref.in.(${cbRefsForSearch.map((s) => `"${s}"`).join(",")})`);
+          orParts.push(`wallet_address.eq.${rawRef}`);
+          q = q.or(orParts.join(","));
+        } else if (directRef) {
+          q = q.eq("partner_user_ref", directRef);
+        }
+        if (fromDate) q = q.gte("tx_created_at", new Date(fromDate + "T00:00:00").toISOString());
+        if (toDate) q = q.lte("tx_created_at", new Date(toDate + "T23:59:59.999").toISOString());
+        const { data, error } = await q;
+        if (error) throw error;
+        const batch = (data ?? []).map(normalizeCoinbaseDb);
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+        offset += PAGE;
       }
     }
 
@@ -518,11 +556,8 @@ export default function CoinbaseTransactions() {
     setExporting(false);
     toast({ title: "Export complete", description: `Exported ${rowsData.length} transaction${rowsData.length === 1 ? "" : "s"}.` });
   };
-  const hasNext =
-    providerFilter === "stripe"
-      ? transactions.filter((t) => t.provider === "stripe").length >=
-        Math.max(1, Math.min(100, parseInt(pageSize) || 25))
-      : !!cbNextKey || providerFilter === "all";
+  const pageSizeNum = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+  const hasNext = transactions.length >= pageSizeNum;
 
   return (
     <div className="space-y-4">

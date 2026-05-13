@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      coinbase_transactions: {
+        Row: {
+          asset: string | null
+          created_at: string
+          crypto_currency: string | null
+          crypto_value: number | null
+          fiat_currency: string | null
+          fiat_value: number | null
+          id: string
+          last_synced_at: string
+          network: string | null
+          partner_user_ref: string | null
+          payload: Json | null
+          status: string
+          transaction_id: string
+          tx_created_at: string | null
+          tx_updated_at: string | null
+          updated_at: string
+          user_id: string | null
+          wallet_address: string | null
+        }
+        Insert: {
+          asset?: string | null
+          created_at?: string
+          crypto_currency?: string | null
+          crypto_value?: number | null
+          fiat_currency?: string | null
+          fiat_value?: number | null
+          id?: string
+          last_synced_at?: string
+          network?: string | null
+          partner_user_ref?: string | null
+          payload?: Json | null
+          status?: string
+          transaction_id: string
+          tx_created_at?: string | null
+          tx_updated_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+          wallet_address?: string | null
+        }
+        Update: {
+          asset?: string | null
+          created_at?: string
+          crypto_currency?: string | null
+          crypto_value?: number | null
+          fiat_currency?: string | null
+          fiat_value?: number | null
+          id?: string
+          last_synced_at?: string
+          network?: string | null
+          partner_user_ref?: string | null
+          payload?: Json | null
+          status?: string
+          transaction_id?: string
+          tx_created_at?: string | null
+          tx_updated_at?: string | null
+          updated_at?: string
+          user_id?: string | null
+          wallet_address?: string | null
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
