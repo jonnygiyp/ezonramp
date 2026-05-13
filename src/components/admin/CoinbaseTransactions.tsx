@@ -52,6 +52,25 @@ function normalizeCoinbase(tx: any): UnifiedTx {
   };
 }
 
+function normalizeCoinbaseAudit(row: any): UnifiedTx {
+  const cb = (row.callback_data || {}) as any;
+  return {
+    provider: "coinbase",
+    id: row.request_id || cb.transaction_id || cb.id || "—",
+    status: cb.status || "—",
+    fiat: cb.payment_total || cb.source_amount || cb.purchase_amount ||
+      (row.amount != null ? { value: String(row.amount), currency: row.currency } : undefined),
+    crypto: cb.destination_amount || cb.purchase_amount,
+    asset: cb.asset || cb.purchase_currency || cb.destination_amount?.currency || row.crypto_currency,
+    network: cb.network || cb.purchase_network,
+    partner_user_ref: cb.partner_user_ref,
+    wallet_address: row.wallet_address || cb.wallet_address || null,
+    created_at: cb.created_at || row.created_at,
+    updated_at: cb.updated_at || row.updated_at,
+    raw: { ...cb, _stored_at: row.created_at },
+  };
+}
+
 function normalizeStripe(row: any): UnifiedTx {
   const cb = (row.callback_data || {}) as any;
   const td = (cb.transaction_details || {}) as any;
