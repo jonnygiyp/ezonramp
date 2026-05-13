@@ -324,7 +324,125 @@ export default function CoinbaseTransactions() {
     return true;
   });
 
-  const exportCsv = () => {
+  const [exporting, setExporting] = useState(false);
+
+  const fetchAllForExport = async (): Promise<UnifiedTx[]> => {
+    const PAGE = 100;
+    const rawRef = searchRef.trim();
+    const isWalletSearch = !!rawRef && !rawRef.includes("-");
+    let cbRefsForSearch: string[] = [];
+    let stripeUserIdsForSearch: string[] = [];
+    let directRef: string | undefined = undefined;
+
+    if (rawRef) {
+      if (isWalletSearch) {
+        const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
+          body: { wallet_search: rawRef },
+        });
+        cbRefsForSearch = lookup?.wallet_search?.partner_user_refs || [];
+        stripeUserIdsForSearch = lookup?.wallet_search?.user_ids || [];
+        if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) return [];
+      } else {
+        directRef = rawRef;
+      }
+    }
+
+    const all: UnifiedTx[] = [];
+
+    if (providerFilter === "all" || providerFilter === "coinbase") {
+      const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
+      for (const r of refsToQuery) {
+        let pageKey: string | undefined = undefined;
+        // Safety cap to avoid infinite loops
+        for (let i = 0; i < 200; i++) {
+          const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
+            body: {
+              partnerUserRef: r || undefined,
+              page_key: pageKey,
+              page_size: String(PAGE),
+            },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          if (Array.isArray(data?.transactions)) all.push(...data.transactions.map(normalizeCoinbase));
+          if (data?.next_page_key) pageKey = data.next_page_key;
+          else break;
+        }
+      }
+    }
+
+    if (providerFilter === "all" || providerFilter === "stripe") {
+      let offset = 0;
+      for (let i = 0; i < 200; i++) {
+        let q = supabase
+          .from("stripe_onramp_sessions")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE - 1);
+        if (isWalletSearch) {
+          if (stripeUserIdsForSearch.length === 0) break;
+          q = q.in("user_id", stripeUserIdsForSearch);
+        } else if (directRef) {
+          q = q.eq("user_id", directRef);
+        }
+        if (fromDate) q = q.gte("created_at", new Date(fromDate + "T00:00:00").toISOString());
+        if (toDate) q = q.lte("created_at", new Date(toDate + "T23:59:59.999").toISOString());
+        const { data, error } = await q;
+        if (error) throw error;
+        const batch = (data ?? []).map(normalizeStripe);
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+        offset += PAGE;
+      }
+    }
+
+    // Enrich with email + wallet
+    const cbRefs = all
+      .filter((t) => t.provider === "coinbase" && t.partner_user_ref)
+      .map((t) => t.partner_user_ref as string);
+    const stripeUserIds = all
+      .filter((t) => t.provider === "stripe" && t.user_id)
+      .map((t) => t.user_id as string);
+    if (cbRefs.length || stripeUserIds.length) {
+      try {
+        const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
+          body: { user_ids: stripeUserIds, partner_user_refs: cbRefs },
+        });
+        const refMap = (lookup?.partner_user_refs || {}) as Record<string, { user_id: string; wallet_address: string | null }>;
+        const userMap = (lookup?.users || {}) as Record<string, { email: string | null; wallet_address: string | null }>;
+        for (const t of all) {
+          if (t.provider === "coinbase" && t.partner_user_ref && refMap[t.partner_user_ref]) {
+            t.user_id = refMap[t.partner_user_ref].user_id;
+            t.wallet_address = refMap[t.partner_user_ref].wallet_address;
+          }
+          if (t.user_id && userMap[t.user_id]) {
+            t.email = userMap[t.user_id].email;
+            if (!t.wallet_address) t.wallet_address = userMap[t.user_id].wallet_address;
+          }
+        }
+      } catch (lookupErr) {
+        console.warn("[ADMIN-TX] export user lookup failed", lookupErr);
+      }
+    }
+
+    return all
+      .filter((t) => {
+        if (!matchesStatus(t, statusFilter)) return false;
+        if (fromTs || toTs) {
+          const ts = t.created_at ? new Date(t.created_at).getTime() : 0;
+          if (fromTs && ts < fromTs) return false;
+          if (toTs && ts > toTs) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tb - ta;
+      });
+  };
+
+  const exportCsv = async () => {
     const headers = [
       "provider",
       "id",
@@ -347,7 +465,26 @@ export default function CoinbaseTransactions() {
       const s = String(v);
       return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const rows = filtered.map((t) =>
+    setExporting(true);
+    let rowsData: UnifiedTx[] = [];
+    try {
+      rowsData = await fetchAllForExport();
+    } catch (e: any) {
+      console.error("[ADMIN-TX] export failed", e);
+      toast({
+        title: "Export failed",
+        description: e?.message || "Could not export transactions",
+        variant: "destructive",
+      });
+      setExporting(false);
+      return;
+    }
+    if (rowsData.length === 0) {
+      toast({ title: "Nothing to export", description: "No transactions match the current filters." });
+      setExporting(false);
+      return;
+    }
+    const rows = rowsData.map((t) =>
       [
         t.provider,
         t.id,
