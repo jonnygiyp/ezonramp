@@ -115,6 +115,8 @@ export default function CoinbaseTransactions() {
   const [pageSize, setPageSize] = useState("25");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<UnifiedTx[]>([]);
   const [cbNextKey, setCbNextKey] = useState<string | null>(null);
@@ -122,6 +124,9 @@ export default function CoinbaseTransactions() {
   const [page, setPage] = useState(1);
   const [cbStack, setCbStack] = useState<(string | null)[]>([null]);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  const fromTs = fromDate ? new Date(fromDate + "T00:00:00").getTime() : null;
+  const toTs = toDate ? new Date(toDate + "T23:59:59.999").getTime() : null;
 
   const fetchData = async (opts: { cbKey?: string | null; stripeOff?: number; reset?: boolean }) => {
     setLoading(true);
