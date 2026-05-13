@@ -22,6 +22,9 @@ interface UnifiedTx {
   asset?: string;
   network?: string;
   partner_user_ref?: string;
+  user_id?: string;
+  wallet_address?: string | null;
+  email?: string | null;
   created_at?: string;
   updated_at?: string;
   raw: Record<string, unknown>;
@@ -58,6 +61,8 @@ function normalizeStripe(row: any): UnifiedTx {
     asset: row.destination_currency || "USDC",
     network: row.destination_network || "solana",
     partner_user_ref: row.user_id,
+    user_id: row.user_id,
+    wallet_address: row.wallet_address ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     raw: row,
@@ -138,6 +143,36 @@ export default function CoinbaseTransactions() {
         const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
         return tb - ta;
       });
+
+      // Enrich with email + wallet
+      const cbRefs = merged
+        .filter((t) => t.provider === "coinbase" && t.partner_user_ref)
+        .map((t) => t.partner_user_ref as string);
+      const stripeUserIds = merged
+        .filter((t) => t.provider === "stripe" && t.user_id)
+        .map((t) => t.user_id as string);
+      if (cbRefs.length || stripeUserIds.length) {
+        try {
+          const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
+            body: { user_ids: stripeUserIds, partner_user_refs: cbRefs },
+          });
+          const refMap = (lookup?.partner_user_refs || {}) as Record<string, { user_id: string; wallet_address: string | null }>;
+          const userMap = (lookup?.users || {}) as Record<string, { email: string | null; wallet_address: string | null }>;
+          for (const t of merged) {
+            if (t.provider === "coinbase" && t.partner_user_ref && refMap[t.partner_user_ref]) {
+              t.user_id = refMap[t.partner_user_ref].user_id;
+              t.wallet_address = refMap[t.partner_user_ref].wallet_address;
+            }
+            if (t.user_id && userMap[t.user_id]) {
+              t.email = userMap[t.user_id].email;
+              if (!t.wallet_address) t.wallet_address = userMap[t.user_id].wallet_address;
+            }
+          }
+        } catch (lookupErr) {
+          console.warn("[ADMIN-TX] user lookup failed", lookupErr);
+        }
+      }
+
       setTransactions(merged);
       if (opts.reset) {
         setCbStack([null]);
@@ -274,6 +309,8 @@ export default function CoinbaseTransactions() {
                 <TableRow>
                   <TableHead>Provider</TableHead>
                   <TableHead>ID</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Wallet</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Fiat</TableHead>
                   <TableHead>Crypto</TableHead>
@@ -287,7 +324,7 @@ export default function CoinbaseTransactions() {
               <TableBody>
                 {filtered.length === 0 && !loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       No transactions to display.
                     </TableCell>
                   </TableRow>
@@ -301,6 +338,14 @@ export default function CoinbaseTransactions() {
                           </Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[220px] truncate">{tx.id}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate" title={tx.email || ""}>
+                          {tx.email || "—"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs max-w-[160px] truncate" title={tx.wallet_address || ""}>
+                          {tx.wallet_address
+                            ? `${tx.wallet_address.slice(0, 6)}…${tx.wallet_address.slice(-4)}`
+                            : "—"}
+                        </TableCell>
                         <TableCell className="text-xs">{tx.status}</TableCell>
                         <TableCell>
                           {tx.fiat?.value ? `${tx.fiat.value} ${tx.fiat.currency || ""}` : "—"}
@@ -330,7 +375,7 @@ export default function CoinbaseTransactions() {
                       </TableRow>
                       {expandedIdx === idx && (
                         <TableRow>
-                          <TableCell colSpan={10} className="bg-muted/30">
+                          <TableCell colSpan={12} className="bg-muted/30">
                             <pre className="text-xs overflow-auto max-h-96 p-2">
                               {JSON.stringify(tx.raw, null, 2)}
                             </pre>

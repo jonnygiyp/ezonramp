@@ -39,3 +39,7 @@ verify_jwt = true
 [functions.geo-detect]
 verify_jwt = false
 
+[functions.admin-user-lookup]
+verify_jwt = false
+
+
