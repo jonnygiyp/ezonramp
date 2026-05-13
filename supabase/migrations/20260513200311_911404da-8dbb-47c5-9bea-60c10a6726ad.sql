@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS transaction_audit_log_request_id_key ON public.transaction_audit_log (request_id);
