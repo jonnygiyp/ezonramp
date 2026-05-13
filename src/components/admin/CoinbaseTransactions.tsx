@@ -362,7 +362,7 @@ export default function CoinbaseTransactions() {
         });
         cbRefsForSearch = lookup?.wallet_search?.partner_user_refs || [];
         stripeUserIdsForSearch = lookup?.wallet_search?.user_ids || [];
-        if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) return [];
+        // Don't bail — coinbase_transactions may have wallet_address matches even if no profile linked.
       } else {
         directRef = rawRef;
       }
@@ -371,24 +371,41 @@ export default function CoinbaseTransactions() {
     const all: UnifiedTx[] = [];
 
     if (providerFilter === "all" || providerFilter === "coinbase") {
-      const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
-      for (const r of refsToQuery) {
-        let pageKey: string | undefined = undefined;
-        // Safety cap to avoid infinite loops
-        for (let i = 0; i < 200; i++) {
-          const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-            body: {
-              partnerUserRef: r || undefined,
-              page_key: pageKey,
-              page_size: String(PAGE),
-            },
+      // Refresh the last 30 days of Coinbase data into our DB before exporting.
+      const refsToSync = isWalletSearch ? cbRefsForSearch : [directRef];
+      for (const r of refsToSync) {
+        try {
+          await supabase.functions.invoke("coinbase-transactions", {
+            body: { partnerUserRef: r || undefined, page_size: "100" },
           });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-          if (Array.isArray(data?.transactions)) all.push(...data.transactions.map(normalizeCoinbase));
-          if (data?.next_page_key) pageKey = data.next_page_key;
-          else break;
+        } catch (e) {
+          console.warn("[ADMIN-TX] export sync failed", e);
         }
+      }
+      let offset = 0;
+      for (let i = 0; i < 200; i++) {
+        let q = supabase
+          .from("coinbase_transactions")
+          .select("*")
+          .order("tx_created_at", { ascending: false, nullsFirst: false })
+          .range(offset, offset + PAGE - 1);
+        if (isWalletSearch) {
+          const orParts: string[] = [];
+          if (cbRefsForSearch.length > 0)
+            orParts.push(`partner_user_ref.in.(${cbRefsForSearch.map((s) => `"${s}"`).join(",")})`);
+          orParts.push(`wallet_address.eq.${rawRef}`);
+          q = q.or(orParts.join(","));
+        } else if (directRef) {
+          q = q.eq("partner_user_ref", directRef);
+        }
+        if (fromDate) q = q.gte("tx_created_at", new Date(fromDate + "T00:00:00").toISOString());
+        if (toDate) q = q.lte("tx_created_at", new Date(toDate + "T23:59:59.999").toISOString());
+        const { data, error } = await q;
+        if (error) throw error;
+        const batch = (data ?? []).map(normalizeCoinbaseDb);
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+        offset += PAGE;
       }
     }
 
