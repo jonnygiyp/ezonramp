@@ -61,6 +61,8 @@ function normalizeStripe(row: any): UnifiedTx {
     asset: row.destination_currency || "USDC",
     network: row.destination_network || "solana",
     partner_user_ref: row.user_id,
+    user_id: row.user_id,
+    wallet_address: row.wallet_address ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     raw: row,
