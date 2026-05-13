@@ -309,6 +309,8 @@ export default function CoinbaseTransactions() {
                 <TableRow>
                   <TableHead>Provider</TableHead>
                   <TableHead>ID</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Wallet</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Fiat</TableHead>
                   <TableHead>Crypto</TableHead>
