@@ -175,11 +175,8 @@ export default function CoinbaseTransactions() {
             console.warn("[ADMIN-TX] wallet search lookup failed", err);
           }
           if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) {
-            toast({ title: "No matches", description: "No transactions found for that wallet." });
-            setTransactions([]);
-            setCbNextKey(null);
-            setLoading(false);
-            return;
+            // Wallet might still match coinbase_transactions.wallet_address directly — don't bail early.
+            // Allow query to continue with rawRef as wallet filter.
           }
         } else {
           directRef = rawRef;
@@ -293,7 +290,7 @@ export default function CoinbaseTransactions() {
 
       setTransactions(merged);
       if (opts.reset) {
-        setCbStack([null]);
+        setCbOffset(0);
         setStripeOffset(0);
         setPage(1);
       }
@@ -305,7 +302,6 @@ export default function CoinbaseTransactions() {
         variant: "destructive",
       });
       setTransactions([]);
-      setCbNextKey(null);
     } finally {
       setLoading(false);
     }
@@ -313,44 +309,30 @@ export default function CoinbaseTransactions() {
 
   const onSearch = () => {
     setExpandedIdx(null);
-    fetchData({ cbKey: null, stripeOff: 0, reset: true });
+    fetchData({ cbOff: 0, stripeOff: 0, reset: true });
   };
 
   const onNext = () => {
     const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+    const newCbOff = cbOffset + size;
     const newStripeOff = stripeOffset + size;
     setExpandedIdx(null);
-    if (providerFilter === "stripe") {
-      setStripeOffset(newStripeOff);
-      setPage((p) => p + 1);
-      fetchData({ stripeOff: newStripeOff });
-    } else {
-      if (!cbNextKey && providerFilter === "coinbase") return;
-      setCbStack((s) => [...s, cbNextKey]);
-      if (providerFilter === "all") setStripeOffset(newStripeOff);
-      setPage((p) => p + 1);
-      fetchData({ cbKey: cbNextKey, stripeOff: providerFilter === "all" ? newStripeOff : undefined });
-    }
+    setCbOffset(newCbOff);
+    setStripeOffset(newStripeOff);
+    setPage((p) => p + 1);
+    fetchData({ cbOff: newCbOff, stripeOff: newStripeOff });
   };
 
   const onPrev = () => {
     if (page <= 1) return;
     const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+    const newCbOff = Math.max(0, cbOffset - size);
+    const newStripeOff = Math.max(0, stripeOffset - size);
     setExpandedIdx(null);
-    if (providerFilter === "stripe") {
-      const newOff = Math.max(0, stripeOffset - size);
-      setStripeOffset(newOff);
-      setPage((p) => p - 1);
-      fetchData({ stripeOff: newOff });
-    } else {
-      const newStack = cbStack.slice(0, -1);
-      const prevKey = newStack[newStack.length - 1];
-      setCbStack(newStack);
-      const newOff = Math.max(0, stripeOffset - size);
-      if (providerFilter === "all") setStripeOffset(newOff);
-      setPage((p) => p - 1);
-      fetchData({ cbKey: prevKey, stripeOff: providerFilter === "all" ? newOff : undefined });
-    }
+    setCbOffset(newCbOff);
+    setStripeOffset(newStripeOff);
+    setPage((p) => p - 1);
+    fetchData({ cbOff: newCbOff, stripeOff: newStripeOff });
   };
 
   const filtered = transactions.filter((t) => {
