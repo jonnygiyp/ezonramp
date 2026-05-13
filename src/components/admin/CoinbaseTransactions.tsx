@@ -207,6 +207,8 @@ export default function CoinbaseTransactions() {
             } else if (directRef) {
               q = q.eq("user_id", directRef);
             }
+            if (fromDate) q = q.gte("created_at", new Date(fromDate + "T00:00:00").toISOString());
+            if (toDate) q = q.lte("created_at", new Date(toDate + "T23:59:59.999").toISOString());
             const { data, error } = await q;
             if (error) throw error;
             return (data ?? []).map(normalizeStripe);
