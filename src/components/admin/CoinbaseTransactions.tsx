@@ -80,6 +80,22 @@ function matchesStatus(tx: UnifiedTx, filter: StatusFilter): boolean {
   return STRIPE_FAILED_SET.has(tx.status);
 }
 
+function shortStatus(tx: UnifiedTx): string {
+  const s = tx.status || "";
+  if (tx.provider === "coinbase") {
+    if (s === COINBASE_SUCCESS) return "Success";
+    if (s === COINBASE_FAILED) return "Failed";
+    // ONRAMP_TRANSACTION_STATUS_IN_PROGRESS / _CREATED → take last token
+    const parts = s.split("_");
+    const tail = parts[parts.length - 1] || s;
+    return tail.charAt(0) + tail.slice(1).toLowerCase();
+  }
+  if (s === STRIPE_SUCCESS) return "Success";
+  if (STRIPE_FAILED_SET.has(s)) return "Failed";
+  if (s.startsWith("fulfillment_")) return "Pending";
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
+}
+
 export default function CoinbaseTransactions() {
   const { toast } = useToast();
   const [searchRef, setSearchRef] = useState("");
@@ -98,23 +114,60 @@ export default function CoinbaseTransactions() {
     setLoading(true);
     try {
       const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
-      const ref = searchRef.trim() || undefined;
+      const rawRef = searchRef.trim();
+      // Heuristic: UUIDs contain dashes; otherwise treat as wallet address lookup
+      const isWalletSearch = !!rawRef && !rawRef.includes("-");
+      let cbRefsForSearch: string[] = [];
+      let stripeUserIdsForSearch: string[] = [];
+      let directRef: string | undefined = undefined;
+
+      if (rawRef) {
+        if (isWalletSearch) {
+          try {
+            const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
+              body: { wallet_search: rawRef },
+            });
+            cbRefsForSearch = lookup?.wallet_search?.partner_user_refs || [];
+            stripeUserIdsForSearch = lookup?.wallet_search?.user_ids || [];
+          } catch (err) {
+            console.warn("[ADMIN-TX] wallet search lookup failed", err);
+          }
+          if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) {
+            toast({ title: "No matches", description: "No transactions found for that wallet." });
+            setTransactions([]);
+            setCbNextKey(null);
+            setLoading(false);
+            return;
+          }
+        } else {
+          directRef = rawRef;
+        }
+      }
+
       const tasks: Promise<UnifiedTx[]>[] = [];
 
       if (providerFilter === "all" || providerFilter === "coinbase") {
         tasks.push(
           (async () => {
-            const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-              body: {
-                partnerUserRef: ref,
-                page_key: opts.cbKey || undefined,
-                page_size: String(size),
-              },
-            });
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
-            setCbNextKey(data?.next_page_key ?? null);
-            return (Array.isArray(data?.transactions) ? data.transactions : []).map(normalizeCoinbase);
+            // For wallet search with multiple refs, fan out and merge
+            const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
+            const all: any[] = [];
+            let lastNextKey: string | null = null;
+            for (const r of refsToQuery) {
+              const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
+                body: {
+                  partnerUserRef: r || undefined,
+                  page_key: opts.cbKey || undefined,
+                  page_size: String(size),
+                },
+              });
+              if (error) throw error;
+              if (data?.error) throw new Error(data.error);
+              if (data?.next_page_key) lastNextKey = data.next_page_key;
+              if (Array.isArray(data?.transactions)) all.push(...data.transactions);
+            }
+            setCbNextKey(isWalletSearch ? null : lastNextKey);
+            return all.map(normalizeCoinbase);
           })()
         );
       } else {
@@ -130,7 +183,12 @@ export default function CoinbaseTransactions() {
               .select("*")
               .order("created_at", { ascending: false })
               .range(offset, offset + size - 1);
-            if (ref) q = q.eq("user_id", ref);
+            if (isWalletSearch) {
+              if (stripeUserIdsForSearch.length === 0) return [];
+              q = q.in("user_id", stripeUserIdsForSearch);
+            } else if (directRef) {
+              q = q.eq("user_id", directRef);
+            }
             const { data, error } = await q;
             if (error) throw error;
             return (data ?? []).map(normalizeStripe);
@@ -252,12 +310,12 @@ export default function CoinbaseTransactions() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_120px_auto] gap-3 items-end">
             <div className="space-y-1">
-              <Label htmlFor="puref">Search Ref (Coinbase partnerUserRef / Stripe user_id)</Label>
+              <Label htmlFor="puref">Search (wallet address, Coinbase partnerUserRef, or Stripe user_id)</Label>
               <Input
                 id="puref"
                 value={searchRef}
                 onChange={(e) => setSearchRef(e.target.value)}
-                placeholder="optional"
+                placeholder="wallet address or user ref (optional)"
                 onKeyDown={(e) => e.key === "Enter" && onSearch()}
               />
             </div>
@@ -337,7 +395,33 @@ export default function CoinbaseTransactions() {
                             {tx.provider}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[220px] truncate">{tx.id}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {tx.id && tx.id !== "—" ? (
+                            <div className="flex items-center gap-1">
+                              <span className="max-w-[120px] truncate" title={tx.id}>
+                                {tx.id.length > 14 ? `${tx.id.slice(0, 8)}…${tx.id.slice(-4)}` : tx.id}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(tx.id);
+                                    toast({ title: "Copied", description: "Transaction ID copied" });
+                                  } catch {
+                                    toast({ title: "Copy failed", variant: "destructive" });
+                                  }
+                                }}
+                                aria-label="Copy transaction ID"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">
                           {tx.wallet_address ? (
                             <div className="flex items-center gap-1">
@@ -365,7 +449,7 @@ export default function CoinbaseTransactions() {
                             "—"
                           )}
                         </TableCell>
-                        <TableCell className="text-xs">{tx.status}</TableCell>
+                        <TableCell className="text-xs" title={tx.status}>{shortStatus(tx)}</TableCell>
                         <TableCell>
                           {tx.fiat?.value ? `${tx.fiat.value} ${tx.fiat.currency || ""}` : "—"}
                         </TableCell>
