@@ -310,12 +310,12 @@ export default function CoinbaseTransactions() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_120px_auto] gap-3 items-end">
             <div className="space-y-1">
-              <Label htmlFor="puref">Search Ref (Coinbase partnerUserRef / Stripe user_id)</Label>
+              <Label htmlFor="puref">Search (wallet address, Coinbase partnerUserRef, or Stripe user_id)</Label>
               <Input
                 id="puref"
                 value={searchRef}
                 onChange={(e) => setSearchRef(e.target.value)}
-                placeholder="optional"
+                placeholder="wallet address or user ref (optional)"
                 onKeyDown={(e) => e.key === "Enter" && onSearch()}
               />
             </div>
