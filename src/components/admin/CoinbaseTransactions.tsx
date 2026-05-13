@@ -539,11 +539,8 @@ export default function CoinbaseTransactions() {
     setExporting(false);
     toast({ title: "Export complete", description: `Exported ${rowsData.length} transaction${rowsData.length === 1 ? "" : "s"}.` });
   };
-  const hasNext =
-    providerFilter === "stripe"
-      ? transactions.filter((t) => t.provider === "stripe").length >=
-        Math.max(1, Math.min(100, parseInt(pageSize) || 25))
-      : !!cbNextKey || providerFilter === "all";
+  const pageSizeNum = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+  const hasNext = transactions.length >= pageSizeNum;
 
   return (
     <div className="space-y-4">
