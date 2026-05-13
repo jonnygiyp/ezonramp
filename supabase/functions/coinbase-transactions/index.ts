@@ -262,6 +262,53 @@ serve(async (req) => {
   const next_page_key = parsed?.next_page_key ?? parsed?.pagination?.next_page_key ?? null;
   const total_count = parsed?.total_count ?? parsed?.pagination?.total_count ?? null;
 
+  // Persist every fetched transaction into long-term storage (Coinbase only keeps 30 days).
+  // Best-effort — we never fail the request if persistence fails.
+  if (Array.isArray(transactions) && transactions.length > 0) {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const adminClient = createClient(supabaseUrl, serviceKey);
+      const nowIso = new Date().toISOString();
+      const rows = transactions
+        .map((tx: any) => {
+          const txId = tx.transaction_id || tx.id;
+          if (!txId) return null;
+          const fiat = tx.payment_total || tx.source_amount || tx.purchase_amount || {};
+          const crypto = tx.destination_amount || tx.purchase_amount || {};
+          return {
+            transaction_id: txId,
+            partner_user_ref: tx.partner_user_ref || null,
+            wallet_address: tx.wallet_address || null,
+            status: tx.status || "unknown",
+            fiat_value: fiat?.value ? Number(fiat.value) : null,
+            fiat_currency: fiat?.currency || null,
+            crypto_value: crypto?.value ? Number(crypto.value) : null,
+            crypto_currency: crypto?.currency || tx.purchase_currency || null,
+            asset: tx.asset || tx.purchase_currency || crypto?.currency || null,
+            network: tx.network || tx.purchase_network || null,
+            tx_created_at: tx.created_at || null,
+            tx_updated_at: tx.updated_at || null,
+            last_synced_at: nowIso,
+            payload: tx,
+          };
+        })
+        .filter(Boolean);
+      if (rows.length > 0) {
+        const { error: storeErr } = await adminClient
+          .from("coinbase_transactions")
+          .upsert(rows, { onConflict: "transaction_id" });
+        if (storeErr) {
+          console.error("[COINBASE-TX] persistence upsert failed:", storeErr.message);
+        } else {
+          console.log(`[COINBASE-TX] Persisted ${rows.length} transactions to long-term store`);
+        }
+      }
+    } catch (persistErr) {
+      console.error("[COINBASE-TX] persistence error:", persistErr);
+    }
+  }
+
   return jsonResponse(
     { transactions, next_page_key, total_count, raw: parsed },
     200,

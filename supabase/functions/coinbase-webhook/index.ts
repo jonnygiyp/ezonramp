@@ -280,6 +280,36 @@ serve(async (req) => {
       console.log(`[COINBASE-WEBHOOK] Updated transaction ${transactionId} to status: ${canonicalStatus}`);
     }
 
+    // Also persist into long-term coinbase_transactions store (Coinbase API only retains 30 days)
+    if (transactionId) {
+      const partnerUserRefForStore =
+        event.partnerUserId || event.partner_user_id || event.partnerUserRef || null;
+      const nowIso = new Date().toISOString();
+      const { error: storeError } = await supabase
+        .from("coinbase_transactions")
+        .upsert(
+          {
+            transaction_id: transactionId,
+            partner_user_ref: partnerUserRefForStore,
+            wallet_address: walletAddress,
+            status: status || canonicalStatus,
+            fiat_value: fiatAmount || null,
+            fiat_currency: currency,
+            crypto_value: cryptoAmount || null,
+            crypto_currency: cryptoCurrency,
+            asset: cryptoCurrency,
+            network: network,
+            tx_updated_at: nowIso,
+            last_synced_at: nowIso,
+            payload: event,
+          },
+          { onConflict: "transaction_id" }
+        );
+      if (storeError) {
+        console.error("[COINBASE-WEBHOOK] coinbase_transactions upsert error:", storeError);
+      }
+    }
+
     // Also update purchase_attempts if partnerUserId is present in webhook payload
     const partnerUserId = event.partnerUserId || event.partner_user_id || event.partnerUserRef;
     if (partnerUserId) {
