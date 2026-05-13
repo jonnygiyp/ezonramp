@@ -595,7 +595,7 @@ export default function CoinbaseTransactions() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-[160px_160px_auto_auto] gap-3 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
               <Label htmlFor="from-date">From</Label>
               <Input
