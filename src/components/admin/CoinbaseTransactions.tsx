@@ -323,6 +323,62 @@ export default function CoinbaseTransactions() {
     }
     return true;
   });
+
+  const exportCsv = () => {
+    const headers = [
+      "provider",
+      "id",
+      "status",
+      "wallet_address",
+      "user_id",
+      "partner_user_ref",
+      "email",
+      "fiat_value",
+      "fiat_currency",
+      "crypto_value",
+      "crypto_currency",
+      "asset",
+      "network",
+      "created_at",
+      "updated_at",
+    ];
+    const escape = (v: unknown) => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = filtered.map((t) =>
+      [
+        t.provider,
+        t.id,
+        shortStatus(t),
+        t.wallet_address,
+        t.user_id,
+        t.partner_user_ref,
+        t.email,
+        t.fiat?.value,
+        t.fiat?.currency,
+        t.crypto?.value,
+        t.crypto?.currency,
+        t.asset,
+        t.network,
+        t.created_at,
+        t.updated_at,
+      ]
+        .map(escape)
+        .join(",")
+    );
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   const hasNext =
     providerFilter === "stripe"
       ? transactions.filter((t) => t.provider === "stripe").length >=
