@@ -314,7 +314,15 @@ export default function CoinbaseTransactions() {
     }
   };
 
-  const filtered = transactions.filter((t) => matchesStatus(t, statusFilter));
+  const filtered = transactions.filter((t) => {
+    if (!matchesStatus(t, statusFilter)) return false;
+    if (fromTs || toTs) {
+      const ts = t.created_at ? new Date(t.created_at).getTime() : 0;
+      if (fromTs && ts < fromTs) return false;
+      if (toTs && ts > toTs) return false;
+    }
+    return true;
+  });
   const hasNext =
     providerFilter === "stripe"
       ? transactions.filter((t) => t.provider === "stripe").length >=
