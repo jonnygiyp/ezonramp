@@ -262,63 +262,6 @@ serve(async (req) => {
   const next_page_key = parsed?.next_page_key ?? parsed?.pagination?.next_page_key ?? null;
   const total_count = parsed?.total_count ?? parsed?.pagination?.total_count ?? null;
 
-  // Persist each transaction into transaction_audit_log so we keep history
-  // beyond the Coinbase API's ~30-day window.
-  if (Array.isArray(transactions) && transactions.length > 0) {
-    try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const adminClient = createClient(supabaseUrl, serviceKey);
-
-      const rows = transactions
-        .map((tx: any) => {
-          const requestId = tx.transaction_id || tx.id;
-          if (!requestId) return null;
-          const wallet = tx.wallet_address || tx.destination_address || "";
-          const fiatVal = parseFloat(
-            tx.payment_total?.value ?? tx.source_amount?.value ?? tx.purchase_amount?.value ?? "0",
-          );
-          const fiatCur = (tx.payment_total?.currency || tx.source_amount?.currency || "USD").toString();
-          const cryptoCur = (tx.purchase_amount?.currency || tx.destination_amount?.currency || "USDC").toString();
-          const status = tx.status || "";
-          let canonical: string = "callback_received";
-          if (status === "ONRAMP_TRANSACTION_STATUS_SUCCESS") canonical = "success";
-          else if (status === "ONRAMP_TRANSACTION_STATUS_FAILED") canonical = "failed";
-          else if (
-            status === "ONRAMP_TRANSACTION_STATUS_IN_PROGRESS" ||
-            status === "ONRAMP_TRANSACTION_STATUS_PENDING_PAYMENT" ||
-            status === "ONRAMP_TRANSACTION_STATUS_PENDING_ON_CHAIN"
-          ) canonical = "pending";
-          return {
-            request_id: requestId,
-            provider: "coinbase",
-            wallet_address: wallet,
-            amount: isFinite(fiatVal) ? fiatVal : 0,
-            currency: fiatCur,
-            crypto_currency: cryptoCur,
-            status: canonical,
-            callback_data: tx,
-            created_at: tx.created_at || new Date().toISOString(),
-            updated_at: tx.updated_at || new Date().toISOString(),
-          };
-        })
-        .filter(Boolean);
-
-      if (rows.length > 0) {
-        const { error: upsertErr } = await adminClient
-          .from("transaction_audit_log")
-          .upsert(rows, { onConflict: "request_id" });
-        if (upsertErr) {
-          console.error("[COINBASE-TX] persist upsert error:", upsertErr.message);
-        } else {
-          console.log(`[COINBASE-TX] Persisted ${rows.length} tx to audit log`);
-        }
-      }
-    } catch (persistErr) {
-      console.error("[COINBASE-TX] persist failed:", persistErr);
-    }
-  }
-
   return jsonResponse(
     { transactions, next_page_key, total_count, raw: parsed },
     200,
