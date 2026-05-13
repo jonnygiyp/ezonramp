@@ -395,7 +395,33 @@ export default function CoinbaseTransactions() {
                             {tx.provider}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[220px] truncate">{tx.id}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {tx.id && tx.id !== "—" ? (
+                            <div className="flex items-center gap-1">
+                              <span className="max-w-[120px] truncate" title={tx.id}>
+                                {tx.id.length > 14 ? `${tx.id.slice(0, 8)}…${tx.id.slice(-4)}` : tx.id}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(tx.id);
+                                    toast({ title: "Copied", description: "Transaction ID copied" });
+                                  } catch {
+                                    toast({ title: "Copy failed", variant: "destructive" });
+                                  }
+                                }}
+                                aria-label="Copy transaction ID"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">
                           {tx.wallet_address ? (
                             <div className="flex items-center gap-1">
