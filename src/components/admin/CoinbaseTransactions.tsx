@@ -640,6 +640,15 @@ export default function CoinbaseTransactions() {
               {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               {exporting ? "Exporting..." : "Export CSV"}
             </Button>
+            <Button
+              variant="outline"
+              onClick={onSyncCoinbase}
+              disabled={syncing || loading}
+              title="Pull the last ~30 days of transactions from Coinbase and persist them. Past syncs are kept forever."
+            >
+              {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              {syncing ? "Syncing..." : "Sync from Coinbase"}
+            </Button>
           </div>
 
           <div className="rounded-md border">
