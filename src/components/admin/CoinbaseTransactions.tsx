@@ -53,17 +53,30 @@ function normalizeCoinbase(tx: any): UnifiedTx {
 }
 
 function normalizeStripe(row: any): UnifiedTx {
+  const cb = (row.callback_data || {}) as any;
+  const td = (cb.transaction_details || {}) as any;
+  const fiatValue =
+    cb.source_total_amount ??
+    td.source_amount ??
+    (row.source_amount != null ? String(row.source_amount) : undefined);
+  const fiatCurrency = (td.source_currency || "USD").toString().toUpperCase();
+  const cryptoValue = td.destination_amount
+    ? String(parseFloat(td.destination_amount))
+    : undefined;
+  const cryptoCurrency = (td.destination_currency || row.destination_currency || "USDC")
+    .toString()
+    .toUpperCase();
   return {
     provider: "stripe",
     id: row.stripe_session_id || row.id,
     status: row.status || "—",
-    fiat: row.source_amount ? { value: String(row.source_amount), currency: "USD" } : undefined,
-    crypto: undefined,
-    asset: row.destination_currency || "USDC",
-    network: row.destination_network || "solana",
+    fiat: fiatValue != null ? { value: String(fiatValue), currency: fiatCurrency } : undefined,
+    crypto: cryptoValue ? { value: cryptoValue, currency: cryptoCurrency } : undefined,
+    asset: td.destination_currency?.toString().toUpperCase() || row.destination_currency || "USDC",
+    network: td.destination_network || row.destination_network || "solana",
     partner_user_ref: row.user_id,
     user_id: row.user_id,
-    wallet_address: row.wallet_address ?? null,
+    wallet_address: td.wallet_address || row.wallet_address || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     raw: row,
