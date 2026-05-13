@@ -115,6 +115,8 @@ export default function CoinbaseTransactions() {
   const [pageSize, setPageSize] = useState("25");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<UnifiedTx[]>([]);
   const [cbNextKey, setCbNextKey] = useState<string | null>(null);
@@ -122,6 +124,9 @@ export default function CoinbaseTransactions() {
   const [page, setPage] = useState(1);
   const [cbStack, setCbStack] = useState<(string | null)[]>([null]);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  const fromTs = fromDate ? new Date(fromDate + "T00:00:00").getTime() : null;
+  const toTs = toDate ? new Date(toDate + "T23:59:59.999").getTime() : null;
 
   const fetchData = async (opts: { cbKey?: string | null; stripeOff?: number; reset?: boolean }) => {
     setLoading(true);
@@ -202,6 +207,8 @@ export default function CoinbaseTransactions() {
             } else if (directRef) {
               q = q.eq("user_id", directRef);
             }
+            if (fromDate) q = q.gte("created_at", new Date(fromDate + "T00:00:00").toISOString());
+            if (toDate) q = q.lte("created_at", new Date(toDate + "T23:59:59.999").toISOString());
             const { data, error } = await q;
             if (error) throw error;
             return (data ?? []).map(normalizeStripe);
@@ -307,7 +314,15 @@ export default function CoinbaseTransactions() {
     }
   };
 
-  const filtered = transactions.filter((t) => matchesStatus(t, statusFilter));
+  const filtered = transactions.filter((t) => {
+    if (!matchesStatus(t, statusFilter)) return false;
+    if (fromTs || toTs) {
+      const ts = t.created_at ? new Date(t.created_at).getTime() : 0;
+      if (fromTs && ts < fromTs) return false;
+      if (toTs && ts > toTs) return false;
+    }
+    return true;
+  });
   const hasNext =
     providerFilter === "stripe"
       ? transactions.filter((t) => t.provider === "stripe").length >=
@@ -321,7 +336,7 @@ export default function CoinbaseTransactions() {
           <CardTitle>Onramp Transactions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_120px_auto] gap-3 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_120px] gap-3 items-end">
             <div className="space-y-1">
               <Label htmlFor="puref">Search (wallet address, Coinbase partnerUserRef, or Stripe user_id)</Label>
               <Input
@@ -369,6 +384,40 @@ export default function CoinbaseTransactions() {
                 onChange={(e) => setPageSize(e.target.value)}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-[160px_160px_auto_auto] gap-3 items-end">
+            <div className="space-y-1">
+              <Label htmlFor="from-date">From</Label>
+              <Input
+                id="from-date"
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="to-date">To</Label>
+              <Input
+                id="to-date"
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+            {(fromDate || toDate) && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                  onSearch();
+                }}
+              >
+                Clear dates
+              </Button>
+            )}
             <Button onClick={onSearch} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
               Search
