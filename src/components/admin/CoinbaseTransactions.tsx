@@ -52,6 +52,31 @@ function normalizeCoinbase(tx: any): UnifiedTx {
   };
 }
 
+// Normalize a row from the persistent `coinbase_transactions` table
+function normalizeCoinbaseDb(row: any): UnifiedTx {
+  return {
+    provider: "coinbase",
+    id: row.transaction_id || row.id || "—",
+    status: row.status || "—",
+    fiat:
+      row.fiat_value != null
+        ? { value: String(row.fiat_value), currency: row.fiat_currency || "USD" }
+        : undefined,
+    crypto:
+      row.crypto_value != null
+        ? { value: String(row.crypto_value), currency: row.crypto_currency || "USDC" }
+        : undefined,
+    asset: row.asset || row.crypto_currency || undefined,
+    network: row.network || undefined,
+    partner_user_ref: row.partner_user_ref || undefined,
+    user_id: row.user_id || undefined,
+    wallet_address: row.wallet_address || null,
+    created_at: row.tx_created_at || row.created_at,
+    updated_at: row.tx_updated_at || row.updated_at,
+    raw: row.payload || row,
+  };
+}
+
 function normalizeStripe(row: any): UnifiedTx {
   const cb = (row.callback_data || {}) as any;
   const td = (cb.transaction_details || {}) as any;
