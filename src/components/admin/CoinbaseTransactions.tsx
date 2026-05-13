@@ -137,24 +137,23 @@ export default function CoinbaseTransactions() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [transactions, setTransactions] = useState<UnifiedTx[]>([]);
-  const [cbNextKey, setCbNextKey] = useState<string | null>(null);
+  const [cbOffset, setCbOffset] = useState(0);
   const [stripeOffset, setStripeOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [cbStack, setCbStack] = useState<(string | null)[]>([null]);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const fromTs = fromDate ? new Date(fromDate + "T00:00:00").getTime() : null;
   const toTs = toDate ? new Date(toDate + "T23:59:59.999").getTime() : null;
 
-  const fetchData = async (opts: { cbKey?: string | null; stripeOff?: number; reset?: boolean }) => {
+  const fetchData = async (opts: { cbOff?: number; stripeOff?: number; reset?: boolean }) => {
     setLoading(true);
     try {
       const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
       const rawRef = searchRef.trim();
       // Heuristic: UUIDs contain dashes; otherwise treat as wallet address lookup
       const isWalletSearch = !!rawRef && !rawRef.includes("-");
-      let cbRefsForSearch: string[] = [];
       let stripeUserIdsForSearch: string[] = [];
       let directRef: string | undefined = undefined;
 
