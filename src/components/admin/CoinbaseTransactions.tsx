@@ -98,23 +98,60 @@ export default function CoinbaseTransactions() {
     setLoading(true);
     try {
       const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
-      const ref = searchRef.trim() || undefined;
+      const rawRef = searchRef.trim();
+      // Heuristic: UUIDs contain dashes; otherwise treat as wallet address lookup
+      const isWalletSearch = !!rawRef && !rawRef.includes("-");
+      let cbRefsForSearch: string[] = [];
+      let stripeUserIdsForSearch: string[] = [];
+      let directRef: string | undefined = undefined;
+
+      if (rawRef) {
+        if (isWalletSearch) {
+          try {
+            const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
+              body: { wallet_search: rawRef },
+            });
+            cbRefsForSearch = lookup?.wallet_search?.partner_user_refs || [];
+            stripeUserIdsForSearch = lookup?.wallet_search?.user_ids || [];
+          } catch (err) {
+            console.warn("[ADMIN-TX] wallet search lookup failed", err);
+          }
+          if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) {
+            toast({ title: "No matches", description: "No transactions found for that wallet." });
+            setTransactions([]);
+            setCbNextKey(null);
+            setLoading(false);
+            return;
+          }
+        } else {
+          directRef = rawRef;
+        }
+      }
+
       const tasks: Promise<UnifiedTx[]>[] = [];
 
       if (providerFilter === "all" || providerFilter === "coinbase") {
         tasks.push(
           (async () => {
-            const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-              body: {
-                partnerUserRef: ref,
-                page_key: opts.cbKey || undefined,
-                page_size: String(size),
-              },
-            });
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
-            setCbNextKey(data?.next_page_key ?? null);
-            return (Array.isArray(data?.transactions) ? data.transactions : []).map(normalizeCoinbase);
+            // For wallet search with multiple refs, fan out and merge
+            const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
+            const all: any[] = [];
+            let lastNextKey: string | null = null;
+            for (const r of refsToQuery) {
+              const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
+                body: {
+                  partnerUserRef: r || undefined,
+                  page_key: opts.cbKey || undefined,
+                  page_size: String(size),
+                },
+              });
+              if (error) throw error;
+              if (data?.error) throw new Error(data.error);
+              if (data?.next_page_key) lastNextKey = data.next_page_key;
+              if (Array.isArray(data?.transactions)) all.push(...data.transactions);
+            }
+            setCbNextKey(isWalletSearch ? null : lastNextKey);
+            return all.map(normalizeCoinbase);
           })()
         );
       } else {
@@ -130,7 +167,12 @@ export default function CoinbaseTransactions() {
               .select("*")
               .order("created_at", { ascending: false })
               .range(offset, offset + size - 1);
-            if (ref) q = q.eq("user_id", ref);
+            if (isWalletSearch) {
+              if (stripeUserIdsForSearch.length === 0) return [];
+              q = q.in("user_id", stripeUserIdsForSearch);
+            } else if (directRef) {
+              q = q.eq("user_id", directRef);
+            }
             const { data, error } = await q;
             if (error) throw error;
             return (data ?? []).map(normalizeStripe);
