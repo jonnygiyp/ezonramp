@@ -45,6 +45,7 @@ function normalizeCoinbase(tx: any): UnifiedTx {
     asset: tx.asset || tx.purchase_currency || tx.destination_amount?.currency,
     network: tx.network || tx.purchase_network,
     partner_user_ref: tx.partner_user_ref,
+    wallet_address: tx.wallet_address ?? null,
     created_at: tx.created_at,
     updated_at: tx.updated_at,
     raw: tx,
