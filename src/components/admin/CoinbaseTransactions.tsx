@@ -336,7 +336,7 @@ export default function CoinbaseTransactions() {
           <CardTitle>Onramp Transactions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_120px_auto] gap-3 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_120px] gap-3 items-end">
             <div className="space-y-1">
               <Label htmlFor="puref">Search (wallet address, Coinbase partnerUserRef, or Stripe user_id)</Label>
               <Input
