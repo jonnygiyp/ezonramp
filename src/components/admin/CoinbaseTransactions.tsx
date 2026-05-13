@@ -80,6 +80,22 @@ function matchesStatus(tx: UnifiedTx, filter: StatusFilter): boolean {
   return STRIPE_FAILED_SET.has(tx.status);
 }
 
+function shortStatus(tx: UnifiedTx): string {
+  const s = tx.status || "";
+  if (tx.provider === "coinbase") {
+    if (s === COINBASE_SUCCESS) return "Success";
+    if (s === COINBASE_FAILED) return "Failed";
+    // ONRAMP_TRANSACTION_STATUS_IN_PROGRESS / _CREATED → take last token
+    const parts = s.split("_");
+    const tail = parts[parts.length - 1] || s;
+    return tail.charAt(0) + tail.slice(1).toLowerCase();
+  }
+  if (s === STRIPE_SUCCESS) return "Success";
+  if (STRIPE_FAILED_SET.has(s)) return "Failed";
+  if (s.startsWith("fulfillment_")) return "Pending";
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
+}
+
 export default function CoinbaseTransactions() {
   const { toast } = useToast();
   const [searchRef, setSearchRef] = useState("");
