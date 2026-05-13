@@ -515,6 +515,8 @@ export default function CoinbaseTransactions() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setExporting(false);
+    toast({ title: "Export complete", description: `Exported ${rowsData.length} transaction${rowsData.length === 1 ? "" : "s"}.` });
   };
   const hasNext =
     providerFilter === "stripe"
