@@ -134,7 +134,7 @@ serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ users, partner_user_refs: refMap }),
+    JSON.stringify({ users, partner_user_refs: refMap, wallet_search: walletSearchResult }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 });
