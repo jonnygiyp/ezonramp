@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, ChevronDown, Copy, Download } from "lucide-react";
+import { Loader2, Search, ChevronDown, Copy, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type StatusFilter = "all" | "success" | "failed";
