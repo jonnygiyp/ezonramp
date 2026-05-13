@@ -384,6 +384,40 @@ export default function CoinbaseTransactions() {
                 onChange={(e) => setPageSize(e.target.value)}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-[160px_160px_auto_auto] gap-3 items-end">
+            <div className="space-y-1">
+              <Label htmlFor="from-date">From</Label>
+              <Input
+                id="from-date"
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="to-date">To</Label>
+              <Input
+                id="to-date"
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+            {(fromDate || toDate) && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                  onSearch();
+                }}
+              >
+                Clear dates
+              </Button>
+            )}
             <Button onClick={onSearch} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
               Search
