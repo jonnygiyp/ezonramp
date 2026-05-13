@@ -620,10 +620,10 @@ export default function CoinbaseTransactions() {
             <Button
               variant="outline"
               onClick={exportCsv}
-              disabled={filtered.length === 0}
+              disabled={exporting || loading}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {exporting ? "Exporting..." : "Export CSV"}
             </Button>
           </div>
 
