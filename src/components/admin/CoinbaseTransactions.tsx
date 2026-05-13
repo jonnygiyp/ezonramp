@@ -22,6 +22,9 @@ interface UnifiedTx {
   asset?: string;
   network?: string;
   partner_user_ref?: string;
+  user_id?: string;
+  wallet_address?: string | null;
+  email?: string | null;
   created_at?: string;
   updated_at?: string;
   raw: Record<string, unknown>;
