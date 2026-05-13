@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, ChevronDown, Copy } from "lucide-react";
+import { Loader2, Search, ChevronDown, Copy, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type StatusFilter = "all" | "success" | "failed";
@@ -323,6 +323,62 @@ export default function CoinbaseTransactions() {
     }
     return true;
   });
+
+  const exportCsv = () => {
+    const headers = [
+      "provider",
+      "id",
+      "status",
+      "wallet_address",
+      "user_id",
+      "partner_user_ref",
+      "email",
+      "fiat_value",
+      "fiat_currency",
+      "crypto_value",
+      "crypto_currency",
+      "asset",
+      "network",
+      "created_at",
+      "updated_at",
+    ];
+    const escape = (v: unknown) => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = filtered.map((t) =>
+      [
+        t.provider,
+        t.id,
+        shortStatus(t),
+        t.wallet_address,
+        t.user_id,
+        t.partner_user_ref,
+        t.email,
+        t.fiat?.value,
+        t.fiat?.currency,
+        t.crypto?.value,
+        t.crypto?.currency,
+        t.asset,
+        t.network,
+        t.created_at,
+        t.updated_at,
+      ]
+        .map(escape)
+        .join(",")
+    );
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   const hasNext =
     providerFilter === "stripe"
       ? transactions.filter((t) => t.provider === "stripe").length >=
@@ -421,6 +477,14 @@ export default function CoinbaseTransactions() {
             <Button onClick={onSearch} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
               Search
+            </Button>
+            <Button
+              variant="outline"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
             </Button>
           </div>
 
