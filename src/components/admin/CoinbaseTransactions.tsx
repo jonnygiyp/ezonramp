@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, ChevronDown } from "lucide-react";
+import { Loader2, Search, ChevronDown, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type StatusFilter = "all" | "success" | "failed";
@@ -309,7 +309,6 @@ export default function CoinbaseTransactions() {
                 <TableRow>
                   <TableHead>Provider</TableHead>
                   <TableHead>ID</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Wallet</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Fiat</TableHead>
@@ -324,7 +323,7 @@ export default function CoinbaseTransactions() {
               <TableBody>
                 {filtered.length === 0 && !loading ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                       No transactions to display.
                     </TableCell>
                   </TableRow>
@@ -338,13 +337,32 @@ export default function CoinbaseTransactions() {
                           </Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[220px] truncate">{tx.id}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate" title={tx.email || ""}>
-                          {tx.email || "—"}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[160px] truncate" title={tx.wallet_address || ""}>
-                          {tx.wallet_address
-                            ? `${tx.wallet_address.slice(0, 6)}…${tx.wallet_address.slice(-4)}`
-                            : "—"}
+                        <TableCell className="font-mono text-xs">
+                          {tx.wallet_address ? (
+                            <div className="flex items-center gap-1">
+                              <span className="max-w-[140px] truncate" title={tx.wallet_address}>
+                                {`${tx.wallet_address.slice(0, 6)}…${tx.wallet_address.slice(-4)}`}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(tx.wallet_address!);
+                                    toast({ title: "Copied", description: "Wallet address copied" });
+                                  } catch {
+                                    toast({ title: "Copy failed", variant: "destructive" });
+                                  }
+                                }}
+                                aria-label="Copy wallet address"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                         <TableCell className="text-xs">{tx.status}</TableCell>
                         <TableCell>
@@ -375,7 +393,7 @@ export default function CoinbaseTransactions() {
                       </TableRow>
                       {expandedIdx === idx && (
                         <TableRow>
-                          <TableCell colSpan={12} className="bg-muted/30">
+                          <TableCell colSpan={11} className="bg-muted/30">
                             <pre className="text-xs overflow-auto max-h-96 p-2">
                               {JSON.stringify(tx.raw, null, 2)}
                             </pre>
