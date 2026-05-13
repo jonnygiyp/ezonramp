@@ -324,7 +324,7 @@ export default function CoinbaseTransactions() {
               <TableBody>
                 {filtered.length === 0 && !loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       No transactions to display.
                     </TableCell>
                   </TableRow>
@@ -338,6 +338,14 @@ export default function CoinbaseTransactions() {
                           </Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[220px] truncate">{tx.id}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate" title={tx.email || ""}>
+                          {tx.email || "—"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs max-w-[160px] truncate" title={tx.wallet_address || ""}>
+                          {tx.wallet_address
+                            ? `${tx.wallet_address.slice(0, 6)}…${tx.wallet_address.slice(-4)}`
+                            : "—"}
+                        </TableCell>
                         <TableCell className="text-xs">{tx.status}</TableCell>
                         <TableCell>
                           {tx.fiat?.value ? `${tx.fiat.value} ${tx.fiat.currency || ""}` : "—"}
