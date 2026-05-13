@@ -143,6 +143,36 @@ export default function CoinbaseTransactions() {
         const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
         return tb - ta;
       });
+
+      // Enrich with email + wallet
+      const cbRefs = merged
+        .filter((t) => t.provider === "coinbase" && t.partner_user_ref)
+        .map((t) => t.partner_user_ref as string);
+      const stripeUserIds = merged
+        .filter((t) => t.provider === "stripe" && t.user_id)
+        .map((t) => t.user_id as string);
+      if (cbRefs.length || stripeUserIds.length) {
+        try {
+          const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
+            body: { user_ids: stripeUserIds, partner_user_refs: cbRefs },
+          });
+          const refMap = (lookup?.partner_user_refs || {}) as Record<string, { user_id: string; wallet_address: string | null }>;
+          const userMap = (lookup?.users || {}) as Record<string, { email: string | null; wallet_address: string | null }>;
+          for (const t of merged) {
+            if (t.provider === "coinbase" && t.partner_user_ref && refMap[t.partner_user_ref]) {
+              t.user_id = refMap[t.partner_user_ref].user_id;
+              t.wallet_address = refMap[t.partner_user_ref].wallet_address;
+            }
+            if (t.user_id && userMap[t.user_id]) {
+              t.email = userMap[t.user_id].email;
+              if (!t.wallet_address) t.wallet_address = userMap[t.user_id].wallet_address;
+            }
+          }
+        } catch (lookupErr) {
+          console.warn("[ADMIN-TX] user lookup failed", lookupErr);
+        }
+      }
+
       setTransactions(merged);
       if (opts.reset) {
         setCbStack([null]);
