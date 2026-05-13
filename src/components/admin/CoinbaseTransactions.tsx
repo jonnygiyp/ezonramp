@@ -393,7 +393,7 @@ export default function CoinbaseTransactions() {
                       </TableRow>
                       {expandedIdx === idx && (
                         <TableRow>
-                          <TableCell colSpan={12} className="bg-muted/30">
+                          <TableCell colSpan={11} className="bg-muted/30">
                             <pre className="text-xs overflow-auto max-h-96 p-2">
                               {JSON.stringify(tx.raw, null, 2)}
                             </pre>
