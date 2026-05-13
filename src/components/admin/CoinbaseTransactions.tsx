@@ -449,7 +449,7 @@ export default function CoinbaseTransactions() {
                             "—"
                           )}
                         </TableCell>
-                        <TableCell className="text-xs">{tx.status}</TableCell>
+                        <TableCell className="text-xs" title={tx.status}>{shortStatus(tx)}</TableCell>
                         <TableCell>
                           {tx.fiat?.value ? `${tx.fiat.value} ${tx.fiat.currency || ""}` : "—"}
                         </TableCell>
