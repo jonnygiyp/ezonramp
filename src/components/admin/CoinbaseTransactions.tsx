@@ -192,29 +192,44 @@ export default function CoinbaseTransactions() {
       if (providerFilter === "all" || providerFilter === "coinbase") {
         tasks.push(
           (async () => {
-            // For wallet search with multiple refs, fan out and merge
-            const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
-            const all: any[] = [];
-            let lastNextKey: string | null = null;
-            for (const r of refsToQuery) {
-              const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-                body: {
-                  partnerUserRef: r || undefined,
-                  page_key: opts.cbKey || undefined,
-                  page_size: String(size),
-                },
-              });
-              if (error) throw error;
-              if (data?.error) throw new Error(data.error);
-              if (data?.next_page_key) lastNextKey = data.next_page_key;
-              if (Array.isArray(data?.transactions)) all.push(...data.transactions);
+            // Fire-and-forget sync: refresh the last 30 days of Coinbase data into the DB.
+            // We don't await for big payloads — only awaited when wallet search needs the freshest data.
+            const refsToSync = isWalletSearch ? cbRefsForSearch : [directRef];
+            for (const r of refsToSync) {
+              try {
+                await supabase.functions.invoke("coinbase-transactions", {
+                  body: {
+                    partnerUserRef: r || undefined,
+                    page_size: "100",
+                  },
+                });
+              } catch (syncErr) {
+                console.warn("[ADMIN-TX] coinbase live sync failed (continuing with DB)", syncErr);
+              }
             }
-            setCbNextKey(isWalletSearch ? null : lastNextKey);
-            return all.map(normalizeCoinbase);
+
+            const offset = opts.cbOff ?? 0;
+            let q = supabase
+              .from("coinbase_transactions")
+              .select("*")
+              .order("tx_created_at", { ascending: false, nullsFirst: false })
+              .range(offset, offset + size - 1);
+            if (isWalletSearch) {
+              const orParts: string[] = [];
+              if (cbRefsForSearch.length > 0)
+                orParts.push(`partner_user_ref.in.(${cbRefsForSearch.map((s) => `"${s}"`).join(",")})`);
+              orParts.push(`wallet_address.eq.${rawRef}`);
+              q = q.or(orParts.join(","));
+            } else if (directRef) {
+              q = q.eq("partner_user_ref", directRef);
+            }
+            if (fromDate) q = q.gte("tx_created_at", new Date(fromDate + "T00:00:00").toISOString());
+            if (toDate) q = q.lte("tx_created_at", new Date(toDate + "T23:59:59.999").toISOString());
+            const { data, error } = await q;
+            if (error) throw error;
+            return (data ?? []).map(normalizeCoinbaseDb);
           })()
         );
-      } else {
-        setCbNextKey(null);
       }
 
       if (providerFilter === "all" || providerFilter === "stripe") {
