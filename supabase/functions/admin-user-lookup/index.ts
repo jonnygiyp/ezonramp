@@ -39,7 +39,7 @@ serve(async (req) => {
     return forbiddenResponse(corsHeaders, "Admin only");
   }
 
-  let body: { user_ids?: string[]; partner_user_refs?: string[] } = {};
+  let body: { user_ids?: string[]; partner_user_refs?: string[]; wallet_search?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -48,6 +48,36 @@ serve(async (req) => {
 
   const userIds = Array.from(new Set((body.user_ids || []).filter(Boolean))).slice(0, 200);
   const partnerRefs = Array.from(new Set((body.partner_user_refs || []).filter(Boolean))).slice(0, 200);
+
+  // Resolve a wallet address -> { user_ids, partner_user_refs } for search
+  const walletSearch = (body.wallet_search || "").trim();
+  const walletSearchResult: { user_ids: string[]; partner_user_refs: string[] } = {
+    user_ids: [],
+    partner_user_refs: [],
+  };
+  if (walletSearch) {
+    const { data: profs } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("wallet_address", walletSearch);
+    for (const p of profs || []) {
+      walletSearchResult.user_ids.push(p.id);
+      userIds.push(p.id);
+    }
+    const { data: attempts } = await admin
+      .from("purchase_attempts")
+      .select("partner_user_ref, user_id")
+      .eq("wallet_address", walletSearch);
+    for (const a of attempts || []) {
+      if (a.partner_user_ref) walletSearchResult.partner_user_refs.push(a.partner_user_ref);
+      if (a.user_id) {
+        walletSearchResult.user_ids.push(a.user_id);
+        userIds.push(a.user_id);
+      }
+    }
+    walletSearchResult.user_ids = Array.from(new Set(walletSearchResult.user_ids));
+    walletSearchResult.partner_user_refs = Array.from(new Set(walletSearchResult.partner_user_refs));
+  }
 
   // Resolve partner_user_refs -> { user_id, wallet_address }
   const refMap: Record<string, { user_id: string; wallet_address: string | null }> = {};
