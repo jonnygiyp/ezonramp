@@ -163,17 +163,9 @@ export default function CoinbaseTransactions() {
             const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
               body: { wallet_search: rawRef },
             });
-            cbRefsForSearch = lookup?.wallet_search?.partner_user_refs || [];
             stripeUserIdsForSearch = lookup?.wallet_search?.user_ids || [];
           } catch (err) {
             console.warn("[ADMIN-TX] wallet search lookup failed", err);
-          }
-          if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) {
-            toast({ title: "No matches", description: "No transactions found for that wallet." });
-            setTransactions([]);
-            setCbNextKey(null);
-            setLoading(false);
-            return;
           }
         } else {
           directRef = rawRef;
@@ -185,29 +177,25 @@ export default function CoinbaseTransactions() {
       if (providerFilter === "all" || providerFilter === "coinbase") {
         tasks.push(
           (async () => {
-            // For wallet search with multiple refs, fan out and merge
-            const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
-            const all: any[] = [];
-            let lastNextKey: string | null = null;
-            for (const r of refsToQuery) {
-              const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-                body: {
-                  partnerUserRef: r || undefined,
-                  page_key: opts.cbKey || undefined,
-                  page_size: String(size),
-                },
-              });
-              if (error) throw error;
-              if (data?.error) throw new Error(data.error);
-              if (data?.next_page_key) lastNextKey = data.next_page_key;
-              if (Array.isArray(data?.transactions)) all.push(...data.transactions);
+            const offset = opts.cbOff ?? 0;
+            let q = supabase
+              .from("transaction_audit_log")
+              .select("*")
+              .eq("provider", "coinbase")
+              .order("created_at", { ascending: false })
+              .range(offset, offset + size - 1);
+            if (isWalletSearch) {
+              q = q.ilike("wallet_address", rawRef);
+            } else if (directRef) {
+              q = q.eq("callback_data->>partner_user_ref", directRef);
             }
-            setCbNextKey(isWalletSearch ? null : lastNextKey);
-            return all.map(normalizeCoinbase);
+            if (fromDate) q = q.gte("created_at", new Date(fromDate + "T00:00:00").toISOString());
+            if (toDate) q = q.lte("created_at", new Date(toDate + "T23:59:59.999").toISOString());
+            const { data, error } = await q;
+            if (error) throw error;
+            return (data ?? []).map(normalizeCoinbaseAudit);
           })()
         );
-      } else {
-        setCbNextKey(null);
       }
 
       if (providerFilter === "all" || providerFilter === "stripe") {
@@ -258,7 +246,7 @@ export default function CoinbaseTransactions() {
           for (const t of merged) {
             if (t.provider === "coinbase" && t.partner_user_ref && refMap[t.partner_user_ref]) {
               t.user_id = refMap[t.partner_user_ref].user_id;
-              t.wallet_address = refMap[t.partner_user_ref].wallet_address;
+              if (!t.wallet_address) t.wallet_address = refMap[t.partner_user_ref].wallet_address;
             }
             if (t.user_id && userMap[t.user_id]) {
               t.email = userMap[t.user_id].email;
@@ -272,7 +260,7 @@ export default function CoinbaseTransactions() {
 
       setTransactions(merged);
       if (opts.reset) {
-        setCbStack([null]);
+        setCbOffset(0);
         setStripeOffset(0);
         setPage(1);
       }
@@ -284,7 +272,6 @@ export default function CoinbaseTransactions() {
         variant: "destructive",
       });
       setTransactions([]);
-      setCbNextKey(null);
     } finally {
       setLoading(false);
     }
@@ -292,43 +279,55 @@ export default function CoinbaseTransactions() {
 
   const onSearch = () => {
     setExpandedIdx(null);
-    fetchData({ cbKey: null, stripeOff: 0, reset: true });
+    fetchData({ cbOff: 0, stripeOff: 0, reset: true });
   };
 
   const onNext = () => {
     const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+    const newCbOff = cbOffset + size;
     const newStripeOff = stripeOffset + size;
     setExpandedIdx(null);
-    if (providerFilter === "stripe") {
-      setStripeOffset(newStripeOff);
-      setPage((p) => p + 1);
-      fetchData({ stripeOff: newStripeOff });
-    } else {
-      if (!cbNextKey && providerFilter === "coinbase") return;
-      setCbStack((s) => [...s, cbNextKey]);
-      if (providerFilter === "all") setStripeOffset(newStripeOff);
-      setPage((p) => p + 1);
-      fetchData({ cbKey: cbNextKey, stripeOff: providerFilter === "all" ? newStripeOff : undefined });
-    }
+    setCbOffset(newCbOff);
+    setStripeOffset(newStripeOff);
+    setPage((p) => p + 1);
+    fetchData({ cbOff: newCbOff, stripeOff: newStripeOff });
   };
 
   const onPrev = () => {
     if (page <= 1) return;
     const size = Math.max(1, Math.min(100, parseInt(pageSize) || 25));
+    const newCbOff = Math.max(0, cbOffset - size);
+    const newStripeOff = Math.max(0, stripeOffset - size);
     setExpandedIdx(null);
-    if (providerFilter === "stripe") {
-      const newOff = Math.max(0, stripeOffset - size);
-      setStripeOffset(newOff);
-      setPage((p) => p - 1);
-      fetchData({ stripeOff: newOff });
-    } else {
-      const newStack = cbStack.slice(0, -1);
-      const prevKey = newStack[newStack.length - 1];
-      setCbStack(newStack);
-      const newOff = Math.max(0, stripeOffset - size);
-      if (providerFilter === "all") setStripeOffset(newOff);
-      setPage((p) => p - 1);
-      fetchData({ cbKey: prevKey, stripeOff: providerFilter === "all" ? newOff : undefined });
+    setCbOffset(newCbOff);
+    setStripeOffset(newStripeOff);
+    setPage((p) => p - 1);
+    fetchData({ cbOff: newCbOff, stripeOff: newStripeOff });
+  };
+
+  const onSyncCoinbase = async () => {
+    setSyncing(true);
+    try {
+      let pageKey: string | undefined = undefined;
+      let total = 0;
+      // Safety cap
+      for (let i = 0; i < 200; i++) {
+        const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
+          body: { page_key: pageKey, page_size: "100" },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        if (Array.isArray(data?.transactions)) total += data.transactions.length;
+        if (data?.next_page_key) pageKey = data.next_page_key;
+        else break;
+      }
+      toast({ title: "Sync complete", description: `Persisted ${total} Coinbase transaction${total === 1 ? "" : "s"}.` });
+      onSearch();
+    } catch (e: any) {
+      console.error("[ADMIN-TX] sync failed", e);
+      toast({ title: "Sync failed", description: e?.message || "Could not sync from Coinbase", variant: "destructive" });
+    } finally {
+      setSyncing(false);
     }
   };
 
