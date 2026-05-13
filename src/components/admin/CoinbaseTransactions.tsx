@@ -347,7 +347,6 @@ export default function CoinbaseTransactions() {
     const PAGE = 100;
     const rawRef = searchRef.trim();
     const isWalletSearch = !!rawRef && !rawRef.includes("-");
-    let cbRefsForSearch: string[] = [];
     let stripeUserIdsForSearch: string[] = [];
     let directRef: string | undefined = undefined;
 
@@ -356,9 +355,7 @@ export default function CoinbaseTransactions() {
         const { data: lookup } = await supabase.functions.invoke("admin-user-lookup", {
           body: { wallet_search: rawRef },
         });
-        cbRefsForSearch = lookup?.wallet_search?.partner_user_refs || [];
         stripeUserIdsForSearch = lookup?.wallet_search?.user_ids || [];
-        if (cbRefsForSearch.length === 0 && stripeUserIdsForSearch.length === 0) return [];
       } else {
         directRef = rawRef;
       }
@@ -367,24 +364,27 @@ export default function CoinbaseTransactions() {
     const all: UnifiedTx[] = [];
 
     if (providerFilter === "all" || providerFilter === "coinbase") {
-      const refsToQuery = isWalletSearch ? cbRefsForSearch : [directRef];
-      for (const r of refsToQuery) {
-        let pageKey: string | undefined = undefined;
-        // Safety cap to avoid infinite loops
-        for (let i = 0; i < 200; i++) {
-          const { data, error } = await supabase.functions.invoke("coinbase-transactions", {
-            body: {
-              partnerUserRef: r || undefined,
-              page_key: pageKey,
-              page_size: String(PAGE),
-            },
-          });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-          if (Array.isArray(data?.transactions)) all.push(...data.transactions.map(normalizeCoinbase));
-          if (data?.next_page_key) pageKey = data.next_page_key;
-          else break;
+      let offset = 0;
+      for (let i = 0; i < 200; i++) {
+        let q = supabase
+          .from("transaction_audit_log")
+          .select("*")
+          .eq("provider", "coinbase")
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE - 1);
+        if (isWalletSearch) {
+          q = q.ilike("wallet_address", rawRef);
+        } else if (directRef) {
+          q = q.eq("callback_data->>partner_user_ref", directRef);
         }
+        if (fromDate) q = q.gte("created_at", new Date(fromDate + "T00:00:00").toISOString());
+        if (toDate) q = q.lte("created_at", new Date(toDate + "T23:59:59.999").toISOString());
+        const { data, error } = await q;
+        if (error) throw error;
+        const batch = (data ?? []).map(normalizeCoinbaseAudit);
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+        offset += PAGE;
       }
     }
 
