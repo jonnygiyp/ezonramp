@@ -348,7 +348,7 @@ const AccountModal = ({ open, onOpenChange, variant = 'default' }: AccountModalP
             className="w-full text-destructive hover:text-destructive"
           >
             <LogOut className="mr-2 h-4 w-4" />
-            Disconnect Wallet
+            Sign Out
           </Button>
         </div>
       </DialogContent>
