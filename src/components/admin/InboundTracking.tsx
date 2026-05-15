@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Plus, Copy, ArrowLeft, Download, Archive, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Plus, Copy, ArrowLeft, Download, Archive, RefreshCw, Trash2, Eye, LogIn, Wallet, ShoppingCart, DollarSign, UserCheck, Target } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
