@@ -2,8 +2,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Production domains - update with your actual domains
 const ALLOWED_ORIGINS = [
+  "https://ezonramp.com",
+  "https://www.ezonramp.com",
   "https://ezonramp.lovable.app",
   "https://id-preview--7b38c753-20a4-4c8b-8302-f8796fd8f46e.lovable.app",
+];
+
+const PROJECT_ID = "7b38c753-20a4-4c8b-8302-f8796fd8f46e";
+// Allow Lovable preview/sandbox subdomains for this project
+const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
+  new RegExp(`^https://([a-z0-9-]+--)?${PROJECT_ID}\\.lovable\\.app$`),
+  new RegExp(`^https://${PROJECT_ID}\\.lovableproject\\.com$`),
+  new RegExp(`^https://([a-z0-9-]+--)?${PROJECT_ID}\\.lovableproject\\.com$`),
 ];
 
 // Include localhost for development if needed
@@ -18,15 +28,21 @@ export interface AuthResult {
   error?: string;
 }
 
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  return ALLOWED_ORIGIN_PATTERNS.some((re) => re.test(origin));
+}
+
 /**
  * Get CORS headers with restricted origin
  */
 export function getCorsHeaders(origin: string | null): Record<string, string> {
-  const isAllowed = origin && ALLOWED_ORIGINS.includes(origin);
-  const allowedOrigin = isAllowed ? origin : ALLOWED_ORIGINS[0];
+  const allowedOrigin = isOriginAllowed(origin) ? (origin as string) : ALLOWED_ORIGINS[0];
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
+    "Vary": "Origin",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Credentials": "true",
