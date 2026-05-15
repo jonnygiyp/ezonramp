@@ -369,6 +369,7 @@ export function CoinbaseOnrampWidget({
       updateTxState("waiting");
 
       console.log("[COINBASE-GLOBAL] Coinbase Global opened");
+      void import("@/lib/tracking").then((m) => m.trackOnrampStart("coinbase", { partnerUserId: attemptId }));
       const popup = window.open(onrampURL, "_blank", "width=460,height=700");
 
       if (!popup) {

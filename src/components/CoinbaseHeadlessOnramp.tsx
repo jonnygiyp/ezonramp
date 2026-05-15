@@ -540,6 +540,7 @@ export function CoinbaseHeadlessOnramp({
 
       // Open payment window
       console.log('[COINBASE-FLOW] opening payment window', { attemptId });
+      void import("@/lib/tracking").then((m) => m.trackOnrampStart("coinbase", { partnerUserId: attemptId }));
       const paymentWindow = window.open(buyUrl, '_blank', 'width=500,height=700');
 
       if (!paymentWindow) {
