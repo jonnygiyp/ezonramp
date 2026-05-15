@@ -31,7 +31,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Plus, Copy, ArrowLeft, Download, Archive, RefreshCw } from "lucide-react";
+import { Loader2, Plus, Copy, ArrowLeft, Download, Archive, RefreshCw, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 const PUBLIC_BASE = "https://ezonramp.com";
@@ -168,6 +179,19 @@ export default function InboundTracking() {
     toast({ title: "Failed to create campaign", description: lastErr ?? "Unknown error", variant: "destructive" });
   }
 
+  async function deleteCampaign(c: CampaignStat) {
+    const { error } = await supabase
+      .from("inbound_tracking_campaigns")
+      .delete()
+      .eq("id", c.id);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Campaign deleted", description: c.campaign_name });
+      await loadCampaigns();
+    }
+  }
+
   async function toggleActive(c: CampaignStat) {
     const { error } = await supabase
       .from("inbound_tracking_campaigns")
@@ -214,7 +238,7 @@ export default function InboundTracking() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle>Inbound Tracking</CardTitle>
+        <CardTitle>Tracking Links</CardTitle>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={loadCampaigns}>
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
@@ -314,6 +338,29 @@ export default function InboundTracking() {
                         <Button size="sm" variant="ghost" onClick={() => toggleActive(c)} title={c.is_active ? "Archive" : "Activate"}>
                           <Archive className="h-4 w-4" />
                         </Button>
+                        {!c.is_active && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="ghost" title="Delete archived campaign" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete this campaign?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This permanently deletes "{c.campaign_name}" and all of its tracked sessions, events, and attributions. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteCampaign(c)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
