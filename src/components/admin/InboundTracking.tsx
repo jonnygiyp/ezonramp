@@ -116,6 +116,17 @@ function downloadCsv(filename: string, rows: (string | number | null)[][]) {
   URL.revokeObjectURL(url);
 }
 
+function HeaderIcon({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex justify-end w-full cursor-help" aria-label={label}>{icon}</span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function InboundTracking() {
   const { user } = useAuth();
   const { toast } = useToast();
