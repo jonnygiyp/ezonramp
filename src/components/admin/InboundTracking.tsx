@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Plus, Copy, ArrowLeft, Download, Archive, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Plus, Copy, ArrowLeft, Download, Archive, RefreshCw, Trash2, Eye, LogIn, Wallet, ShoppingCart, DollarSign, UserCheck, Target } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,6 +114,17 @@ function downloadCsv(filename: string, rows: (string | number | null)[][]) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function HeaderIcon({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex justify-end w-full cursor-help" aria-label={label}>{icon}</span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export default function InboundTracking() {
@@ -294,13 +306,13 @@ export default function InboundTracking() {
                 <TableHead>Campaign</TableHead>
                 <TableHead>Destination</TableHead>
                 <TableHead>Tracking URL</TableHead>
-                <TableHead className="text-right">Visits</TableHead>
-                <TableHead className="text-right">Sign-ins</TableHead>
-                <TableHead className="text-right">Wallets</TableHead>
-                <TableHead className="text-right">Purchases</TableHead>
-                <TableHead className="text-right">Volume</TableHead>
-                <TableHead className="text-right">Sign-in %</TableHead>
-                <TableHead className="text-right">Purchase %</TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<Eye className="h-4 w-4" />} label="Visits" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<LogIn className="h-4 w-4" />} label="Sign-ins" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<Wallet className="h-4 w-4" />} label="Wallets" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<ShoppingCart className="h-4 w-4" />} label="Purchases" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<DollarSign className="h-4 w-4" />} label="Volume" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<UserCheck className="h-4 w-4" />} label="Sign-in %" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<Target className="h-4 w-4" />} label="Purchase %" /></TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
