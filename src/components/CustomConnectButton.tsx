@@ -61,7 +61,7 @@ const CustomConnectButton = () => {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => disconnect()}>
               <LogOut className="mr-2 h-4 w-4" />
-              Disconnect
+              Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
