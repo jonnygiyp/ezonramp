@@ -164,6 +164,245 @@ export type Database = {
         }
         Relationships: []
       }
+      inbound_tracking_attributions: {
+        Row: {
+          campaign_id: string
+          chain: string | null
+          created_at: string
+          crypto_amount: number | null
+          crypto_currency: string | null
+          fiat_amount: number | null
+          fiat_currency: string | null
+          id: string
+          onramp_provider: string
+          purchase_status: string | null
+          session_id: string | null
+          tracking_code: string
+          transaction_id: string
+          updated_at: string
+          user_id: string | null
+          wallet_address: string | null
+        }
+        Insert: {
+          campaign_id: string
+          chain?: string | null
+          created_at?: string
+          crypto_amount?: number | null
+          crypto_currency?: string | null
+          fiat_amount?: number | null
+          fiat_currency?: string | null
+          id?: string
+          onramp_provider: string
+          purchase_status?: string | null
+          session_id?: string | null
+          tracking_code: string
+          transaction_id: string
+          updated_at?: string
+          user_id?: string | null
+          wallet_address?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          chain?: string | null
+          created_at?: string
+          crypto_amount?: number | null
+          crypto_currency?: string | null
+          fiat_amount?: number | null
+          fiat_currency?: string | null
+          id?: string
+          onramp_provider?: string
+          purchase_status?: string | null
+          session_id?: string | null
+          tracking_code?: string
+          transaction_id?: string
+          updated_at?: string
+          user_id?: string | null
+          wallet_address?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_tracking_attributions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_campaign_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_tracking_attributions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_tracking_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_tracking_attributions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_tracking_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbound_tracking_campaigns: {
+        Row: {
+          campaign_name: string
+          created_at: string
+          created_by: string | null
+          destination_path: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          tracking_code: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_name: string
+          created_at?: string
+          created_by?: string | null
+          destination_path?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          tracking_code: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_name?: string
+          created_at?: string
+          created_by?: string | null
+          destination_path?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          tracking_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inbound_tracking_events: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          event_type: Database["public"]["Enums"]["inbound_event_type"]
+          id: string
+          metadata: Json | null
+          session_id: string
+          tracking_code: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          event_type: Database["public"]["Enums"]["inbound_event_type"]
+          id?: string
+          metadata?: Json | null
+          session_id: string
+          tracking_code: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          event_type?: Database["public"]["Enums"]["inbound_event_type"]
+          id?: string
+          metadata?: Json | null
+          session_id?: string
+          tracking_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_tracking_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_campaign_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_tracking_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_tracking_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_tracking_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_tracking_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbound_tracking_sessions: {
+        Row: {
+          campaign_id: string
+          country: string | null
+          created_at: string
+          first_seen_at: string
+          full_landing_url: string | null
+          id: string
+          landing_path: string | null
+          last_seen_at: string
+          referrer_url: string | null
+          session_duration_seconds: number
+          sign_in_at: string | null
+          signed_in_user_id: string | null
+          tracking_code: string
+          updated_at: string
+          user_agent: string | null
+          wallet_address: string | null
+        }
+        Insert: {
+          campaign_id: string
+          country?: string | null
+          created_at?: string
+          first_seen_at?: string
+          full_landing_url?: string | null
+          id?: string
+          landing_path?: string | null
+          last_seen_at?: string
+          referrer_url?: string | null
+          session_duration_seconds?: number
+          sign_in_at?: string | null
+          signed_in_user_id?: string | null
+          tracking_code: string
+          updated_at?: string
+          user_agent?: string | null
+          wallet_address?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          country?: string | null
+          created_at?: string
+          first_seen_at?: string
+          full_landing_url?: string | null
+          id?: string
+          landing_path?: string | null
+          last_seen_at?: string
+          referrer_url?: string | null
+          session_duration_seconds?: number
+          sign_in_at?: string | null
+          signed_in_user_id?: string | null
+          tracking_code?: string
+          updated_at?: string
+          user_agent?: string | null
+          wallet_address?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_tracking_sessions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_campaign_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_tracking_sessions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_tracking_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onramp_providers: {
         Row: {
           config: Json
@@ -469,7 +708,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      inbound_campaign_stats: {
+        Row: {
+          campaign_name: string | null
+          created_at: string | null
+          destination_path: string | null
+          id: string | null
+          is_active: boolean | null
+          purchase_rate: number | null
+          purchases: number | null
+          sign_in_rate: number | null
+          sign_ins: number | null
+          tracking_code: string | null
+          visits: number | null
+          volume: number | null
+          wallets: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       delete_email: {
@@ -524,9 +780,26 @@ export type Database = {
           read_ct: number
         }[]
       }
+      validate_tracking_code: {
+        Args: { _code: string }
+        Returns: {
+          campaign_id: string
+          destination_path: string
+          is_active: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"
+      inbound_event_type:
+        | "landing"
+        | "page_view"
+        | "sign_in"
+        | "wallet_connected"
+        | "onramp_started"
+        | "purchase_completed"
+        | "purchase_failed"
+        | "session_heartbeat"
       transaction_status: "pending" | "success" | "failed" | "callback_received"
     }
     CompositeTypes: {
@@ -656,6 +929,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      inbound_event_type: [
+        "landing",
+        "page_view",
+        "sign_in",
+        "wallet_connected",
+        "onramp_started",
+        "purchase_completed",
+        "purchase_failed",
+        "session_heartbeat",
+      ],
       transaction_status: ["pending", "success", "failed", "callback_received"],
     },
   },
