@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ParticleConnectkit } from "./connectkit";
 import { AuthProvider } from "./hooks/useAuth";
 import { useGlobalErrorLogger } from "./hooks/useGlobalErrorLogger";
+import { useEffect } from "react";
+import { initTracking } from "./lib/tracking";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { isCurrentDarkPortalRoute } from "./lib/portalRoute";
 import Index from "./pages/Index";
@@ -33,7 +35,8 @@ const suspenseFallback = isDarkPortalRoute ? (
 // Inner component that can use hooks
 const AppContent = () => {
   useGlobalErrorLogger();
-  
+  useEffect(() => { void initTracking(); }, []);
+
   return (
     <TooltipProvider>
       <Toaster />

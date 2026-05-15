@@ -50,6 +50,7 @@ export function MoonPayOnramp({
     if (!walletAddress) {
       return;
     }
+    void import("@/lib/tracking").then((m) => m.trackOnrampStart("moonpay", { wallet: walletAddress }));
     setShowWidget(true);
   };
 

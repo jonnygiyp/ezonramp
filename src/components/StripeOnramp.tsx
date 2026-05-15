@@ -175,8 +175,25 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
 
       // Listen for session updates
       onrampSession.addEventListener('onramp_session_updated', (event: any) => {
-        log("Session updated:", event.payload?.session?.status);
-        if (event.payload?.session?.status === 'fulfillment_complete') {
+        const sess = event.payload?.session;
+        const sStatus = sess?.status;
+        log("Session updated:", sStatus);
+        const sId = sess?.id;
+        if (sId) {
+          void import("@/lib/tracking").then((m) =>
+            m.attachPurchase({
+              provider: "stripe",
+              transactionId: sId,
+              status: sStatus,
+              fiatAmount: sess?.transaction_details?.source_amount ? Number(sess.transaction_details.source_amount) : undefined,
+              fiatCurrency: sess?.transaction_details?.source_currency,
+              cryptoAmount: sess?.transaction_details?.destination_amount ? Number(sess.transaction_details.destination_amount) : undefined,
+              cryptoCurrency: sess?.transaction_details?.destination_currency,
+              chain: sess?.transaction_details?.destination_network,
+            }),
+          );
+        }
+        if (sStatus === 'fulfillment_complete') {
           toast({
             title: "Success!",
             description: "Your crypto purchase was successful.",

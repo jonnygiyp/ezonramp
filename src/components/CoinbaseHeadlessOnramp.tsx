@@ -540,6 +540,7 @@ export function CoinbaseHeadlessOnramp({
 
       // Open payment window
       console.log('[COINBASE-FLOW] opening payment window', { attemptId });
+      void import("@/lib/tracking").then((m) => m.trackOnrampStart("coinbase", { partnerUserId: attemptId }));
       const paymentWindow = window.open(buyUrl, '_blank', 'width=500,height=700');
 
       if (!paymentWindow) {
@@ -567,28 +568,33 @@ export function CoinbaseHeadlessOnramp({
             (supabase as any).from('purchase_attempts')
               .update({ status: 'initialized', coinbase_transaction_id: txId || null })
               .eq('partner_user_ref', attemptId);
+            if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "initialized" }));
             break;
           }
           case 'onramp_api.cancel':
-            // Cancel from Coinbase's UI is authoritative for non-success states,
-            // but updateTxState() will refuse to downgrade a completed status.
             updateTxState('incomplete', 'postMessage:cancel');
             (supabase as any).from('purchase_attempts')
               .update({ status: 'incomplete' })
               .eq('partner_user_ref', attemptId);
             break;
-          case 'onramp_api.polling_success':
+          case 'onramp_api.polling_success': {
             updateTxState('completed', 'postMessage:polling_success');
             (supabase as any).from('purchase_attempts')
               .update({ status: 'completed' })
               .eq('partner_user_ref', attemptId);
+            const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
+            if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "completed" }));
             break;
-          case 'onramp_api.polling_error':
+          }
+          case 'onramp_api.polling_error': {
             updateTxState('failed', 'postMessage:polling_error');
             (supabase as any).from('purchase_attempts')
               .update({ status: 'failed' })
               .eq('partner_user_ref', attemptId);
+            const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
+            if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "failed" }));
             break;
+          }
         }
       };
 

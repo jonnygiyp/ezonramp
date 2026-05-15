@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { attachUserOnSignIn } from '@/lib/tracking';
 
 interface AuthContextType {
   user: User | null;
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setTimeout(() => {
           checkAdminRole(session.user.id);
+          void attachUserOnSignIn();
         }, 0);
       } else {
         setIsAdmin(false);

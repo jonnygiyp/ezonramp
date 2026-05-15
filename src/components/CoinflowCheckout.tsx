@@ -104,6 +104,7 @@ export const CoinflowCheckout: FC = () => {
       return;
     }
     
+    void import("@/lib/tracking").then((m) => m.trackOnrampStart("coinflow"));
     setShowCheckout(true);
   };
 
@@ -126,6 +127,7 @@ export const CoinflowCheckout: FC = () => {
             blockchain="solana"
             email={email}
             onSuccess={() => {
+              void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinflow", transactionId: `coinflow-${Date.now()}`, status: "completed", fiatAmount: amount }));
               toast({
                 title: "Purchase Successful!",
                 description: "Your crypto purchase has been completed.",

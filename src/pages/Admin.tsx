@@ -11,6 +11,7 @@ import OnrampManager from '@/components/admin/OnrampManager';
 import TermsEditor from '@/components/admin/TermsEditor';
 import PrivacyEditor from '@/components/admin/PrivacyEditor';
 import CoinbaseTransactions from '@/components/admin/CoinbaseTransactions';
+import InboundTracking from '@/components/admin/InboundTracking';
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading, signOut } = useAuth();
@@ -74,7 +75,7 @@ export default function AdminDashboard() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <Tabs defaultValue="about" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="faq">FAQ</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -82,6 +83,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
             <TabsTrigger value="onramps">Onramps</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="tracking">Inbound</TabsTrigger>
           </TabsList>
 
           <TabsContent value="about">
@@ -110,6 +112,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="transactions">
             <CoinbaseTransactions />
+          </TabsContent>
+
+          <TabsContent value="tracking">
+            <InboundTracking />
           </TabsContent>
         </Tabs>
       </main>
