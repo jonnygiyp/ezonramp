@@ -295,13 +295,13 @@ export default function InboundTracking() {
                 <TableHead>Campaign</TableHead>
                 <TableHead>Destination</TableHead>
                 <TableHead>Tracking URL</TableHead>
-                <TableHead className="text-right">Visits</TableHead>
-                <TableHead className="text-right">Sign-ins</TableHead>
-                <TableHead className="text-right">Wallets</TableHead>
-                <TableHead className="text-right">Purchases</TableHead>
-                <TableHead className="text-right">Volume</TableHead>
-                <TableHead className="text-right">Sign-in %</TableHead>
-                <TableHead className="text-right">Purchase %</TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<Eye className="h-4 w-4" />} label="Visits" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<LogIn className="h-4 w-4" />} label="Sign-ins" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<Wallet className="h-4 w-4" />} label="Wallets" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<ShoppingCart className="h-4 w-4" />} label="Purchases" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<DollarSign className="h-4 w-4" />} label="Volume" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<UserCheck className="h-4 w-4" />} label="Sign-in %" /></TableHead>
+                <TableHead className="text-right"><HeaderIcon icon={<Target className="h-4 w-4" />} label="Purchase %" /></TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
