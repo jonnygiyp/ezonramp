@@ -179,6 +179,19 @@ export default function InboundTracking() {
     toast({ title: "Failed to create campaign", description: lastErr ?? "Unknown error", variant: "destructive" });
   }
 
+  async function deleteCampaign(c: CampaignStat) {
+    const { error } = await supabase
+      .from("inbound_tracking_campaigns")
+      .delete()
+      .eq("id", c.id);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Campaign deleted", description: c.campaign_name });
+      await loadCampaigns();
+    }
+  }
+
   async function toggleActive(c: CampaignStat) {
     const { error } = await supabase
       .from("inbound_tracking_campaigns")
