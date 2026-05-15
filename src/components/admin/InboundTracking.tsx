@@ -238,7 +238,7 @@ export default function InboundTracking() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle>Inbound Tracking</CardTitle>
+        <CardTitle>Tracking Links</CardTitle>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={loadCampaigns}>
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
