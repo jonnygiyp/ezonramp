@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAccount } from '@/hooks/useParticle';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { attachUserOnSignIn, trackEvent } from '@/lib/tracking';
 
 /**
  * Hook to sync the connected Particle wallet address to the user's profile.
@@ -50,6 +51,8 @@ export function useWalletSync() {
         } else {
           lastSyncedRef.current = address;
           console.log(`[WalletSync] Wallet synced successfully`);
+          void trackEvent('wallet_connected', { wallet_address: address });
+          void attachUserOnSignIn();
         }
       } catch (err) {
         console.error('[WalletSync] Error syncing wallet:', err);
