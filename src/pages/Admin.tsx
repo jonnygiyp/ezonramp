@@ -83,7 +83,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="privacy">Privacy</TabsTrigger>
             <TabsTrigger value="onramps">Onramps</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="tracking">Inbound</TabsTrigger>
+            <TabsTrigger value="tracking">Tracking Links</TabsTrigger>
           </TabsList>
 
           <TabsContent value="about">
