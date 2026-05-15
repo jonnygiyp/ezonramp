@@ -338,6 +338,29 @@ export default function InboundTracking() {
                         <Button size="sm" variant="ghost" onClick={() => toggleActive(c)} title={c.is_active ? "Archive" : "Activate"}>
                           <Archive className="h-4 w-4" />
                         </Button>
+                        {!c.is_active && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="ghost" title="Delete archived campaign" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete this campaign?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This permanently deletes "{c.campaign_name}" and all of its tracked sessions, events, and attributions. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteCampaign(c)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
