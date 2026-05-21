@@ -17,6 +17,7 @@ interface CoinbaseOnrampWidgetProps {
   defaultAmount?: string;
   hideHeader?: boolean;
   checkoutDescription?: string;
+  transactionSource?: 'home' | 'express';
 }
 
 /**
@@ -72,6 +73,7 @@ export function CoinbaseOnrampWidget({
   defaultAmount = "0",
   hideHeader = false,
   checkoutDescription,
+  transactionSource = 'home',
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -345,7 +347,7 @@ export function CoinbaseOnrampWidget({
           partner_user_ref: attemptId,
           provider: "coinbase",
           status: "waiting",
-          source: typeof window !== 'undefined' && window.location.pathname.startsWith('/express') ? 'express' : 'home',
+          source: transactionSource,
         });
       } catch (err) {
         console.error("[COINBASE-GLOBAL] Failed to insert purchase attempt:", err);
@@ -428,7 +430,7 @@ export function CoinbaseOnrampWidget({
     } finally {
       setIsLoading(false);
     }
-  }, [destinationAddress, defaultNetwork, defaultAsset, amount, toast, session, isConnected, address, startPolling, updateTxState]);
+  }, [destinationAddress, defaultNetwork, defaultAsset, transactionSource, amount, toast, session, isConnected, address, startPolling, updateTxState]);
 
   if (isLoadingConfig) {
     return (
