@@ -20,6 +20,7 @@ import { useAccount } from "@/hooks/useParticle";
 import { useGeoLocation } from "@/hooks/useGeoLocation";
 import { resolveInitialRamp, writeManualRamp } from "@/lib/rampSelection";
 import AccountModal from "@/components/AccountModal";
+import PartnerPortalTutorial from "@/components/PartnerPortalTutorial";
 
 const getTabIcon = (name: string) => {
   switch (name) {
