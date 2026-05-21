@@ -97,6 +97,7 @@ interface CoinbaseHeadlessOnrampProps {
   presetAmounts?: string[];
   defaultAmount?: string;
   hideHeader?: boolean;
+  transactionSource?: 'home' | 'express';
 }
 
 export function CoinbaseHeadlessOnramp({
@@ -105,6 +106,7 @@ export function CoinbaseHeadlessOnramp({
   presetAmounts = ['50', '100', '250', '500'],
   defaultAmount = "0",
   hideHeader = false,
+  transactionSource = 'home',
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -528,7 +530,7 @@ export function CoinbaseHeadlessOnramp({
           network: defaultNetwork,
           partner_user_ref: attemptId,
           status: 'idle',
-          source: typeof window !== 'undefined' && window.location.pathname.startsWith('/express') ? 'express' : 'home',
+          source: transactionSource,
         });
       } catch (err) {
         console.error('[COINBASE] Failed to create purchase attempt:', err);

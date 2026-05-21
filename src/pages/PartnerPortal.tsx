@@ -182,13 +182,13 @@ const PartnerPortal = () => {
               {/* Widget content */}
               <div className="pp-widget-content">
                 {activeTab === 'coinbase' && (
-                  <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" presetAmounts={['5', '10', '20', '50']} defaultAmount="0" hideHeader />
+                  <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" presetAmounts={['5', '10', '20', '50']} defaultAmount="0" hideHeader transactionSource="express" />
                 )}
                 {activeTab === 'coinbase_global' && (
-                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Requires Coinbase account. May require KYC." defaultAmount="0" hideHeader checkoutDescription="A new page will open to complete purchase." />
+                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Requires Coinbase account. May require KYC." defaultAmount="0" hideHeader checkoutDescription="A new page will open to complete purchase." transactionSource="express" />
                 )}
                 {activeTab === 'stripe' && (
-                  <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" theme="dark" hideHeader />
+                  <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" theme="dark" hideHeader transactionSource="express" />
                 )}
               </div>
             </div>
