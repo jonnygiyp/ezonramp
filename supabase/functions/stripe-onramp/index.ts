@@ -171,7 +171,7 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount, sourceCurrency } = await req.json();
+    const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount, sourceCurrency, source } = await req.json();
 
     // Safe payload logging - no secrets
     console.log("[STRIPE-ONRAMP] payload", {
