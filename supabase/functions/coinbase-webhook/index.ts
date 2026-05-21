@@ -285,26 +285,39 @@ serve(async (req) => {
       const partnerUserRefForStore =
         event.partnerUserId || event.partner_user_id || event.partnerUserRef || null;
       const nowIso = new Date().toISOString();
+
+      // Look up the originating page (home vs /express) recorded on the purchase attempt.
+      let sourceForStore: string | null = null;
+      if (partnerUserRefForStore) {
+        const { data: attemptRow } = await supabase
+          .from("purchase_attempts")
+          .select("source")
+          .eq("partner_user_ref", partnerUserRefForStore)
+          .maybeSingle();
+        sourceForStore = (attemptRow?.source as string | null) ?? null;
+      }
+
+      const storeRow: Record<string, unknown> = {
+        transaction_id: transactionId,
+        partner_user_ref: partnerUserRefForStore,
+        wallet_address: walletAddress,
+        status: status || canonicalStatus,
+        fiat_value: fiatAmount || null,
+        fiat_currency: currency,
+        crypto_value: cryptoAmount || null,
+        crypto_currency: cryptoCurrency,
+        asset: cryptoCurrency,
+        network: network,
+        tx_updated_at: nowIso,
+        last_synced_at: nowIso,
+        payload: event,
+      };
+      // Only set source when we know it, so the periodic sync upsert never wipes a known value.
+      if (sourceForStore) storeRow.source = sourceForStore;
+
       const { error: storeError } = await supabase
         .from("coinbase_transactions")
-        .upsert(
-          {
-            transaction_id: transactionId,
-            partner_user_ref: partnerUserRefForStore,
-            wallet_address: walletAddress,
-            status: status || canonicalStatus,
-            fiat_value: fiatAmount || null,
-            fiat_currency: currency,
-            crypto_value: cryptoAmount || null,
-            crypto_currency: cryptoCurrency,
-            asset: cryptoCurrency,
-            network: network,
-            tx_updated_at: nowIso,
-            last_synced_at: nowIso,
-            payload: event,
-          },
-          { onConflict: "transaction_id" }
-        );
+        .upsert(storeRow, { onConflict: "transaction_id" });
       if (storeError) {
         console.error("[COINBASE-WEBHOOK] coinbase_transactions upsert error:", storeError);
       }

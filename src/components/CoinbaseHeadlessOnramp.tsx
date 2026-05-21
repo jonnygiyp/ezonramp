@@ -528,6 +528,7 @@ export function CoinbaseHeadlessOnramp({
           network: defaultNetwork,
           partner_user_ref: attemptId,
           status: 'idle',
+          source: typeof window !== 'undefined' && window.location.pathname.startsWith('/express') ? 'express' : 'home',
         });
       } catch (err) {
         console.error('[COINBASE] Failed to create purchase attempt:', err);

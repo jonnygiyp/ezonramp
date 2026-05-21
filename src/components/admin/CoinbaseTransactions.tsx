@@ -27,7 +27,14 @@ interface UnifiedTx {
   email?: string | null;
   created_at?: string;
   updated_at?: string;
+  source?: string | null;
   raw: Record<string, unknown>;
+}
+
+function formatDomain(source?: string | null): string {
+  if (source === 'express') return 'Express';
+  if (source === 'home') return 'Homepage';
+  return '—';
 }
 
 const COINBASE_SUCCESS = "ONRAMP_TRANSACTION_STATUS_SUCCESS";
@@ -73,6 +80,7 @@ function normalizeCoinbaseDb(row: any): UnifiedTx {
     wallet_address: row.wallet_address || null,
     created_at: row.tx_created_at || row.created_at,
     updated_at: row.tx_updated_at || row.updated_at,
+    source: (row.source as string | null) ?? null,
     raw: row.payload || row,
   };
 }
@@ -104,6 +112,7 @@ function normalizeStripe(row: any): UnifiedTx {
     wallet_address: td.wallet_address || row.wallet_address || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    source: (row.source as string | null) ?? null,
     raw: row,
   };
 }
@@ -492,7 +501,7 @@ export default function CoinbaseTransactions() {
       "asset",
       "network",
       "created_at",
-      "updated_at",
+      "domain",
     ];
     const escape = (v: unknown) => {
       if (v == null) return "";
@@ -534,7 +543,7 @@ export default function CoinbaseTransactions() {
         t.asset,
         t.network,
         t.created_at,
-        t.updated_at,
+        formatDomain(t.source),
       ]
         .map(escape)
         .join(",")
@@ -671,7 +680,7 @@ export default function CoinbaseTransactions() {
                   <TableHead>Asset</TableHead>
                   <TableHead>Network</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
+                  <TableHead>Domain</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -757,8 +766,8 @@ export default function CoinbaseTransactions() {
                         <TableCell className="text-xs">
                           {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
                         </TableCell>
-                        <TableCell className="text-xs">
-                          {tx.updated_at ? new Date(tx.updated_at).toLocaleString() : "—"}
+                        <TableCell className="text-xs" title={tx.source || ""}>
+                          {formatDomain(tx.source)}
                         </TableCell>
                         <TableCell>
                           <Button
