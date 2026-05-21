@@ -270,15 +270,38 @@ serve(async (req) => {
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const adminClient = createClient(supabaseUrl, serviceKey);
       const nowIso = new Date().toISOString();
+      const partnerRefs = [...new Set(
+        transactions
+          .map((tx: any) => tx.partner_user_ref)
+          .filter((ref: unknown): ref is string => typeof ref === "string" && ref.length > 0)
+      )];
+      const sourceByPartnerRef = new Map<string, string>();
+      if (partnerRefs.length > 0) {
+        const { data: attempts, error: attemptsErr } = await adminClient
+          .from("purchase_attempts")
+          .select("partner_user_ref, source")
+          .in("partner_user_ref", partnerRefs);
+        if (attemptsErr) {
+          console.error("[COINBASE-TX] source lookup failed:", attemptsErr.message);
+        } else {
+          for (const attempt of attempts ?? []) {
+            if (attempt.partner_user_ref && attempt.source) {
+              sourceByPartnerRef.set(attempt.partner_user_ref, attempt.source);
+            }
+          }
+        }
+      }
+
       const rows = transactions
         .map((tx: any) => {
           const txId = tx.transaction_id || tx.id;
           if (!txId) return null;
           const fiat = tx.payment_total || tx.source_amount || tx.purchase_amount || {};
           const crypto = tx.destination_amount || tx.purchase_amount || {};
-          return {
+          const partnerUserRef = tx.partner_user_ref || null;
+          const row: Record<string, unknown> = {
             transaction_id: txId,
-            partner_user_ref: tx.partner_user_ref || null,
+            partner_user_ref: partnerUserRef,
             wallet_address: tx.wallet_address || null,
             status: tx.status || "unknown",
             fiat_value: fiat?.value ? Number(fiat.value) : null,
@@ -292,6 +315,9 @@ serve(async (req) => {
             last_synced_at: nowIso,
             payload: tx,
           };
+          const knownSource = partnerUserRef ? sourceByPartnerRef.get(partnerUserRef) : null;
+          if (knownSource) row.source = knownSource;
+          return row;
         })
         .filter(Boolean);
       if (rows.length > 0) {
