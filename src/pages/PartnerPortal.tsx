@@ -129,7 +129,7 @@ const PartnerPortal = () => {
         <main className="flex-1 flex flex-col items-center px-4 pt-6 pb-24">
           <div className="pp-container w-full">
             {/* Headline */}
-            <div className="text-center mb-6">
+            <div className="text-center mb-6" data-pp-tut="headline">
               <h1 className="text-xl md:text-2xl font-bold pp-text-white mb-2">
                 Add Funds to Your Wallet
               </h1>
@@ -142,7 +142,7 @@ const PartnerPortal = () => {
               </div>
             ) : supportedProviders.length > 1 ? (
               <>
-                <div className="flex justify-center mb-2">
+                <div className="flex justify-center mb-2" data-pp-tut="tabs">
                   <div className="pp-tab-bar">
                     {supportedProviders.map((provider) => {
                       const Icon = getTabIcon(provider.name);
@@ -167,9 +167,12 @@ const PartnerPortal = () => {
             ) : null}
 
             {/* Onramp card */}
-            <div className="pp-card">
+            <div className="pp-card" data-pp-tut="widget">
               {/* Debit success tip */}
-              <div className="pp-provider-label pp-text-primary font-semibold">
+              <div
+                className="pp-provider-label pp-text-primary font-semibold"
+                data-pp-tut="debit-tip"
+              >
                 Debit is more likely to succeed when purchasing
               </div>
 
