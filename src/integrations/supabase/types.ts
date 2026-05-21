@@ -27,6 +27,7 @@ export type Database = {
           network: string | null
           partner_user_ref: string | null
           payload: Json | null
+          source: string | null
           status: string
           transaction_id: string
           tx_created_at: string | null
@@ -47,6 +48,7 @@ export type Database = {
           network?: string | null
           partner_user_ref?: string | null
           payload?: Json | null
+          source?: string | null
           status?: string
           transaction_id: string
           tx_created_at?: string | null
@@ -67,6 +69,7 @@ export type Database = {
           network?: string | null
           partner_user_ref?: string | null
           payload?: Json | null
+          source?: string | null
           status?: string
           transaction_id?: string
           tx_created_at?: string | null
@@ -471,6 +474,7 @@ export type Database = {
           network: string
           partner_user_ref: string
           provider: string
+          source: string | null
           status: string
           updated_at: string
           user_id: string
@@ -486,6 +490,7 @@ export type Database = {
           network?: string
           partner_user_ref: string
           provider?: string
+          source?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -501,6 +506,7 @@ export type Database = {
           network?: string
           partner_user_ref?: string
           provider?: string
+          source?: string | null
           status?: string
           updated_at?: string
           user_id?: string
@@ -543,6 +549,7 @@ export type Database = {
           destination_network: string | null
           id: string
           last_stripe_event_id: string | null
+          source: string | null
           source_amount: number | null
           status: string
           stripe_session_id: string
@@ -557,6 +564,7 @@ export type Database = {
           destination_network?: string | null
           id?: string
           last_stripe_event_id?: string | null
+          source?: string | null
           source_amount?: number | null
           status?: string
           stripe_session_id: string
@@ -571,6 +579,7 @@ export type Database = {
           destination_network?: string | null
           id?: string
           last_stripe_event_id?: string | null
+          source?: string | null
           source_amount?: number | null
           status?: string
           stripe_session_id?: string
