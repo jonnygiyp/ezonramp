@@ -291,6 +291,7 @@ export default function CoinbaseTransactions() {
         const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
         return tb - ta;
       });
+      await enrichCoinbaseSources(merged);
 
       // Enrich with email + wallet
       const cbRefs = merged
@@ -466,6 +467,8 @@ export default function CoinbaseTransactions() {
         offset += PAGE;
       }
     }
+
+      await enrichCoinbaseSources(all);
 
     // Enrich with email + wallet
     const cbRefs = all
