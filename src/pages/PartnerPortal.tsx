@@ -105,6 +105,7 @@ const PartnerPortal = () => {
             <div className="flex items-center gap-2">
               {isConnected && (
                 <button
+                  data-pp-tut="account"
                   onClick={() => setAccountModalOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
                 >
@@ -113,6 +114,7 @@ const PartnerPortal = () => {
                 </button>
               )}
               <button
+                data-pp-tut="help"
                 onClick={() => setShowHelp(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
               >
