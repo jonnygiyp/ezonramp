@@ -345,6 +345,7 @@ export function CoinbaseOnrampWidget({
           partner_user_ref: attemptId,
           provider: "coinbase",
           status: "waiting",
+          source: typeof window !== 'undefined' && window.location.pathname.startsWith('/express') ? 'express' : 'home',
         });
       } catch (err) {
         console.error("[COINBASE-GLOBAL] Failed to insert purchase attempt:", err);
