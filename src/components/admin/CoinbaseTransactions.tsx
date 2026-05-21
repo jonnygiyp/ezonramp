@@ -501,7 +501,7 @@ export default function CoinbaseTransactions() {
       "asset",
       "network",
       "created_at",
-      "updated_at",
+      "domain",
     ];
     const escape = (v: unknown) => {
       if (v == null) return "";
