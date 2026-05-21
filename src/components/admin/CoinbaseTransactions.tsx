@@ -766,8 +766,8 @@ export default function CoinbaseTransactions() {
                         <TableCell className="text-xs">
                           {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
                         </TableCell>
-                        <TableCell className="text-xs">
-                          {tx.updated_at ? new Date(tx.updated_at).toLocaleString() : "—"}
+                        <TableCell className="text-xs" title={tx.source || ""}>
+                          {formatDomain(tx.source)}
                         </TableCell>
                         <TableCell>
                           <Button
