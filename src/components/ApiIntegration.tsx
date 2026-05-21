@@ -15,6 +15,7 @@ import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 import { useGeoLocation } from "@/hooks/useGeoLocation";
 import { resolveInitialRamp, writeManualRamp } from "@/lib/rampSelection";
 import { AuthGatedButton } from "./AuthGatedButton";
+import { resolveTransactionSource } from "@/lib/transactionSource";
 
 // Input validation schemas
 const emailSchema = z.string().trim().email("Invalid email address").max(254);
@@ -153,6 +154,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
           email: emailResult.data,
           currency: 'USD',
           orderId: `order_${Date.now()}`,
+          source: resolveTransactionSource(),
         },
       });
 
@@ -243,11 +245,11 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
       {/* Content Area */}
       <div className="w-full max-w-2xl mx-auto">
         {activeTab === 'coinbase' && (
-          <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" transactionSource="homepage" />
         )}
 
         {activeTab === 'coinbase_global' && (
-          <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" />
+          <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" transactionSource="homepage" />
         )}
 
         {activeTab === 'card2crypto' && (
@@ -345,7 +347,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
         )}
 
         {activeTab === 'stripe' && (
-          <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" transactionSource="homepage" />
         )}
 
         {activeTab === 'moonpay' && (

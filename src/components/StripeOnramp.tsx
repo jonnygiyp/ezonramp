@@ -8,6 +8,7 @@ import { Loader2, RefreshCw, Wallet, LogIn } from "lucide-react";
 import { useAccount, useModal } from '@/hooks/useParticle';
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp } from "@stripe/crypto";
+import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
 
 const LOG_PREFIX = "[StripeOnramp]";
 const log = (msg: string, ...args: unknown[]) => console.log(`${LOG_PREFIX} ${msg}`, ...args);
@@ -24,12 +25,12 @@ interface StripeOnrampProps {
   defaultNetwork?: string;
   theme?: 'light' | 'dark';
   hideHeader?: boolean;
-  transactionSource?: 'home' | 'express';
+  transactionSource?: TransactionSource;
 }
 
 type LoadState = 'idle' | 'loading' | 'mounted' | 'ready' | 'error';
 
-export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme, hideHeader = false, transactionSource = 'home' }: StripeOnrampProps) {
+export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme, hideHeader = false, transactionSource }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { setOpen } = useModal();
@@ -102,6 +103,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       log("Auth resolved");
 
       log("Requesting Stripe session and config...");
+      const source = resolveTransactionSource(transactionSource);
       const [sessionResult, configResult] = await Promise.all([
         supabase.functions.invoke('stripe-onramp', {
           body: {
@@ -111,7 +113,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
             // Safe default above Stripe's minimum purchase floor.
             // Users can still edit the amount within the Stripe-hosted UI.
             sourceAmount: "2",
-            source: transactionSource,
+            source,
           },
           headers: { authorization: `Bearer ${accessToken}` },
         }),

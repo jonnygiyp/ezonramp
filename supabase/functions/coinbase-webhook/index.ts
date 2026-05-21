@@ -141,6 +141,14 @@ function mapCoinbaseStatus(status: string, eventType: string): string {
   return "callback_received";
 }
 
+function normalizeSource(value: unknown): "homepage" | "express" | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "express") return "express";
+  if (normalized === "homepage" || normalized === "home") return "homepage";
+  return null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -294,7 +302,7 @@ serve(async (req) => {
           .select("source")
           .eq("partner_user_ref", partnerUserRefForStore)
           .maybeSingle();
-        sourceForStore = (attemptRow?.source as string | null) ?? null;
+        sourceForStore = normalizeSource(attemptRow?.source);
       }
 
       const storeRow: Record<string, unknown> = {

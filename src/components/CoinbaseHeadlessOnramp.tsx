@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { AuthGatedButton } from "./AuthGatedButton";
+import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
@@ -97,7 +98,7 @@ interface CoinbaseHeadlessOnrampProps {
   presetAmounts?: string[];
   defaultAmount?: string;
   hideHeader?: boolean;
-  transactionSource?: 'home' | 'express';
+  transactionSource?: TransactionSource;
 }
 
 export function CoinbaseHeadlessOnramp({
@@ -106,7 +107,7 @@ export function CoinbaseHeadlessOnramp({
   presetAmounts = ['50', '100', '250', '500'],
   defaultAmount = "0",
   hideHeader = false,
-  transactionSource = 'home',
+  transactionSource,
 }: CoinbaseHeadlessOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -492,6 +493,7 @@ export function CoinbaseHeadlessOnramp({
       const userIdShort = session.user.id.replace(/-/g, "").slice(0, 8);
       const attemptShort = crypto.randomUUID().replace(/-/g, "");
       const attemptId = `u${userIdShort}_a${attemptShort}`;
+      const source = resolveTransactionSource(transactionSource);
 
       const { data, error } = await supabase.functions.invoke("coinbase-headless", {
         body: {
@@ -530,7 +532,7 @@ export function CoinbaseHeadlessOnramp({
           network: defaultNetwork,
           partner_user_ref: attemptId,
           status: 'idle',
-          source: transactionSource,
+          source,
         });
       } catch (err) {
         console.error('[COINBASE] Failed to create purchase attempt:', err);

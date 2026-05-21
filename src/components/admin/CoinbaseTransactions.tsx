@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, ChevronDown, Copy, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatTransactionDomain, normalizeTransactionSource } from "@/lib/transactionSource";
 
 type StatusFilter = "all" | "success" | "failed";
 type ProviderFilter = "all" | "coinbase" | "stripe";
@@ -31,11 +32,7 @@ interface UnifiedTx {
   raw: Record<string, unknown>;
 }
 
-function formatDomain(source?: string | null): string {
-  if (source === 'express') return 'Express';
-  if (source === 'home') return 'Homepage';
-  return '—';
-}
+const formatDomain = formatTransactionDomain;
 
 const COINBASE_SUCCESS = "ONRAMP_TRANSACTION_STATUS_SUCCESS";
 const COINBASE_FAILED = "ONRAMP_TRANSACTION_STATUS_FAILED";
@@ -55,6 +52,7 @@ function normalizeCoinbase(tx: any): UnifiedTx {
     wallet_address: tx.wallet_address ?? null,
     created_at: tx.created_at,
     updated_at: tx.updated_at,
+    source: normalizeTransactionSource(tx.source || tx.source_page || tx.domain || tx.entry_point),
     raw: tx,
   };
 }
@@ -80,7 +78,7 @@ function normalizeCoinbaseDb(row: any): UnifiedTx {
     wallet_address: row.wallet_address || null,
     created_at: row.tx_created_at || row.created_at,
     updated_at: row.tx_updated_at || row.updated_at,
-    source: (row.source as string | null) ?? null,
+    source: normalizeTransactionSource(row.source as string | null),
     raw: row.payload || row,
   };
 }
@@ -112,9 +110,39 @@ function normalizeStripe(row: any): UnifiedTx {
     wallet_address: td.wallet_address || row.wallet_address || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
-    source: (row.source as string | null) ?? null,
+    source: normalizeTransactionSource(row.source as string | null),
     raw: row,
   };
+}
+
+async function enrichCoinbaseSources(rows: UnifiedTx[]): Promise<void> {
+  const refs = [...new Set(
+    rows
+      .filter((t) => t.provider === "coinbase" && !t.source && t.partner_user_ref)
+      .map((t) => t.partner_user_ref as string)
+  )];
+  if (refs.length === 0) return;
+
+  const { data, error } = await (supabase as any)
+    .from("purchase_attempts")
+    .select("partner_user_ref, source")
+    .in("partner_user_ref", refs);
+  if (error) {
+    console.warn("[ADMIN-TX] purchase attempt source fallback failed", error);
+    return;
+  }
+
+  const sourceByRef = new Map<string, string>();
+  for (const row of data ?? []) {
+    const source = normalizeTransactionSource(row.source);
+    if (row.partner_user_ref && source) sourceByRef.set(row.partner_user_ref, source);
+  }
+
+  for (const tx of rows) {
+    if (tx.provider === "coinbase" && !tx.source && tx.partner_user_ref) {
+      tx.source = sourceByRef.get(tx.partner_user_ref) ?? null;
+    }
+  }
 }
 
 function matchesStatus(tx: UnifiedTx, filter: StatusFilter): boolean {
@@ -263,6 +291,7 @@ export default function CoinbaseTransactions() {
         const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
         return tb - ta;
       });
+      await enrichCoinbaseSources(merged);
 
       // Enrich with email + wallet
       const cbRefs = merged
@@ -438,6 +467,8 @@ export default function CoinbaseTransactions() {
         offset += PAGE;
       }
     }
+
+      await enrichCoinbaseSources(all);
 
     // Enrich with email + wallet
     const cbRefs = all

@@ -124,6 +124,14 @@ function jsonResponse(body: unknown, status: number, corsHeaders: Record<string,
   });
 }
 
+function normalizeSource(value: unknown): "homepage" | "express" | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "express") return "express";
+  if (normalized === "homepage" || normalized === "home") return "homepage";
+  return null;
+}
+
 serve(async (req) => {
   const origin = req.headers.get("origin");
   if (!isOriginAllowed(origin)) {
@@ -285,8 +293,9 @@ serve(async (req) => {
           console.error("[COINBASE-TX] source lookup failed:", attemptsErr.message);
         } else {
           for (const attempt of attempts ?? []) {
-            if (attempt.partner_user_ref && attempt.source) {
-              sourceByPartnerRef.set(attempt.partner_user_ref, attempt.source);
+            const source = normalizeSource(attempt.source);
+            if (attempt.partner_user_ref && source) {
+              sourceByPartnerRef.set(attempt.partner_user_ref, source);
             }
           }
         }
