@@ -680,7 +680,7 @@ export default function CoinbaseTransactions() {
                   <TableHead>Asset</TableHead>
                   <TableHead>Network</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
+                  <TableHead>Domain</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
