@@ -80,6 +80,7 @@ function normalizeCoinbaseDb(row: any): UnifiedTx {
     wallet_address: row.wallet_address || null,
     created_at: row.tx_created_at || row.created_at,
     updated_at: row.tx_updated_at || row.updated_at,
+    source: (row.source as string | null) ?? null,
     raw: row.payload || row,
   };
 }
