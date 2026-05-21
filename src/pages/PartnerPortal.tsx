@@ -160,9 +160,6 @@ const PartnerPortal = () => {
                     })}
                   </div>
                 </div>
-                <p className="text-[11px] pp-text-secondary text-center mb-4">
-                  Payment options are selected based on your region and availability
-                </p>
               </>
             ) : null}
 
