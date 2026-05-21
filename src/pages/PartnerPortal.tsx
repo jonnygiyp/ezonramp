@@ -266,6 +266,7 @@ const PartnerPortal = () => {
         </div>
       </div>
       <AccountModal open={accountModalOpen} onOpenChange={setAccountModalOpen} variant="dark" />
+      <PartnerPortalTutorial selectedProvider={activeTab} />
     </>
   );
 };
