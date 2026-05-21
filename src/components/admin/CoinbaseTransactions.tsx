@@ -27,7 +27,14 @@ interface UnifiedTx {
   email?: string | null;
   created_at?: string;
   updated_at?: string;
+  source?: string | null;
   raw: Record<string, unknown>;
+}
+
+function formatDomain(source?: string | null): string {
+  if (source === 'express') return 'Express';
+  if (source === 'home') return 'Homepage';
+  return '—';
 }
 
 const COINBASE_SUCCESS = "ONRAMP_TRANSACTION_STATUS_SUCCESS";
