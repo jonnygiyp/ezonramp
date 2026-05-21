@@ -165,6 +165,11 @@ const PartnerPortal = () => {
 
             {/* Onramp card */}
             <div className="pp-card">
+              {/* Debit success tip */}
+              <div className="pp-provider-label pp-text-primary font-semibold">
+                Debit is more likely to succeed when purchasing
+              </div>
+
               {/* Provider label */}
               <div className="pp-provider-label">
                 Powered by{' '}
