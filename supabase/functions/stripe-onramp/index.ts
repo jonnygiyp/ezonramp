@@ -269,6 +269,7 @@ serve(async (req) => {
           destination_network: destinationNetwork || null,
           source_amount: sourceAmount || null,
           status: session.status || "created",
+          source: source === 'express' ? 'express' : 'home',
         });
 
       if (insertError) {
