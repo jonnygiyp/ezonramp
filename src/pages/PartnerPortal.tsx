@@ -20,6 +20,7 @@ import { useAccount } from "@/hooks/useParticle";
 import { useGeoLocation } from "@/hooks/useGeoLocation";
 import { resolveInitialRamp, writeManualRamp } from "@/lib/rampSelection";
 import AccountModal from "@/components/AccountModal";
+import PartnerPortalTutorial from "@/components/PartnerPortalTutorial";
 
 const getTabIcon = (name: string) => {
   switch (name) {
@@ -104,6 +105,7 @@ const PartnerPortal = () => {
             <div className="flex items-center gap-2">
               {isConnected && (
                 <button
+                  data-pp-tut="account"
                   onClick={() => setAccountModalOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
                 >
@@ -112,6 +114,7 @@ const PartnerPortal = () => {
                 </button>
               )}
               <button
+                data-pp-tut="help"
                 onClick={() => setShowHelp(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#BABABA] bg-[#1C1C1C] border border-white/10 hover:bg-[#2E9484] hover:text-white hover:border-[#3AAD9A]/50 transition-all duration-200"
               >
@@ -126,7 +129,7 @@ const PartnerPortal = () => {
         <main className="flex-1 flex flex-col items-center px-4 pt-6 pb-24">
           <div className="pp-container w-full">
             {/* Headline */}
-            <div className="text-center mb-6">
+            <div className="text-center mb-6" data-pp-tut="headline">
               <h1 className="text-xl md:text-2xl font-bold pp-text-white mb-2">
                 Add Funds to Your Wallet
               </h1>
@@ -139,7 +142,7 @@ const PartnerPortal = () => {
               </div>
             ) : supportedProviders.length > 1 ? (
               <>
-                <div className="flex justify-center mb-2">
+                <div className="flex justify-center mb-2" data-pp-tut="tabs">
                   <div className="pp-tab-bar">
                     {supportedProviders.map((provider) => {
                       const Icon = getTabIcon(provider.name);
@@ -164,9 +167,12 @@ const PartnerPortal = () => {
             ) : null}
 
             {/* Onramp card */}
-            <div className="pp-card">
+            <div className="pp-card" data-pp-tut="widget">
               {/* Debit success tip */}
-              <div className="pp-provider-label pp-text-primary font-semibold">
+              <div
+                className="pp-provider-label pp-text-primary font-semibold"
+                data-pp-tut="debit-tip"
+              >
                 Debit is more likely to succeed when purchasing
               </div>
 
@@ -260,6 +266,7 @@ const PartnerPortal = () => {
         </div>
       </div>
       <AccountModal open={accountModalOpen} onOpenChange={setAccountModalOpen} variant="dark" />
+      <PartnerPortalTutorial selectedProvider={activeTab} />
     </>
   );
 };
