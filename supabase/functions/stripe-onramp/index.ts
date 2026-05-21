@@ -172,6 +172,7 @@ serve(async (req) => {
     });
 
     const { walletAddress, destinationCurrency, destinationNetwork, sourceAmount, sourceCurrency, source } = await req.json();
+    const normalizedSource = source === "express" ? "express" : "homepage";
 
     // Safe payload logging - no secrets
     console.log("[STRIPE-ONRAMP] payload", {
@@ -269,7 +270,7 @@ serve(async (req) => {
           destination_network: destinationNetwork || null,
           source_amount: sourceAmount || null,
           status: session.status || "created",
-          source: source === 'express' ? 'express' : 'home',
+          source: normalizedSource,
         });
 
       if (insertError) {
