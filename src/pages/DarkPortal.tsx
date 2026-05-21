@@ -133,9 +133,6 @@ const DarkPortal = () => {
                     })}
                   </div>
                 </div>
-                <p className="text-[11px] dp-text-secondary text-center mb-4">
-                  Payment options are selected based on your region and availability
-                </p>
               </>
             ) : null}
 
