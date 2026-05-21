@@ -9,6 +9,7 @@ import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGatedButton } from "./AuthGatedButton";
+import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
 
 interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
@@ -17,7 +18,7 @@ interface CoinbaseOnrampWidgetProps {
   defaultAmount?: string;
   hideHeader?: boolean;
   checkoutDescription?: string;
-  transactionSource?: 'home' | 'express';
+  transactionSource?: TransactionSource;
 }
 
 /**
@@ -73,7 +74,7 @@ export function CoinbaseOnrampWidget({
   defaultAmount = "0",
   hideHeader = false,
   checkoutDescription,
-  transactionSource = 'home',
+  transactionSource,
 }: CoinbaseOnrampWidgetProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
@@ -314,6 +315,7 @@ export function CoinbaseOnrampWidget({
       const userIdShort = session.user.id.replace(/-/g, "").slice(0, 8);
       const attemptShort = crypto.randomUUID().replace(/-/g, "");
       const attemptId = `u${userIdShort}_a${attemptShort}`;
+      const source = resolveTransactionSource(transactionSource);
 
       console.log("[COINBASE-GLOBAL] Creating session for", destinationAddress.slice(0, 10) + "...", "ref:", attemptId);
 
@@ -347,7 +349,7 @@ export function CoinbaseOnrampWidget({
           partner_user_ref: attemptId,
           provider: "coinbase",
           status: "waiting",
-          source: transactionSource,
+          source,
         });
       } catch (err) {
         console.error("[COINBASE-GLOBAL] Failed to insert purchase attempt:", err);
