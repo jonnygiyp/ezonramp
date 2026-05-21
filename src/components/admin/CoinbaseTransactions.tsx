@@ -543,7 +543,7 @@ export default function CoinbaseTransactions() {
         t.asset,
         t.network,
         t.created_at,
-        t.updated_at,
+        formatDomain(t.source),
       ]
         .map(escape)
         .join(",")
