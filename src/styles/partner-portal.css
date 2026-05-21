@@ -348,3 +348,148 @@
   color: #FFFFFF !important;
 }
 
+
+/* ===== Partner Portal Tutorial ===== */
+@keyframes pp-wiggle {
+  0%, 92%, 100% { transform: rotate(0deg); }
+  93% { transform: rotate(-12deg); }
+  95% { transform: rotate(12deg); }
+  97% { transform: rotate(-8deg); }
+  99% { transform: rotate(6deg); }
+}
+@keyframes pp-tut-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(58, 173, 154, 0.55); }
+  70% { box-shadow: 0 0 0 12px rgba(58, 173, 154, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(58, 173, 154, 0); }
+}
+.pp-tut-btn {
+  position: fixed;
+  right: 14px;
+  bottom: 64px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #1C1C1C;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #BABABA;
+  transition: all 200ms ease;
+  cursor: pointer;
+}
+.pp-tut-btn:hover {
+  color: #FFFFFF;
+  border-color: rgba(58, 173, 154, 0.5);
+  background: #2E9484;
+}
+.pp-tut-btn-large {
+  height: 44px;
+  width: 44px;
+}
+.pp-tut-btn-small {
+  height: 32px;
+  width: 32px;
+  opacity: 0.6;
+}
+.pp-tut-btn-small:hover { opacity: 1; }
+.pp-tut-btn-first {
+  background: #3AAD9A;
+  color: #FFFFFF;
+  border-color: #3AAD9A;
+  animation: pp-wiggle 2.4s ease-in-out infinite, pp-tut-pulse-ring 2.4s ease-out infinite;
+}
+@media (max-width: 640px) {
+  .pp-tut-btn { bottom: 56px; right: 10px; }
+  .pp-tut-btn-large { height: 38px; width: 38px; }
+  .pp-tut-btn-small { height: 28px; width: 28px; }
+}
+.pp-tut-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+}
+.pp-tut-ring {
+  position: fixed;
+  z-index: 91;
+  pointer-events: none;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 3px #3AAD9A,
+    0 0 0 6px rgba(58, 173, 154, 0.25),
+    0 0 0 9999px rgba(0, 0, 0, 0.72);
+  transition: top 180ms ease, left 180ms ease, width 180ms ease, height 180ms ease;
+}
+.pp-tut-tooltip {
+  position: fixed;
+  z-index: 92;
+  background: #111111;
+  color: #FFFFFF;
+  border: 1px solid rgba(58, 173, 154, 0.35);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  width: min(320px, calc(100vw - 24px));
+}
+@media (max-width: 640px) {
+  .pp-tut-tooltip {
+    left: 12px !important;
+    right: 12px;
+    width: auto !important;
+    bottom: 12px;
+    top: auto !important;
+  }
+}
+.pp-tut-tooltip h4 {
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.pp-tut-tooltip p {
+  color: #BABABA;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.pp-tut-tooltip .pp-tut-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pp-tut-tooltip .pp-tut-counter {
+  font-size: 11px;
+  color: #BABABA;
+}
+.pp-tut-btn-action {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: #BABABA;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.pp-tut-btn-action:hover:not(:disabled) { color: #FFFFFF; background: rgba(255,255,255,0.05); }
+.pp-tut-btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
+.pp-tut-btn-action-primary {
+  background: #3AAD9A;
+  color: #FFFFFF;
+  border-color: #3AAD9A;
+}
+.pp-tut-btn-action-primary:hover:not(:disabled) { background: #2E9484; color: #FFFFFF; }
+.pp-tut-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #BABABA;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 0;
+}
+.pp-tut-close:hover { color: #FFFFFF; }
