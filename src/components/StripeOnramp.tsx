@@ -24,11 +24,12 @@ interface StripeOnrampProps {
   defaultNetwork?: string;
   theme?: 'light' | 'dark';
   hideHeader?: boolean;
+  transactionSource?: 'home' | 'express';
 }
 
 type LoadState = 'idle' | 'loading' | 'mounted' | 'ready' | 'error';
 
-export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme, hideHeader = false }: StripeOnrampProps) {
+export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana", theme, hideHeader = false, transactionSource = 'home' }: StripeOnrampProps) {
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { setOpen } = useModal();
@@ -110,7 +111,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
             // Safe default above Stripe's minimum purchase floor.
             // Users can still edit the amount within the Stripe-hosted UI.
             sourceAmount: "2",
-            source: typeof window !== 'undefined' && window.location.pathname.startsWith('/express') ? 'express' : 'home',
+            source: transactionSource,
           },
           headers: { authorization: `Bearer ${accessToken}` },
         }),
@@ -264,7 +265,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       setLoadState('error');
       initLockRef.current = false;
     }
-  }, [walletAddress, defaultAsset, defaultNetwork, toast, getAccessToken, clearWatchdog, destroySession]);
+  }, [walletAddress, defaultAsset, defaultNetwork, transactionSource, toast, getAccessToken, clearWatchdog, destroySession]);
 
   // Track component mount
   useEffect(() => {
