@@ -213,7 +213,74 @@ export function CoinbaseHeadlessOnramp({
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     if (windowCheckRef.current) { clearInterval(windowCheckRef.current); windowCheckRef.current = null; }
+    if (popupCloseTimerRef.current) { clearTimeout(popupCloseTimerRef.current); popupCloseTimerRef.current = null; }
   }, []);
+
+  // Best-effort persistence of lifecycle fields onto the current purchase_attempts row.
+  // Never throws — diagnostics only.
+  const persistAttempt = useCallback(async (
+    attemptId: string,
+    patch: Record<string, unknown>,
+  ) => {
+    try {
+      await (supabase as any)
+        .from("purchase_attempts")
+        .update(patch)
+        .eq("partner_user_ref", attemptId);
+    } catch (err) {
+      console.warn("[CB-GLOBAL] persistAttempt failed", err);
+    }
+  }, []);
+
+  // Granular lifecycle transition. Returns the resolved state for chaining.
+  const updateLifecycle = useCallback((
+    next: CoinbaseLifecycleState,
+    source: CoinbaseStatusSource | string,
+    extra?: { failureCode?: CoinbaseFailureCode | null; attemptId?: string | null },
+  ): CoinbaseLifecycleState => {
+    const current = lifecycleRef.current;
+    if (!canTransition(current, next)) return current;
+    cbDiag.stateTransition(extra?.attemptId ?? null, current, next, String(source));
+    lifecycleRef.current = next;
+    setLifecycleState(next);
+    if (extra?.failureCode !== undefined) setFailureCode(extra.failureCode);
+
+    const attemptId = extra?.attemptId ?? purchaseAttemptId;
+    if (attemptId) {
+      const patch: Record<string, unknown> = {
+        lifecycle_state: next,
+        status_source: source,
+      };
+      if (next === "complete") patch.completed_at = new Date().toISOString();
+      if (isTerminal(next) && next !== "complete") {
+        patch.failure_detected_at = new Date().toISOString();
+        if (extra?.failureCode) patch.failure_reason_code = extra.failureCode;
+      }
+      void persistAttempt(attemptId, patch);
+    }
+
+    if (isTerminal(next)) {
+      cbDiag.resolved(attemptId ?? null, next, String(source));
+    }
+    return next;
+  }, [persistAttempt, purchaseAttemptId]);
+
+  // Pull the latest failure_reason_code from coinbase_transactions when we
+  // know a transaction id but only saw a generic failure status.
+  const fetchFailureReason = useCallback(async (txId: string): Promise<CoinbaseFailureCode | null> => {
+    try {
+      const { data } = await (supabase as any)
+        .from("coinbase_transactions")
+        .select("failure_reason_code")
+        .eq("transaction_id", txId)
+        .maybeSingle();
+      return (data?.failure_reason_code as CoinbaseFailureCode) || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+
 
   // State priority — higher wins. Terminal success cannot be downgraded.
   // 0: unknown, 1: pending-ish, 2: non-success terminal, 3: success terminal
