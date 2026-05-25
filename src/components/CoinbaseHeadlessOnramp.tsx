@@ -820,11 +820,15 @@ export function CoinbaseHeadlessOnramp({
   };
 
   // --- Reset ---
-  const resetFlow = () => {
+  const resetFlow = useCallback(() => {
     stopPolling();
     if (messageHandlerRef.current) {
       window.removeEventListener('message', messageHandlerRef.current);
       messageHandlerRef.current = null;
+    }
+    if (visibilityHandlerRef.current) {
+      document.removeEventListener('visibilitychange', visibilityHandlerRef.current);
+      visibilityHandlerRef.current = null;
     }
     if (realtimeChannelRef.current) {
       supabase.removeChannel(realtimeChannelRef.current);
@@ -841,7 +845,31 @@ export function CoinbaseHeadlessOnramp({
     // Reset must clear terminal status — bypass priority guard.
     txStateRef.current = 'waiting';
     setTxState('waiting');
-  };
+    lifecycleRef.current = 'idle';
+    setLifecycleState('idle');
+    setFailureCode(null);
+    webhookSeenRef.current = false;
+    popupOpenedAtRef.current = null;
+    popupClosedAtRef.current = null;
+    visibilityEventsRef.current = [];
+    widgetKeyRef.current += 1;
+  }, [isVerified, stopPolling]);
+
+  // Start Again — invoked from the lifecycle banner on any terminal failure.
+  // Best-effort marks the current attempt as abandoned-by-user when it is
+  // not already terminal, then resets local lifecycle state. The Supabase /
+  // Particle session is preserved.
+  const startAgain = useCallback(() => {
+    const attemptId = purchaseAttemptId;
+    cbDiag.startAgain(attemptId);
+    if (attemptId && lifecycleRef.current !== 'complete') {
+      void persistAttempt(attemptId, {
+        status: 'abandoned_by_user',
+        failure_detected_at: new Date().toISOString(),
+      });
+    }
+    resetFlow();
+  }, [purchaseAttemptId, persistAttempt, resetFlow]);
 
   const resetVerification = () => {
     clearStoredVerification();
