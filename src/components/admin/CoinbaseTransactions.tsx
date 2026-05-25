@@ -29,6 +29,8 @@ interface UnifiedTx {
   created_at?: string;
   updated_at?: string;
   source?: string | null;
+  failure_reason_code?: string | null;
+  failure_reason_raw?: string | null;
   raw: Record<string, unknown>;
 }
 
