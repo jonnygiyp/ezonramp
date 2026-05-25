@@ -651,7 +651,14 @@ export function CoinbaseHeadlessOnramp({
       // Set state and switch to result view
       setPurchaseAttemptId(attemptId);
       updateTxState('waiting', 'continueToPurchase');
+      updateLifecycle('initializing', 'sdk-callback', { attemptId });
       setStep('result');
+
+      // Reset per-attempt tracking refs
+      webhookSeenRef.current = false;
+      popupOpenedAtRef.current = null;
+      popupClosedAtRef.current = null;
+      visibilityEventsRef.current = [];
 
       // Insert purchase attempt record
       try {
@@ -665,14 +672,12 @@ export function CoinbaseHeadlessOnramp({
           partner_user_ref: attemptId,
           status: 'idle',
           source,
+          lifecycle_state: 'initializing',
         });
       } catch (err) {
         console.error('[COINBASE] Failed to create purchase attempt:', err);
       }
 
-      // Subscribe to realtime updates immediately so webhook-driven status
-      // changes reach the UI even if Coinbase postMessage events never fire
-      // (e.g. user closes the popup right after a successful payment).
       subscribeToAttempt(attemptId);
 
       // Open payment window
@@ -684,6 +689,24 @@ export function CoinbaseHeadlessOnramp({
         window.location.href = buyUrl;
         return;
       }
+
+      // Popup-open tracking
+      popupOpenedAtRef.current = new Date().toISOString();
+      cbDiag.popupOpen(attemptId);
+      updateLifecycle('waiting_coinbase', 'sdk-callback', { attemptId });
+      void persistAttempt(attemptId, { popup_opened_at: popupOpenedAtRef.current });
+
+      // Visibility tracking — capped history
+      const visHandler = () => {
+        const hidden = document.hidden;
+        cbDiag.visibility(attemptId, hidden);
+        const next = [...visibilityEventsRef.current, { at: new Date().toISOString(), hidden }]
+          .slice(-MAX_VISIBILITY_EVENTS);
+        visibilityEventsRef.current = next;
+        void persistAttempt(attemptId, { visibility_events: next });
+      };
+      document.addEventListener('visibilitychange', visHandler);
+      visibilityHandlerRef.current = visHandler;
 
       toast({ title: "Complete Payment", description: "Complete your card payment in the Coinbase window" });
 
