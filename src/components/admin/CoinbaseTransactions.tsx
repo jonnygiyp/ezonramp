@@ -81,6 +81,8 @@ function normalizeCoinbaseDb(row: any): UnifiedTx {
     created_at: row.tx_created_at || row.created_at,
     updated_at: row.tx_updated_at || row.updated_at,
     source: normalizeTransactionSource(row.source as string | null),
+    failure_reason_code: row.failure_reason_code || null,
+    failure_reason_raw: row.failure_reason_raw || null,
     raw: row.payload || row,
   };
 }
