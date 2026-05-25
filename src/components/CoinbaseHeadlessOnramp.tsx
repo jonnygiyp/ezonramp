@@ -442,22 +442,26 @@ export function CoinbaseHeadlessOnramp({
         });
         if (error) { console.error('[COINBASE-POLL] Error:', error); return; }
         if (data?.status) {
+          cbDiag.pollUpdate(attemptId, String(data.status));
           const mapped = mapDbStatus(data.status);
           if (mapped) updateTxState(mapped, 'poll');
         }
       } catch (err) { console.error('[COINBASE-POLL] Error:', err); }
     }, 10000);
 
+    // Hard cap: 5 minutes (down from 30). If we're still pending after that,
+    // treat the transaction as incomplete and stop polling.
     timeoutRef.current = setTimeout(() => {
       const current = txStateRef.current;
       if (current === 'initialized' || current === 'processing' || current === 'waiting') {
-        updateTxState('delayed', 'timeout');
-        (supabase as any).from('purchase_attempts')
-          .update({ status: 'delayed' })
-          .eq('partner_user_ref', attemptId);
+        cbDiag.timeout(attemptId, current);
+        updateTxState('incomplete', 'timeout');
+        updateLifecycle('incomplete', 'timeout', { failureCode: 'timeout', attemptId });
+        void persistAttempt(attemptId, { status: 'incomplete' });
       }
-    }, 30 * 60 * 1000);
-  }, [updateTxState]);
+    }, POLL_TIMEOUT_MS);
+  }, [updateTxState, updateLifecycle, persistAttempt]);
+
 
   useEffect(() => {
     return () => {
