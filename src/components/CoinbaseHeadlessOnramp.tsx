@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn, X, Clock } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
