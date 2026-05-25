@@ -132,6 +132,19 @@ function normalizeSource(value: unknown): "homepage" | "express" | null {
   return null;
 }
 
+/** Mirrors src/lib/coinbaseLifecycle.ts normalizeFailureReason. */
+function normalizeFailureReason(rawReason: unknown, rawErrorCode: unknown): string {
+  const reason = typeof rawReason === "string" ? rawReason.toUpperCase() : "";
+  const code = typeof rawErrorCode === "string" ? rawErrorCode.toUpperCase() : "";
+  if (code.includes("CARD_DECLINED") || code.includes("DECLINE")) return "card_declined";
+  if (reason.includes("KYC") || reason.includes("IDENTITY") || reason.includes("VERIFICATION")) {
+    return "verification_failed";
+  }
+  if (reason.includes("USER_CANCELED") || reason.includes("USER_CANCELLED")) return "abandoned";
+  if (reason.includes("TIMEOUT")) return "timeout";
+  return "unknown";
+}
+
 serve(async (req) => {
   const origin = req.headers.get("origin");
   if (!isOriginAllowed(origin)) {
