@@ -581,6 +581,8 @@ export default function CoinbaseTransactions() {
         t.network,
         t.created_at,
         formatDomain(t.source),
+        t.failure_reason_code,
+        t.failure_reason_raw,
       ]
         .map(escape)
         .join(",")
