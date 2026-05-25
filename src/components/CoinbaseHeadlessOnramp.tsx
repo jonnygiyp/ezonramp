@@ -396,12 +396,14 @@ export function CoinbaseHeadlessOnramp({
         },
         (payload: any) => {
           const newRow = payload?.new || {};
-          console.log('[COINBASE-RT] update received', { status: newRow.status, txId: newRow.coinbase_transaction_id });
+          webhookSeenRef.current = true;
+          cbDiag.webhookSeen(attemptId, String(newRow.status || ''));
+          void persistAttempt(attemptId, { webhook_received_at: new Date().toISOString() });
           if (newRow.coinbase_transaction_id) {
             setCoinbaseTxId((prev) => prev || newRow.coinbase_transaction_id);
           }
           const mapped = mapDbStatus(newRow.status);
-          if (mapped) updateTxState(mapped, 'realtime');
+          if (mapped) updateTxState(mapped, 'webhook');
         }
       )
       .subscribe((status) => {
