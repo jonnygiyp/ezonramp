@@ -723,7 +723,7 @@ export default function CoinbaseTransactions() {
               <TableBody>
                 {filtered.length === 0 && !loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       No transactions to display.
                     </TableCell>
                   </TableRow>
@@ -819,7 +819,7 @@ export default function CoinbaseTransactions() {
                       </TableRow>
                       {expandedIdx === idx && (
                         <TableRow>
-                          <TableCell colSpan={11} className="bg-muted/30">
+                          <TableCell colSpan={12} className="bg-muted/30">
                             <pre className="text-xs overflow-auto max-h-96 p-2">
                               {JSON.stringify(tx.raw, null, 2)}
                             </pre>
