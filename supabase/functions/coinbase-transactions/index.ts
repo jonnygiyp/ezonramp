@@ -308,11 +308,21 @@ serve(async (req) => {
           const fiat = tx.payment_total || tx.source_amount || tx.purchase_amount || {};
           const crypto = tx.destination_amount || tx.purchase_amount || {};
           const partnerUserRef = tx.partner_user_ref || null;
+          const status: string = tx.status || "unknown";
+          const isFailed = /FAILED|CANCELED|CANCELLED|EXPIRED/i.test(status);
+          const rawReason = tx.failure_reason || tx.failureReason || null;
+          const rawErrorCode = tx.error_code || tx.errorCode || null;
+          const failureReasonCode = isFailed
+            ? normalizeFailureReason(rawReason, rawErrorCode)
+            : null;
+          const failureReasonRaw = isFailed
+            ? [rawReason, rawErrorCode].filter(Boolean).join(" / ") || null
+            : null;
           const row: Record<string, unknown> = {
             transaction_id: txId,
             partner_user_ref: partnerUserRef,
             wallet_address: tx.wallet_address || null,
-            status: tx.status || "unknown",
+            status,
             fiat_value: fiat?.value ? Number(fiat.value) : null,
             fiat_currency: fiat?.currency || null,
             crypto_value: crypto?.value ? Number(crypto.value) : null,
@@ -324,6 +334,8 @@ serve(async (req) => {
             last_synced_at: nowIso,
             payload: tx,
           };
+          if (failureReasonCode) row.failure_reason_code = failureReasonCode;
+          if (failureReasonRaw) row.failure_reason_raw = failureReasonRaw;
           const knownSource = partnerUserRef ? sourceByPartnerRef.get(partnerUserRef) : null;
           if (knownSource) row.source = knownSource;
           return row;
