@@ -805,6 +805,14 @@ export default function CoinbaseTransactions() {
                         <TableCell className="text-xs" title={tx.source || ""}>
                           {formatDomain(tx.source)}
                         </TableCell>
+                        <TableCell
+                          className="text-xs"
+                          title={tx.failure_reason_raw || tx.failure_reason_code || ""}
+                        >
+                          {tx.failure_reason_code
+                            ? tx.failure_reason_code.replace(/_/g, " ")
+                            : "—"}
+                        </TableCell>
                         <TableCell>
                           <Button
                             size="sm"
