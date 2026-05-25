@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock, AlertCircle, LogIn } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { AuthGatedButton } from "./AuthGatedButton";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
+import { CoinbaseLifecycleBanner } from "./coinbase/CoinbaseLifecycleBanner";
+import {
+  type CoinbaseLifecycleState,
+  type CoinbaseFailureCode,
+  type CoinbaseStatusSource,
+  canTransition,
+  isTerminal,
+  failureCodeToLifecycle,
+  coinbaseStatusToLifecycle,
+} from "@/lib/coinbaseLifecycle";
+import { cbDiag } from "@/lib/coinbaseDiagnostics";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
@@ -20,6 +31,12 @@ type Step = 'identity' | 'verify' | 'amount' | 'result';
 type TxState = 'waiting' | 'incomplete' | 'initialized' | 'processing' | 'completed' | 'failed' | 'delayed';
 type VerifyChannel = 'sms' | 'email';
 type QuoteState = 'idle' | 'loading' | 'ready' | 'error';
+
+// Timing constants (per spec)
+const POPUP_CLOSE_INCOMPLETE_MS = 75_000; // popup closed + no webhook → incomplete
+const POLL_TIMEOUT_MS = 5 * 60 * 1000;    // 5-minute hard cap (was 30 min)
+
+const MAX_VISIBILITY_EVENTS = 20;
 
 interface QuoteData {
   purchaseAmount: string;
