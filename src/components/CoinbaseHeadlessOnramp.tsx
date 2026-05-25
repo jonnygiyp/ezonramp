@@ -723,36 +723,52 @@ export function CoinbaseHeadlessOnramp({
           case 'onramp_api.commit_success': {
             const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
             if (txId) setCoinbaseTxId(txId);
-            updateTxState('initialized', 'postMessage:commit_success');
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('initialized', 'sdk-callback');
+            updateLifecycle('processing', 'sdk-callback', { attemptId });
             startPolling(attemptId);
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'initialized', coinbase_transaction_id: txId || null })
-              .eq('partner_user_ref', attemptId);
+            void persistAttempt(attemptId, {
+              status: 'initialized',
+              coinbase_transaction_id: txId || null,
+              last_sdk_callback_at: new Date().toISOString(),
+            });
             if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "initialized" }));
             break;
           }
           case 'onramp_api.cancel':
-            updateTxState('incomplete', 'postMessage:cancel');
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'incomplete' })
-              .eq('partner_user_ref', attemptId);
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('incomplete', 'sdk-callback');
+            updateLifecycle('incomplete', 'abandoned', { failureCode: 'abandoned', attemptId });
+            void persistAttempt(attemptId, { status: 'incomplete', last_sdk_callback_at: new Date().toISOString() });
             break;
           case 'onramp_api.polling_success': {
-            updateTxState('completed', 'postMessage:polling_success');
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'completed' })
-              .eq('partner_user_ref', attemptId);
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('completed', 'sdk-callback');
+            updateLifecycle('complete', 'sdk-callback', { attemptId });
+            void persistAttempt(attemptId, { status: 'completed', last_sdk_callback_at: new Date().toISOString() });
             const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
             if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "completed" }));
             break;
           }
           case 'onramp_api.polling_error': {
-            updateTxState('failed', 'postMessage:polling_error');
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'failed' })
-              .eq('partner_user_ref', attemptId);
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('failed', 'sdk-callback');
             const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
-            if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "failed" }));
+            // Try to enrich with a specific failure code if available.
+            if (txId) {
+              setCoinbaseTxId(txId);
+              void fetchFailureReason(txId).then((code) => {
+                updateLifecycle(
+                  code ? failureCodeToLifecycle(code) : 'unknown_failure',
+                  'sdk-callback',
+                  { failureCode: code || 'unknown', attemptId },
+                );
+              });
+              void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "failed" }));
+            } else {
+              updateLifecycle('unknown_failure', 'sdk-callback', { failureCode: 'unknown', attemptId });
+            }
+            void persistAttempt(attemptId, { status: 'failed', last_sdk_callback_at: new Date().toISOString() });
             break;
           }
         }
@@ -761,33 +777,40 @@ export function CoinbaseHeadlessOnramp({
       messageHandlerRef.current = handleMessage;
       window.addEventListener('message', handleMessage);
 
-      // Monitor window close. Closing the popup is NOT proof the user abandoned
-      // payment — Coinbase often closes itself after a successful purchase before
-      // the success postMessage reaches us. We therefore:
-      //   1. Never overwrite a terminal success status (guarded in updateTxState).
-      //   2. Move to 'processing' (a neutral pending state) instead of 'incomplete'.
-      //   3. Re-fetch the latest DB status (webhook may have already landed).
-      //   4. Start polling so we converge on Coinbase's reported status.
-      // The 30-minute polling timeout will eventually fall back to 'delayed' if
-      // no confirmation ever arrives.
+      // Popup close monitor. Closing the popup is NOT proof of abandonment —
+      // Coinbase auto-closes on success. We start a 75-second grace timer:
+      // if no webhook arrives in that window AND we never reached a terminal
+      // state, we mark the attempt incomplete via the popup-closed source.
       windowCheckRef.current = setInterval(() => {
         if (paymentWindow.closed) {
           if (windowCheckRef.current) clearInterval(windowCheckRef.current);
           windowCheckRef.current = null;
-          console.log('[COINBASE-FLOW] payment window closed', { attemptId, currentState: txStateRef.current });
+          popupClosedAtRef.current = new Date().toISOString();
+          cbDiag.popupClose(attemptId, txStateRef.current);
+          void persistAttempt(attemptId, { popup_closed_at: popupClosedAtRef.current });
+
           setTimeout(async () => {
             const current = txStateRef.current;
-            // Only nudge into a neutral pending state — never mark incomplete here.
             if (current === 'waiting') {
               updateTxState('processing', 'window-close');
+              updateLifecycle('processing', 'popup-closed', { attemptId });
             }
-            // Always check the DB in case the webhook beat us.
             await fetchAttemptStatus(attemptId);
-            // Make sure polling is running even if commit_success never fired.
             startPolling(attemptId);
           }, 1500);
+
+          // 75s grace timer for popup-closed → incomplete.
+          if (popupCloseTimerRef.current) clearTimeout(popupCloseTimerRef.current);
+          popupCloseTimerRef.current = setTimeout(() => {
+            if (webhookSeenRef.current) return;
+            if (isTerminal(lifecycleRef.current)) return;
+            updateTxState('incomplete', 'popup-closed');
+            updateLifecycle('incomplete', 'popup-closed', { failureCode: 'popup_closed', attemptId });
+            void persistAttempt(attemptId, { status: 'incomplete' });
+          }, POPUP_CLOSE_INCOMPLETE_MS);
         }
       }, 1000);
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to initiate purchase';
       toast({ title: "Error", description: message, variant: "destructive" });
