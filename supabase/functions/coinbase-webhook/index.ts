@@ -149,6 +149,22 @@ function normalizeSource(value: unknown): "homepage" | "express" | null {
   return null;
 }
 
+/**
+ * Normalize Coinbase's verbose failure strings into a small enum the UI
+ * and admin panel can act on. Mirrors src/lib/coinbaseLifecycle.ts.
+ */
+function normalizeFailureReason(rawReason: unknown, rawErrorCode: unknown): string {
+  const reason = typeof rawReason === "string" ? rawReason.toUpperCase() : "";
+  const code = typeof rawErrorCode === "string" ? rawErrorCode.toUpperCase() : "";
+  if (code.includes("CARD_DECLINED") || code.includes("DECLINE")) return "card_declined";
+  if (reason.includes("KYC") || reason.includes("IDENTITY") || reason.includes("VERIFICATION")) {
+    return "verification_failed";
+  }
+  if (reason.includes("USER_CANCELED") || reason.includes("USER_CANCELLED")) return "abandoned";
+  if (reason.includes("TIMEOUT")) return "timeout";
+  return "unknown";
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
