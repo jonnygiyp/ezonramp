@@ -336,14 +336,27 @@ export function CoinbaseOnrampWidget({
       const sessionToken = data.sessionToken;
       if (!sessionToken) throw new Error("Failed to get session token");
 
+      // Validate USDC amount (user enters crypto units, not fiat)
+      const purchaseAmountUsdc = parseFloat(amount);
+      if (!purchaseAmountUsdc || purchaseAmountUsdc <= 0) {
+        toast({
+          title: "Invalid Amount",
+          description: "Please enter a USDC amount greater than 0.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // Insert purchase attempt row BEFORE opening popup, so webhooks arriving
-      // mid-flow can locate it by partner_user_ref.
+      // mid-flow can locate it by partner_user_ref. `amount` is the requested
+      // USDC purchase amount (crypto); `currency` = "USDC" signals this.
       try {
         await (supabase as any).from("purchase_attempts").insert({
           user_id: session.user.id,
           wallet_address: destinationAddress,
-          amount: parseFloat(amount) || 0,
-          currency: "USD",
+          amount: purchaseAmountUsdc,
+          currency: "USDC",
           crypto_currency: defaultAsset,
           network: defaultNetwork,
           partner_user_ref: attemptId,
@@ -359,12 +372,14 @@ export function CoinbaseOnrampWidget({
       const addresses: Record<string, string[]> = {};
       addresses[destinationAddress] = [defaultNetwork];
 
-      // Generate the onramp URL with sessionToken AND partnerUserId for tracking
+      // Use presetCryptoAmount so the user buys a specific USDC amount.
+      // Coinbase computes the fiat payment amount in the user's local
+      // currency inside the hosted checkout. Do NOT also pass presetFiatAmount.
       const onrampURL = generateOnRampURL({
         sessionToken,
         addresses,
         assets: [defaultAsset],
-        presetFiatAmount: parseFloat(amount) || 100,
+        presetCryptoAmount: purchaseAmountUsdc,
         defaultNetwork,
         defaultAsset,
         partnerUserId: attemptId,
