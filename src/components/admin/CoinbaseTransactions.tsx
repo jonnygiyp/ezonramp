@@ -716,6 +716,7 @@ export default function CoinbaseTransactions() {
                   <TableHead>Network</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Domain</TableHead>
+                  <TableHead>Failure Reason</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
