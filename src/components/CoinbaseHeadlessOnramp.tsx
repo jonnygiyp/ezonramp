@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn, X, Clock } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
@@ -820,11 +820,15 @@ export function CoinbaseHeadlessOnramp({
   };
 
   // --- Reset ---
-  const resetFlow = () => {
+  const resetFlow = useCallback(() => {
     stopPolling();
     if (messageHandlerRef.current) {
       window.removeEventListener('message', messageHandlerRef.current);
       messageHandlerRef.current = null;
+    }
+    if (visibilityHandlerRef.current) {
+      document.removeEventListener('visibilitychange', visibilityHandlerRef.current);
+      visibilityHandlerRef.current = null;
     }
     if (realtimeChannelRef.current) {
       supabase.removeChannel(realtimeChannelRef.current);
@@ -841,7 +845,31 @@ export function CoinbaseHeadlessOnramp({
     // Reset must clear terminal status — bypass priority guard.
     txStateRef.current = 'waiting';
     setTxState('waiting');
-  };
+    lifecycleRef.current = 'idle';
+    setLifecycleState('idle');
+    setFailureCode(null);
+    webhookSeenRef.current = false;
+    popupOpenedAtRef.current = null;
+    popupClosedAtRef.current = null;
+    visibilityEventsRef.current = [];
+    widgetKeyRef.current += 1;
+  }, [isVerified, stopPolling]);
+
+  // Start Again — invoked from the lifecycle banner on any terminal failure.
+  // Best-effort marks the current attempt as abandoned-by-user when it is
+  // not already terminal, then resets local lifecycle state. The Supabase /
+  // Particle session is preserved.
+  const startAgain = useCallback(() => {
+    const attemptId = purchaseAttemptId;
+    cbDiag.startAgain(attemptId);
+    if (attemptId && lifecycleRef.current !== 'complete') {
+      void persistAttempt(attemptId, {
+        status: 'abandoned_by_user',
+        failure_detected_at: new Date().toISOString(),
+      });
+    }
+    resetFlow();
+  }, [purchaseAttemptId, persistAttempt, resetFlow]);
 
   const resetVerification = () => {
     clearStoredVerification();
@@ -1230,97 +1258,18 @@ export function CoinbaseHeadlessOnramp({
           </div>
         )}
 
-        {/* Step: Result - event-driven transaction states */}
+        {/* Step: Result — granular lifecycle banner drives all states */}
         {step === 'result' && (
-          <div className="py-8 text-center space-y-6">
-            {txState === 'waiting' && (
-              <>
-                <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">Complete Your Purchase</h2>
-                  <p className="text-muted-foreground">Please complete your payment in the Coinbase window.</p>
-                </div>
-              </>
-            )}
-
-            {txState === 'incomplete' && (
-              <>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
-                  <X className="h-8 w-8 text-destructive" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">Incomplete Transaction!</h2>
-                  <p className="text-muted-foreground">You exited the process before completing your purchase.</p>
-                </div>
-                <Button onClick={resetFlow} className="w-full">Try Again</Button>
-              </>
-            )}
-
-            {(txState === 'initialized' || txState === 'processing') && (
-              <>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-                  <p className="text-lg font-medium">
-                    Transaction Status: {txState === 'initialized' ? 'Initialized' : 'Processing'}
-                  </p>
-                </div>
-                {coinbaseTxId && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
-                    <p className="font-mono text-sm truncate">{coinbaseTxId}</p>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">Status will automatically update every 10 seconds.</p>
-              </>
-            )}
-
-            {txState === 'completed' && (
-              <>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
-                  <Check className="h-8 w-8 text-primary" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-                  <p className="text-lg font-medium text-primary">Transaction Status: Completed</p>
-                </div>
-                {coinbaseTxId && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
-                    <p className="font-mono text-sm truncate">{coinbaseTxId}</p>
-                  </div>
-                )}
-                <Button onClick={resetFlow} variant="outline" className="w-full">Make Another Purchase</Button>
-              </>
-            )}
-
-            {txState === 'failed' && (
-              <>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10">
-                  <X className="h-8 w-8 text-destructive" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-                  <p className="text-lg font-medium text-destructive">Transaction Status: Failed</p>
-                </div>
-                <Button onClick={resetFlow} className="w-full">Try Again</Button>
-              </>
-            )}
-
-            {txState === 'delayed' && (
-              <>
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent">
-                  <Clock className="h-8 w-8 text-accent-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">Purchase Initiated!</h2>
-                  <p className="text-lg font-medium text-muted-foreground">Transaction Status: Delayed</p>
-                  <p className="text-muted-foreground">Your transaction is taking longer than expected. Please check again later.</p>
-                </div>
-                <Button onClick={resetFlow} variant="outline" className="w-full">Make Another Purchase</Button>
-              </>
+          <div className="py-4 space-y-4" key={widgetKeyRef.current}>
+            <CoinbaseLifecycleBanner
+              state={lifecycleState}
+              transactionId={coinbaseTxId}
+              onStartAgain={startAgain}
+            />
+            {lifecycleState === 'complete' && (
+              <Button onClick={resetFlow} variant="outline" className="w-full">
+                Make Another Purchase
+              </Button>
             )}
           </div>
         )}

@@ -149,6 +149,22 @@ function normalizeSource(value: unknown): "homepage" | "express" | null {
   return null;
 }
 
+/**
+ * Normalize Coinbase's verbose failure strings into a small enum the UI
+ * and admin panel can act on. Mirrors src/lib/coinbaseLifecycle.ts.
+ */
+function normalizeFailureReason(rawReason: unknown, rawErrorCode: unknown): string {
+  const reason = typeof rawReason === "string" ? rawReason.toUpperCase() : "";
+  const code = typeof rawErrorCode === "string" ? rawErrorCode.toUpperCase() : "";
+  if (code.includes("CARD_DECLINED") || code.includes("DECLINE")) return "card_declined";
+  if (reason.includes("KYC") || reason.includes("IDENTITY") || reason.includes("VERIFICATION")) {
+    return "verification_failed";
+  }
+  if (reason.includes("USER_CANCELED") || reason.includes("USER_CANCELLED")) return "abandoned";
+  if (reason.includes("TIMEOUT")) return "timeout";
+  return "unknown";
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -288,14 +304,28 @@ serve(async (req) => {
       console.log(`[COINBASE-WEBHOOK] Updated transaction ${transactionId} to status: ${canonicalStatus}`);
     }
 
+    // Extract failure reason details from the webhook payload.
+    const rawReason: string | null =
+      event.failureReason || event.failure_reason || event.reason || null;
+    const rawErrorCode: string | null =
+      event.errorCode || event.error_code || null;
+    const failureReasonCode =
+      canonicalStatus === "failed" ? normalizeFailureReason(rawReason, rawErrorCode) : null;
+    const failureReasonRaw =
+      canonicalStatus === "failed"
+        ? [rawReason, rawErrorCode].filter(Boolean).join(" / ") || null
+        : null;
+
     // Also persist into long-term coinbase_transactions store (Coinbase API only retains 30 days)
     if (transactionId) {
       const partnerUserRefForStore =
         event.partnerUserId || event.partner_user_id || event.partnerUserRef || null;
       const nowIso = new Date().toISOString();
 
-      // Look up the originating page (home vs /express) recorded on the purchase attempt.
+      // Look up the originating page (home vs /express) recorded on the purchase attempt
+      // AND the existing intermediate_statuses array so we can append idempotently.
       let sourceForStore: string | null = null;
+      let existingIntermediate: Array<{ status: string; at: string; source: string }> = [];
       if (partnerUserRefForStore) {
         const { data: attemptRow } = await supabase
           .from("purchase_attempts")
@@ -304,6 +334,23 @@ serve(async (req) => {
           .maybeSingle();
         sourceForStore = normalizeSource(attemptRow?.source);
       }
+      try {
+        const { data: existingTx } = await supabase
+          .from("coinbase_transactions")
+          .select("intermediate_statuses")
+          .eq("transaction_id", transactionId)
+          .maybeSingle();
+        if (Array.isArray(existingTx?.intermediate_statuses)) {
+          existingIntermediate = existingTx!.intermediate_statuses as typeof existingIntermediate;
+        }
+      } catch (_) {
+        // ignore — first webhook for this tx
+      }
+
+      const nextIntermediate = [
+        ...existingIntermediate,
+        { status: status || canonicalStatus, at: nowIso, source: "webhook" },
+      ].slice(-50);
 
       const storeRow: Record<string, unknown> = {
         transaction_id: transactionId,
@@ -319,7 +366,10 @@ serve(async (req) => {
         tx_updated_at: nowIso,
         last_synced_at: nowIso,
         payload: event,
+        intermediate_statuses: nextIntermediate,
       };
+      if (failureReasonCode) storeRow.failure_reason_code = failureReasonCode;
+      if (failureReasonRaw) storeRow.failure_reason_raw = failureReasonRaw;
       // Only set source when we know it, so the periodic sync upsert never wipes a known value.
       if (sourceForStore) storeRow.source = sourceForStore;
 
@@ -338,18 +388,29 @@ serve(async (req) => {
       if (canonicalStatus === 'success') purchaseStatus = 'completed';
       else if (canonicalStatus === 'failed') purchaseStatus = 'failed';
 
+      const nowIso = new Date().toISOString();
+      const patch: Record<string, unknown> = {
+        status: purchaseStatus,
+        coinbase_transaction_id: transactionId,
+        webhook_received_at: nowIso,
+        status_source: 'webhook',
+      };
+      if (purchaseStatus === 'completed') patch.completed_at = nowIso;
+      if (purchaseStatus === 'failed') {
+        patch.failure_detected_at = nowIso;
+        if (failureReasonCode) patch.failure_reason_code = failureReasonCode;
+        if (failureReasonRaw) patch.failure_reason_raw = failureReasonRaw;
+      }
+
       const { error: purchaseUpdateError } = await supabase
         .from("purchase_attempts")
-        .update({
-          status: purchaseStatus,
-          coinbase_transaction_id: transactionId,
-        })
+        .update(patch)
         .eq("partner_user_ref", partnerUserId);
 
       if (purchaseUpdateError) {
         console.error("[COINBASE-WEBHOOK] Purchase attempt update error:", purchaseUpdateError);
       } else {
-        console.log(`[COINBASE-WEBHOOK] Updated purchase attempt ${partnerUserId} to status: ${purchaseStatus}`);
+        console.log(`[COINBASE-WEBHOOK] Updated purchase attempt ${partnerUserId} to status: ${purchaseStatus}${failureReasonCode ? ` (${failureReasonCode})` : ''}`);
       }
     }
 

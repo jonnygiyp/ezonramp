@@ -29,6 +29,8 @@ interface UnifiedTx {
   created_at?: string;
   updated_at?: string;
   source?: string | null;
+  failure_reason_code?: string | null;
+  failure_reason_raw?: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -79,6 +81,8 @@ function normalizeCoinbaseDb(row: any): UnifiedTx {
     created_at: row.tx_created_at || row.created_at,
     updated_at: row.tx_updated_at || row.updated_at,
     source: normalizeTransactionSource(row.source as string | null),
+    failure_reason_code: row.failure_reason_code || null,
+    failure_reason_raw: row.failure_reason_raw || null,
     raw: row.payload || row,
   };
 }
@@ -533,6 +537,8 @@ export default function CoinbaseTransactions() {
       "network",
       "created_at",
       "domain",
+      "failure_reason_code",
+      "failure_reason_raw",
     ];
     const escape = (v: unknown) => {
       if (v == null) return "";
@@ -575,6 +581,8 @@ export default function CoinbaseTransactions() {
         t.network,
         t.created_at,
         formatDomain(t.source),
+        t.failure_reason_code,
+        t.failure_reason_raw,
       ]
         .map(escape)
         .join(",")
@@ -712,13 +720,14 @@ export default function CoinbaseTransactions() {
                   <TableHead>Network</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Domain</TableHead>
+                  <TableHead>Failure Reason</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 && !loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       No transactions to display.
                     </TableCell>
                   </TableRow>
@@ -800,6 +809,14 @@ export default function CoinbaseTransactions() {
                         <TableCell className="text-xs" title={tx.source || ""}>
                           {formatDomain(tx.source)}
                         </TableCell>
+                        <TableCell
+                          className="text-xs"
+                          title={tx.failure_reason_raw || tx.failure_reason_code || ""}
+                        >
+                          {tx.failure_reason_code
+                            ? tx.failure_reason_code.replace(/_/g, " ")
+                            : "—"}
+                        </TableCell>
                         <TableCell>
                           <Button
                             size="sm"
@@ -814,7 +831,7 @@ export default function CoinbaseTransactions() {
                       </TableRow>
                       {expandedIdx === idx && (
                         <TableRow>
-                          <TableCell colSpan={11} className="bg-muted/30">
+                          <TableCell colSpan={12} className="bg-muted/30">
                             <pre className="text-xs overflow-auto max-h-96 p-2">
                               {JSON.stringify(tx.raw, null, 2)}
                             </pre>
