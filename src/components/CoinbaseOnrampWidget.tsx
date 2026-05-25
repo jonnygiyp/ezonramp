@@ -509,16 +509,20 @@ export function CoinbaseOnrampWidget({
       <div className="bg-card border border-border rounded-xl p-6 space-y-6">
         {/* Amount Input */}
         <div className="space-y-2" data-tutorial="global-amount-input">
-          <Label htmlFor="amount-global">Amount (USD)</Label>
+          <Label htmlFor="amount-global">Amount of USDC</Label>
           <Input
             id="amount-global"
             type="number"
-            placeholder="100"
+            placeholder="Enter USDC amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             min="1"
+            step="any"
             className="text-lg"
           />
+          <p className="text-[11px] text-muted-foreground">
+            You'll see the final price in your local currency in Coinbase before confirming.
+          </p>
         </div>
 
         {/* Wallet Address */}
