@@ -168,10 +168,23 @@ export function CoinbaseHeadlessOnramp({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageHandlerRef = useRef<((e: MessageEvent) => void) | null>(null);
   const windowCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const popupCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
+  const visibilityEventsRef = useRef<Array<{ at: string; hidden: boolean }>>([]);
+  const popupOpenedAtRef = useRef<string | null>(null);
+  const popupClosedAtRef = useRef<string | null>(null);
+  const webhookSeenRef = useRef(false);
+  const widgetKeyRef = useRef(0); // bumped by Start Again to force a clean remount
+
+  // Granular lifecycle for the Coinbase Global flow (rendered by CoinbaseLifecycleBanner).
+  const [lifecycleState, setLifecycleState] = useState<CoinbaseLifecycleState>("idle");
+  const lifecycleRef = useRef<CoinbaseLifecycleState>("idle");
+  const [failureCode, setFailureCode] = useState<CoinbaseFailureCode | null>(null);
 
   // Address validation
   const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
   const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
+
 
   const connectedAddressValid = isConnected && address && (
     defaultNetwork === 'solana' ? isSolanaAddress(address) : isEvmAddress(address)
