@@ -319,10 +319,39 @@ export function CoinbaseHeadlessOnramp({
     console.log('[COINBASE-STATE] transition', { from: current, to: next, source });
     txStateRef.current = next;
     setTxState(next);
+
+    // Mirror legacy TxState into the granular lifecycle so the new banner
+    // reflects DB/webhook/poll-driven changes too.
+    const lifecycleMap: Record<TxState, CoinbaseLifecycleState | null> = {
+      waiting: 'waiting_coinbase',
+      initialized: 'processing',
+      processing: 'processing',
+      delayed: 'processing',
+      incomplete: 'incomplete',
+      failed: 'failed',
+      completed: 'complete',
+    };
+    const mappedLifecycle = lifecycleMap[next];
+    if (mappedLifecycle) {
+      // For "failed" from realtime/poll, try to enrich with a specific failure code.
+      if (mappedLifecycle === 'failed' && coinbaseTxId) {
+        void fetchFailureReason(coinbaseTxId).then((code) => {
+          if (code) {
+            updateLifecycle(failureCodeToLifecycle(code), source, { failureCode: code });
+          } else {
+            updateLifecycle('failed', source);
+          }
+        });
+      } else {
+        updateLifecycle(mappedLifecycle, source);
+      }
+    }
+
     if (next === 'completed' || next === 'failed') {
       stopPolling();
     }
-  }, [stopPolling]);
+  }, [stopPolling, updateLifecycle, fetchFailureReason, coinbaseTxId]);
+
 
   // Map DB status string -> TxState
   const mapDbStatus = (s: string | null | undefined): TxState | null => {
