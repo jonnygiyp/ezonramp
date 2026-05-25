@@ -1,128 +1,121 @@
-# Inbound Referral Tracking System
+# Coinbase Global Transaction UX & Lifecycle Overhaul
 
-A complete `?ref=` campaign attribution system for ezonramp.com and /express, modeled on the existing admin Transactions tab.
+A focused upgrade to the Coinbase Global (non-US) onramp flow. Stripe and Coinbase US logic stay untouched except for shared types. All existing JWT auth, CORS allowlists, webhook signature verification, and admin RLS remain intact.
 
-## 1. Database (new migration)
+## 1. Database (migration)
 
-Four new tables, all RLS-enabled, all admin-read-only via `is_admin(auth.uid())`.
+Extend `purchase_attempts` (backward compatible — all new columns nullable):
 
-**inbound_tracking_campaigns**
-- id, tracking_code (unique short slug, default `encode(gen_random_bytes(6),'base64')`-style), campaign_name, destination_path (`/` or `/express`), notes, created_by uuid, is_active bool, created_at, updated_at
+- `lifecycle_state` text — canonical frontend state (see §3)
+- `failure_reason_code` text — normalized (`card_declined`, `verification_failed`, `abandoned`, `popup_closed`, `timeout`, `unknown`, etc.)
+- `failure_reason_raw` text — raw Coinbase reason string
+- `status_source` text — `webhook | polling | popup-closed | timeout | abandoned | resumed-session | sdk-callback`
+- `popup_opened_at`, `popup_closed_at`, `webhook_received_at`, `failure_detected_at`, `completed_at` timestamptz
+- `visibility_events` jsonb (small append-only log capped client-side)
+- `last_sdk_callback_at` timestamptz
 
-**inbound_tracking_sessions**
-- id, tracking_code, campaign_id, landing_path, full_landing_url, referrer_url, user_agent, country (set server-side via Cloudflare/edge geo header — never raw IP), first_seen_at, last_seen_at, session_duration_seconds (generated/computed on update), signed_in_user_id, wallet_address, sign_in_at, created_at, updated_at
+Extend `coinbase_transactions`:
 
-**inbound_tracking_events**
-- id, session_id, campaign_id, tracking_code, event_type (enum: landing, page_view, sign_in, wallet_connected, onramp_started, purchase_completed, purchase_failed, session_heartbeat), metadata jsonb, created_at
+- `failure_reason_code` text
+- `failure_reason_raw` text
+- `intermediate_statuses` jsonb — array of `{status, at, source}` entries
 
-**inbound_tracking_attributions**
-- id, session_id, campaign_id, tracking_code, user_id, wallet_address, onramp_provider, transaction_id (text), purchase_status, fiat_amount, fiat_currency, crypto_amount, crypto_currency, chain, created_at, updated_at
-- unique on (transaction_id, onramp_provider) to dedupe
+No changes to RLS. Service role keeps full access; admins keep read.
 
-**RLS**
-- campaigns: admins ALL; nobody else
-- sessions/events/attributions: service_role full; admins SELECT; clients blocked (writes go through edge functions with service role)
-- A separate `validate_tracking_code(text)` SECURITY DEFINER function returns campaign id+destination if active, used by anon clients without exposing the table
+## 2. Edge functions
 
-## 2. Edge Functions (new)
+**`coinbase-webhook`**
 
-All use the existing `_shared/auth.ts` CORS allowlist pattern. Anonymous endpoints validate the body schema only (no JWT required, since unauth visitors must call them); authenticated endpoints require a Supabase JWT.
+- Map Coinbase failure reasons → normalized `failure_reason_code` (table below).
+- Append every event to `coinbase_transactions.intermediate_statuses` and to `purchase_attempts` (when `partner_user_ref` matches).
+- Persist `webhook_received_at`, set `status_source = 'webhook'`, keep raw payload.
+- Preserve existing signature verification + 5-minute replay window.
 
-- **tracking-validate** (anon) — `POST {ref}` → returns `{valid, campaign_id, destination_path}` via the SECURITY DEFINER function
-- **tracking-session** (anon) — `POST` create/upsert session: `{ref, session_id?, landing_path, full_landing_url, referrer_url, user_agent}` → returns `session_id`. Country comes from `cf-ipcountry` / `x-vercel-ip-country` header. Inserts a `landing` event on first create.
-- **tracking-event** (anon) — `POST {session_id, ref, event_type, metadata?}` → inserts event, updates `last_seen_at` and `session_duration_seconds = last_seen_at - first_seen_at`
-- **tracking-attach-user** (auth required) — `POST {session_id, ref}` → reads `auth.uid()` + profiles.wallet_address, sets `signed_in_user_id`, `wallet_address`, `sign_in_at`; inserts `sign_in` / `wallet_connected` events
-- **tracking-attach-purchase** (service-callable from existing webhooks) — `POST {session_id, ref, provider, transaction_id, status, fiat_amount, crypto_amount, ...}` → upserts `inbound_tracking_attributions` row
+**`coinbase-transactions`** (admin list + polling)
 
-The existing `coinbase-webhook` and `stripe-webhook` get a small addition: when a transaction completes/fails, look up the most recent active session for that `user_id` (or `wallet_address`) within the last 30 days and write an attribution row. No transaction data is duplicated beyond ID + status + amounts needed for reporting.
+- Return new columns to admin panel.
+- When the periodic sync detects a terminal Coinbase state, write `failure_reason_*` and `status_source = 'polling'`.
 
-## 3. Frontend tracking utility
-
-`src/lib/tracking.ts` — small singleton:
-- On import, read `?ref=` from URL; if present, validate via `tracking-validate`; on success, store `{ref, session_id}` in localStorage + sessionStorage + first-party cookie (`ez_ref`, `ez_sid`, 90-day expiry, `SameSite=Lax`, `Secure`)
-- `initTracking()` called from `App.tsx` → triggers `tracking-session` if no `session_id` yet, sends `landing`
-- `trackEvent(type, metadata?)` helper
-- `startHeartbeat()` — `setInterval` every 45s while tab visible (uses `document.visibilityState`); pauses when hidden
-- `attachUserOnSignIn()` — called from `useAuth` after sign-in / from `useWalletSync` after wallet binding
-- `trackOnrampStart(provider)` — wired into the existing onramp launch points (Coinbase widget, Stripe iframe, MoonPay, Coinflow)
-
-Removes `?ref=` from the URL after capture (history.replaceState) so it doesn't pollute analytics or share links.
-
-## 4. Admin UI
-
-New tab `Inbound Tracking` in `src/pages/Admin.tsx` (TabsList becomes 8 cols).
-
-**`src/components/admin/InboundTracking.tsx`** — two-view component:
-
-*Campaigns list view*
-- Header with "New Campaign" button → dialog: campaign_name, destination (Home/Express radio), notes → POSTs to a `tracking-campaign` admin edge function (or direct insert via RLS since admins have ALL on campaigns)
-- Table columns: Campaign, Destination, Tracking URL (with copy button), Visits, Sign-ins, Wallets, Purchases, Volume (USD), Sign-in %, Purchase %, Created, Status, Actions (Archive/Activate, View)
-- Aggregates fetched via a SQL view `inbound_campaign_stats` (admin-readable) that joins campaigns ⇽ sessions ⇽ attributions
-
-*Campaign detail view (when "View" clicked)*
-- Filters: date range, signed-in only, purchased only, provider, status
-- Sessions table: First seen, Last seen, Duration, Landing URL, Referrer, User ID, Wallet, Provider, Tx ID, Status, Amount
-- Reuses the same Table primitives, filter Inputs/Selects, and CSV export pattern already used in `CoinbaseTransactions.tsx`
-
-CSV export of full filtered campaign report, matching the existing transactions export pattern.
-
-## 5. Sign-in & purchase wiring
-
-- `useAuth.tsx` — after successful sign-in, call `attachUserOnSignIn()`
-- `useWalletSync.tsx` — after wallet bound to profile, call `trackEvent('wallet_connected')` and re-attach
-- Onramp components (`CoinbaseOnrampWidget`, `CoinbaseHeadlessOnramp`, `StripeOnramp`, `MoonPayOnramp`, `CoinflowCheckout`) — call `trackOnrampStart(provider)` on launch
-- Webhooks attribute server-side; client also fires `purchase_completed`/`purchase_failed` events when it observes terminal status (best-effort, server is source of truth)
-
-## 6. Security
-
-- All client writes go through edge functions with strict body validation (zod) and CORS from `_shared/auth.ts`
-- No raw IPs stored; only country header
-- `tracking_code` is a random 8-char base62 — no PII
-- RLS denies all client SELECT on tracking tables; admins read via `is_admin()`
-- `validate_tracking_code()` is the only SECURITY DEFINER read path exposed to anon
-
-## Technical Details
+Failure-reason mapping:
 
 ```text
-Files created
-├── supabase/migrations/<ts>_inbound_tracking.sql
-├── supabase/functions/tracking-validate/index.ts
-├── supabase/functions/tracking-session/index.ts
-├── supabase/functions/tracking-event/index.ts
-├── supabase/functions/tracking-attach-user/index.ts
-├── supabase/functions/tracking-attach-purchase/index.ts
-├── src/lib/tracking.ts
-├── src/hooks/useInboundTracking.tsx
-├── src/components/admin/InboundTracking.tsx
-└── src/components/admin/InboundCampaignDetail.tsx
-
-Files changed
-├── src/App.tsx                         (mount tracking init)
-├── src/pages/Admin.tsx                 (8th tab)
-├── src/hooks/useAuth.tsx               (attach on sign-in)
-├── src/hooks/useWalletSync.tsx         (attach on wallet bind)
-├── src/components/CoinbaseOnrampWidget.tsx
-├── src/components/CoinbaseHeadlessOnramp.tsx
-├── src/components/StripeOnramp.tsx
-├── src/components/MoonPayOnramp.tsx
-├── src/components/CoinflowCheckout.tsx
-├── supabase/functions/coinbase-webhook/index.ts   (write attribution)
-└── supabase/functions/stripe-webhook/index.ts     (write attribution)
-
-New tables: inbound_tracking_campaigns, inbound_tracking_sessions,
-            inbound_tracking_events, inbound_tracking_attributions
-New view:   inbound_campaign_stats (admin-only)
-New SECURITY DEFINER fn: public.validate_tracking_code(text)
+ONRAMP_TRANSACTION_FAILURE_REASON_BUY_FAILED + ERROR_CODE_CARD_DECLINED → card_declined
+*_BUY_FAILED + ERROR_CODE_UNSPECIFIED                                   → unknown
+*_KYC_FAILED / *_IDENTITY_*                                             → verification_failed
+*_USER_CANCELED                                                          → abandoned
+*_TIMEOUT                                                                → timeout
+fallback                                                                 → unknown
 ```
 
-## How to test
+## 3. Frontend lifecycle (`CoinbaseHeadlessOnramp.tsx`)
 
-1. Sign in as admin → Admin → Inbound Tracking → create campaign for `/express` named "Test"
-2. Copy URL → open in incognito → confirm `landing` event + session row appear
-3. Navigate around → confirm `page_view` + heartbeat events; `last_seen_at` updates
-4. Sign in via Particle → confirm `signed_in_user_id` + `wallet_address` populate; `sign_in` event fires
-5. Run a Stripe sandbox purchase → confirm `inbound_tracking_attributions` row created with the transaction id and the campaign aggregates update
-6. Archive campaign → confirm new `?ref=` visits return invalid and skip session creation
-7. Open existing Transactions tab → confirm unchanged
+Single state machine `lifecycle_state`:
 
-Approve to proceed and I'll create the migration first (for your approval), then implement the rest.
+```text
+idle
+  → initializing       (creating session)
+  → waiting_coinbase   (popup open, pre-auth)
+  → waiting_card_auth  (3DS / card challenge)
+  → waiting_verification (KYC)
+  → processing         (Coinbase confirmed, awaiting webhook)
+  → complete
+  → incomplete         (popup closed, no terminal webhook in 60–90s)
+  → card_declined
+  → verification_failed
+  → failed
+  → unknown_failure
+```
+
+Transitions driven by: SDK callbacks, popup `window.closed` poll (1s), `document.visibilitychange`, webhook updates via Supabase Realtime on `purchase_attempts`, and a 5-minute hard timeout (down from 15).
+
+Tracked locally + posted to `purchase_attempts` via existing authenticated edge route:
+- `popup_opened_at`, `popup_closed_at`, `last_sdk_callback_at`
+- `visibility_events` (capped at 20 entries)
+- `status_source` when frontend wins the race
+
+Incomplete detection: if `popup_closed_at` set AND no webhook within 75s AND no terminal SDK callback → `incomplete`, `status_source = 'popup-closed'`.
+
+## 4. UI changes
+
+New `CoinbaseLifecycleBanner` component rendered above the widget:
+
+- Maps each state to label + subcopy (per spec messaging).
+- Shows spinner for waiting/processing states, error icon for failures.
+- Renders **Start Again** button on `incomplete | card_declined | verification_failed | failed | unknown_failure`.
+
+Start Again handler:
+- Clears local state, popup ref, timers, lifecycle store.
+- Marks current `purchase_attempts` row `status='abandoned_by_user'` if not already terminal.
+- Re-mounts the headless widget via `key` bump.
+- Leaves Supabase/Particle session intact.
+
+Styling uses existing semantic tokens (`bg-card`, `text-foreground`, `text-destructive`, etc.) — no hardcoded colors, dark mode preserved, mobile-friendly.
+
+## 5. Admin panel (`CoinbaseTransactions.tsx`)
+
+Add columns: **Failure Reason**, **Status Source**, and a popover with timestamps (created / popup opened / popup closed / webhook / failure / completed). Existing Domain logic untouched.
+
+## 6. Diagnostics
+
+`src/lib/coinbaseDiagnostics.ts` — namespaced `console.debug('[CB-GLOBAL]', …)` for: popup open/close, visibility, sdk callback, webhook arrival (via realtime), timeout, terminal resolution. Never logs raw payloads, only IDs + state.
+
+## 7. Files changed
+
+- migration (purchase_attempts + coinbase_transactions extensions)
+- `src/components/CoinbaseHeadlessOnramp.tsx` — state machine, popup/visibility tracking, timeout reduction, Start Again
+- `src/components/coinbase/CoinbaseLifecycleBanner.tsx` (new)
+- `src/lib/coinbaseLifecycle.ts` (new — types + reason mapping shared with edge)
+- `src/lib/coinbaseDiagnostics.ts` (new)
+- `src/components/admin/CoinbaseTransactions.tsx` — new columns + timestamps popover
+- `supabase/functions/coinbase-webhook/index.ts` — normalized reasons + intermediate statuses
+- `supabase/functions/coinbase-transactions/index.ts` — return new columns, write polling source
+
+## 8. Out of scope (unchanged)
+
+Stripe components/functions, Coinbase US widget, Particle auth, RLS policies, CORS allowlist, webhook signature scheme, admin role management.
+
+## 9. Verification
+
+- Build passes.
+- Manual: simulate popup-close-early, complete purchase, force decline (test card), webhook delay (block network), refresh mid-flow (state restored from `purchase_attempts`).
+- Confirm admin table shows new fields and timestamps for a new transaction.

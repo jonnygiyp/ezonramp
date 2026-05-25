@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
-import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, X, Clock, AlertCircle, LogIn } from "lucide-react";
+import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn, X, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { AuthGatedButton } from "./AuthGatedButton";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
+import { CoinbaseLifecycleBanner } from "./coinbase/CoinbaseLifecycleBanner";
+import {
+  type CoinbaseLifecycleState,
+  type CoinbaseFailureCode,
+  type CoinbaseStatusSource,
+  canTransition,
+  isTerminal,
+  failureCodeToLifecycle,
+  coinbaseStatusToLifecycle,
+} from "@/lib/coinbaseLifecycle";
+import { cbDiag } from "@/lib/coinbaseDiagnostics";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
@@ -20,6 +31,12 @@ type Step = 'identity' | 'verify' | 'amount' | 'result';
 type TxState = 'waiting' | 'incomplete' | 'initialized' | 'processing' | 'completed' | 'failed' | 'delayed';
 type VerifyChannel = 'sms' | 'email';
 type QuoteState = 'idle' | 'loading' | 'ready' | 'error';
+
+// Timing constants (per spec)
+const POPUP_CLOSE_INCOMPLETE_MS = 75_000; // popup closed + no webhook → incomplete
+const POLL_TIMEOUT_MS = 5 * 60 * 1000;    // 5-minute hard cap (was 30 min)
+
+const MAX_VISIBILITY_EVENTS = 20;
 
 interface QuoteData {
   purchaseAmount: string;
@@ -151,10 +168,23 @@ export function CoinbaseHeadlessOnramp({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageHandlerRef = useRef<((e: MessageEvent) => void) | null>(null);
   const windowCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const popupCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
+  const visibilityEventsRef = useRef<Array<{ at: string; hidden: boolean }>>([]);
+  const popupOpenedAtRef = useRef<string | null>(null);
+  const popupClosedAtRef = useRef<string | null>(null);
+  const webhookSeenRef = useRef(false);
+  const widgetKeyRef = useRef(0); // bumped by Start Again to force a clean remount
+
+  // Granular lifecycle for the Coinbase Global flow (rendered by CoinbaseLifecycleBanner).
+  const [lifecycleState, setLifecycleState] = useState<CoinbaseLifecycleState>("idle");
+  const lifecycleRef = useRef<CoinbaseLifecycleState>("idle");
+  const [failureCode, setFailureCode] = useState<CoinbaseFailureCode | null>(null);
 
   // Address validation
   const isEvmAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
   const isSolanaAddress = (addr: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
+
 
   const connectedAddressValid = isConnected && address && (
     defaultNetwork === 'solana' ? isSolanaAddress(address) : isEvmAddress(address)
@@ -183,7 +213,74 @@ export function CoinbaseHeadlessOnramp({
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     if (windowCheckRef.current) { clearInterval(windowCheckRef.current); windowCheckRef.current = null; }
+    if (popupCloseTimerRef.current) { clearTimeout(popupCloseTimerRef.current); popupCloseTimerRef.current = null; }
   }, []);
+
+  // Best-effort persistence of lifecycle fields onto the current purchase_attempts row.
+  // Never throws — diagnostics only.
+  const persistAttempt = useCallback(async (
+    attemptId: string,
+    patch: Record<string, unknown>,
+  ) => {
+    try {
+      await (supabase as any)
+        .from("purchase_attempts")
+        .update(patch)
+        .eq("partner_user_ref", attemptId);
+    } catch (err) {
+      console.warn("[CB-GLOBAL] persistAttempt failed", err);
+    }
+  }, []);
+
+  // Granular lifecycle transition. Returns the resolved state for chaining.
+  const updateLifecycle = useCallback((
+    next: CoinbaseLifecycleState,
+    source: CoinbaseStatusSource | string,
+    extra?: { failureCode?: CoinbaseFailureCode | null; attemptId?: string | null },
+  ): CoinbaseLifecycleState => {
+    const current = lifecycleRef.current;
+    if (!canTransition(current, next)) return current;
+    cbDiag.stateTransition(extra?.attemptId ?? null, current, next, String(source));
+    lifecycleRef.current = next;
+    setLifecycleState(next);
+    if (extra?.failureCode !== undefined) setFailureCode(extra.failureCode);
+
+    const attemptId = extra?.attemptId ?? purchaseAttemptId;
+    if (attemptId) {
+      const patch: Record<string, unknown> = {
+        lifecycle_state: next,
+        status_source: source,
+      };
+      if (next === "complete") patch.completed_at = new Date().toISOString();
+      if (isTerminal(next) && next !== "complete") {
+        patch.failure_detected_at = new Date().toISOString();
+        if (extra?.failureCode) patch.failure_reason_code = extra.failureCode;
+      }
+      void persistAttempt(attemptId, patch);
+    }
+
+    if (isTerminal(next)) {
+      cbDiag.resolved(attemptId ?? null, next, String(source));
+    }
+    return next;
+  }, [persistAttempt, purchaseAttemptId]);
+
+  // Pull the latest failure_reason_code from coinbase_transactions when we
+  // know a transaction id but only saw a generic failure status.
+  const fetchFailureReason = useCallback(async (txId: string): Promise<CoinbaseFailureCode | null> => {
+    try {
+      const { data } = await (supabase as any)
+        .from("coinbase_transactions")
+        .select("failure_reason_code")
+        .eq("transaction_id", txId)
+        .maybeSingle();
+      return (data?.failure_reason_code as CoinbaseFailureCode) || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+
 
   // State priority — higher wins. Terminal success cannot be downgraded.
   // 0: unknown, 1: pending-ish, 2: non-success terminal, 3: success terminal
@@ -222,10 +319,39 @@ export function CoinbaseHeadlessOnramp({
     console.log('[COINBASE-STATE] transition', { from: current, to: next, source });
     txStateRef.current = next;
     setTxState(next);
+
+    // Mirror legacy TxState into the granular lifecycle so the new banner
+    // reflects DB/webhook/poll-driven changes too.
+    const lifecycleMap: Record<TxState, CoinbaseLifecycleState | null> = {
+      waiting: 'waiting_coinbase',
+      initialized: 'processing',
+      processing: 'processing',
+      delayed: 'processing',
+      incomplete: 'incomplete',
+      failed: 'failed',
+      completed: 'complete',
+    };
+    const mappedLifecycle = lifecycleMap[next];
+    if (mappedLifecycle) {
+      // For "failed" from realtime/poll, try to enrich with a specific failure code.
+      if (mappedLifecycle === 'failed' && coinbaseTxId) {
+        void fetchFailureReason(coinbaseTxId).then((code) => {
+          if (code) {
+            updateLifecycle(failureCodeToLifecycle(code), source, { failureCode: code });
+          } else {
+            updateLifecycle('failed', source);
+          }
+        });
+      } else {
+        updateLifecycle(mappedLifecycle, source);
+      }
+    }
+
     if (next === 'completed' || next === 'failed') {
       stopPolling();
     }
-  }, [stopPolling]);
+  }, [stopPolling, updateLifecycle, fetchFailureReason, coinbaseTxId]);
+
 
   // Map DB status string -> TxState
   const mapDbStatus = (s: string | null | undefined): TxState | null => {
@@ -270,12 +396,14 @@ export function CoinbaseHeadlessOnramp({
         },
         (payload: any) => {
           const newRow = payload?.new || {};
-          console.log('[COINBASE-RT] update received', { status: newRow.status, txId: newRow.coinbase_transaction_id });
+          webhookSeenRef.current = true;
+          cbDiag.webhookSeen(attemptId, String(newRow.status || ''));
+          void persistAttempt(attemptId, { webhook_received_at: new Date().toISOString() });
           if (newRow.coinbase_transaction_id) {
             setCoinbaseTxId((prev) => prev || newRow.coinbase_transaction_id);
           }
           const mapped = mapDbStatus(newRow.status);
-          if (mapped) updateTxState(mapped, 'realtime');
+          if (mapped) updateTxState(mapped, 'webhook');
         }
       )
       .subscribe((status) => {
@@ -316,22 +444,26 @@ export function CoinbaseHeadlessOnramp({
         });
         if (error) { console.error('[COINBASE-POLL] Error:', error); return; }
         if (data?.status) {
+          cbDiag.pollUpdate(attemptId, String(data.status));
           const mapped = mapDbStatus(data.status);
           if (mapped) updateTxState(mapped, 'poll');
         }
       } catch (err) { console.error('[COINBASE-POLL] Error:', err); }
     }, 10000);
 
+    // Hard cap: 5 minutes (down from 30). If we're still pending after that,
+    // treat the transaction as incomplete and stop polling.
     timeoutRef.current = setTimeout(() => {
       const current = txStateRef.current;
       if (current === 'initialized' || current === 'processing' || current === 'waiting') {
-        updateTxState('delayed', 'timeout');
-        (supabase as any).from('purchase_attempts')
-          .update({ status: 'delayed' })
-          .eq('partner_user_ref', attemptId);
+        cbDiag.timeout(attemptId, current);
+        updateTxState('incomplete', 'timeout');
+        updateLifecycle('incomplete', 'timeout', { failureCode: 'timeout', attemptId });
+        void persistAttempt(attemptId, { status: 'incomplete' });
       }
-    }, 30 * 60 * 1000);
-  }, [updateTxState]);
+    }, POLL_TIMEOUT_MS);
+  }, [updateTxState, updateLifecycle, persistAttempt]);
+
 
   useEffect(() => {
     return () => {
@@ -519,7 +651,14 @@ export function CoinbaseHeadlessOnramp({
       // Set state and switch to result view
       setPurchaseAttemptId(attemptId);
       updateTxState('waiting', 'continueToPurchase');
+      updateLifecycle('initializing', 'sdk-callback', { attemptId });
       setStep('result');
+
+      // Reset per-attempt tracking refs
+      webhookSeenRef.current = false;
+      popupOpenedAtRef.current = null;
+      popupClosedAtRef.current = null;
+      visibilityEventsRef.current = [];
 
       // Insert purchase attempt record
       try {
@@ -533,14 +672,12 @@ export function CoinbaseHeadlessOnramp({
           partner_user_ref: attemptId,
           status: 'idle',
           source,
+          lifecycle_state: 'initializing',
         });
       } catch (err) {
         console.error('[COINBASE] Failed to create purchase attempt:', err);
       }
 
-      // Subscribe to realtime updates immediately so webhook-driven status
-      // changes reach the UI even if Coinbase postMessage events never fire
-      // (e.g. user closes the popup right after a successful payment).
       subscribeToAttempt(attemptId);
 
       // Open payment window
@@ -552,6 +689,24 @@ export function CoinbaseHeadlessOnramp({
         window.location.href = buyUrl;
         return;
       }
+
+      // Popup-open tracking
+      popupOpenedAtRef.current = new Date().toISOString();
+      cbDiag.popupOpen(attemptId);
+      updateLifecycle('waiting_coinbase', 'sdk-callback', { attemptId });
+      void persistAttempt(attemptId, { popup_opened_at: popupOpenedAtRef.current });
+
+      // Visibility tracking — capped history
+      const visHandler = () => {
+        const hidden = document.hidden;
+        cbDiag.visibility(attemptId, hidden);
+        const next = [...visibilityEventsRef.current, { at: new Date().toISOString(), hidden }]
+          .slice(-MAX_VISIBILITY_EVENTS);
+        visibilityEventsRef.current = next;
+        void persistAttempt(attemptId, { visibility_events: next });
+      };
+      document.addEventListener('visibilitychange', visHandler);
+      visibilityHandlerRef.current = visHandler;
 
       toast({ title: "Complete Payment", description: "Complete your card payment in the Coinbase window" });
 
@@ -568,36 +723,52 @@ export function CoinbaseHeadlessOnramp({
           case 'onramp_api.commit_success': {
             const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
             if (txId) setCoinbaseTxId(txId);
-            updateTxState('initialized', 'postMessage:commit_success');
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('initialized', 'sdk-callback');
+            updateLifecycle('processing', 'sdk-callback', { attemptId });
             startPolling(attemptId);
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'initialized', coinbase_transaction_id: txId || null })
-              .eq('partner_user_ref', attemptId);
+            void persistAttempt(attemptId, {
+              status: 'initialized',
+              coinbase_transaction_id: txId || null,
+              last_sdk_callback_at: new Date().toISOString(),
+            });
             if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "initialized" }));
             break;
           }
           case 'onramp_api.cancel':
-            updateTxState('incomplete', 'postMessage:cancel');
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'incomplete' })
-              .eq('partner_user_ref', attemptId);
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('incomplete', 'sdk-callback');
+            updateLifecycle('incomplete', 'abandoned', { failureCode: 'abandoned', attemptId });
+            void persistAttempt(attemptId, { status: 'incomplete', last_sdk_callback_at: new Date().toISOString() });
             break;
           case 'onramp_api.polling_success': {
-            updateTxState('completed', 'postMessage:polling_success');
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'completed' })
-              .eq('partner_user_ref', attemptId);
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('completed', 'sdk-callback');
+            updateLifecycle('complete', 'sdk-callback', { attemptId });
+            void persistAttempt(attemptId, { status: 'completed', last_sdk_callback_at: new Date().toISOString() });
             const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
             if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "completed" }));
             break;
           }
           case 'onramp_api.polling_error': {
-            updateTxState('failed', 'postMessage:polling_error');
-            (supabase as any).from('purchase_attempts')
-              .update({ status: 'failed' })
-              .eq('partner_user_ref', attemptId);
+            cbDiag.sdkCallback(attemptId, eventName);
+            updateTxState('failed', 'sdk-callback');
             const txId = msgData.transactionId || msgData.data?.transactionId || msgData.orderId;
-            if (txId) void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "failed" }));
+            // Try to enrich with a specific failure code if available.
+            if (txId) {
+              setCoinbaseTxId(txId);
+              void fetchFailureReason(txId).then((code) => {
+                updateLifecycle(
+                  code ? failureCodeToLifecycle(code) : 'unknown_failure',
+                  'sdk-callback',
+                  { failureCode: code || 'unknown', attemptId },
+                );
+              });
+              void import("@/lib/tracking").then((m) => m.attachPurchase({ provider: "coinbase", transactionId: txId, status: "failed" }));
+            } else {
+              updateLifecycle('unknown_failure', 'sdk-callback', { failureCode: 'unknown', attemptId });
+            }
+            void persistAttempt(attemptId, { status: 'failed', last_sdk_callback_at: new Date().toISOString() });
             break;
           }
         }
@@ -606,33 +777,40 @@ export function CoinbaseHeadlessOnramp({
       messageHandlerRef.current = handleMessage;
       window.addEventListener('message', handleMessage);
 
-      // Monitor window close. Closing the popup is NOT proof the user abandoned
-      // payment — Coinbase often closes itself after a successful purchase before
-      // the success postMessage reaches us. We therefore:
-      //   1. Never overwrite a terminal success status (guarded in updateTxState).
-      //   2. Move to 'processing' (a neutral pending state) instead of 'incomplete'.
-      //   3. Re-fetch the latest DB status (webhook may have already landed).
-      //   4. Start polling so we converge on Coinbase's reported status.
-      // The 30-minute polling timeout will eventually fall back to 'delayed' if
-      // no confirmation ever arrives.
+      // Popup close monitor. Closing the popup is NOT proof of abandonment —
+      // Coinbase auto-closes on success. We start a 75-second grace timer:
+      // if no webhook arrives in that window AND we never reached a terminal
+      // state, we mark the attempt incomplete via the popup-closed source.
       windowCheckRef.current = setInterval(() => {
         if (paymentWindow.closed) {
           if (windowCheckRef.current) clearInterval(windowCheckRef.current);
           windowCheckRef.current = null;
-          console.log('[COINBASE-FLOW] payment window closed', { attemptId, currentState: txStateRef.current });
+          popupClosedAtRef.current = new Date().toISOString();
+          cbDiag.popupClose(attemptId, txStateRef.current);
+          void persistAttempt(attemptId, { popup_closed_at: popupClosedAtRef.current });
+
           setTimeout(async () => {
             const current = txStateRef.current;
-            // Only nudge into a neutral pending state — never mark incomplete here.
             if (current === 'waiting') {
               updateTxState('processing', 'window-close');
+              updateLifecycle('processing', 'popup-closed', { attemptId });
             }
-            // Always check the DB in case the webhook beat us.
             await fetchAttemptStatus(attemptId);
-            // Make sure polling is running even if commit_success never fired.
             startPolling(attemptId);
           }, 1500);
+
+          // 75s grace timer for popup-closed → incomplete.
+          if (popupCloseTimerRef.current) clearTimeout(popupCloseTimerRef.current);
+          popupCloseTimerRef.current = setTimeout(() => {
+            if (webhookSeenRef.current) return;
+            if (isTerminal(lifecycleRef.current)) return;
+            updateTxState('incomplete', 'popup-closed');
+            updateLifecycle('incomplete', 'popup-closed', { failureCode: 'popup_closed', attemptId });
+            void persistAttempt(attemptId, { status: 'incomplete' });
+          }, POPUP_CLOSE_INCOMPLETE_MS);
         }
       }, 1000);
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to initiate purchase';
       toast({ title: "Error", description: message, variant: "destructive" });
