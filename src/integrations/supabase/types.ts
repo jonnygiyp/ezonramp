@@ -20,9 +20,12 @@ export type Database = {
           created_at: string
           crypto_currency: string | null
           crypto_value: number | null
+          failure_reason_code: string | null
+          failure_reason_raw: string | null
           fiat_currency: string | null
           fiat_value: number | null
           id: string
+          intermediate_statuses: Json | null
           last_synced_at: string
           network: string | null
           partner_user_ref: string | null
@@ -41,9 +44,12 @@ export type Database = {
           created_at?: string
           crypto_currency?: string | null
           crypto_value?: number | null
+          failure_reason_code?: string | null
+          failure_reason_raw?: string | null
           fiat_currency?: string | null
           fiat_value?: number | null
           id?: string
+          intermediate_statuses?: Json | null
           last_synced_at?: string
           network?: string | null
           partner_user_ref?: string | null
@@ -62,9 +68,12 @@ export type Database = {
           created_at?: string
           crypto_currency?: string | null
           crypto_value?: number | null
+          failure_reason_code?: string | null
+          failure_reason_raw?: string | null
           fiat_currency?: string | null
           fiat_value?: number | null
           id?: string
+          intermediate_statuses?: Json | null
           last_synced_at?: string
           network?: string | null
           partner_user_ref?: string | null
@@ -467,50 +476,83 @@ export type Database = {
         Row: {
           amount: number
           coinbase_transaction_id: string | null
+          completed_at: string | null
           created_at: string
           crypto_currency: string
           currency: string
+          failure_detected_at: string | null
+          failure_reason_code: string | null
+          failure_reason_raw: string | null
           id: string
+          last_sdk_callback_at: string | null
+          lifecycle_state: string | null
           network: string
           partner_user_ref: string
+          popup_closed_at: string | null
+          popup_opened_at: string | null
           provider: string
           source: string | null
           status: string
+          status_source: string | null
           updated_at: string
           user_id: string
+          visibility_events: Json | null
           wallet_address: string
+          webhook_received_at: string | null
         }
         Insert: {
           amount?: number
           coinbase_transaction_id?: string | null
+          completed_at?: string | null
           created_at?: string
           crypto_currency?: string
           currency?: string
+          failure_detected_at?: string | null
+          failure_reason_code?: string | null
+          failure_reason_raw?: string | null
           id?: string
+          last_sdk_callback_at?: string | null
+          lifecycle_state?: string | null
           network?: string
           partner_user_ref: string
+          popup_closed_at?: string | null
+          popup_opened_at?: string | null
           provider?: string
           source?: string | null
           status?: string
+          status_source?: string | null
           updated_at?: string
           user_id: string
+          visibility_events?: Json | null
           wallet_address: string
+          webhook_received_at?: string | null
         }
         Update: {
           amount?: number
           coinbase_transaction_id?: string | null
+          completed_at?: string | null
           created_at?: string
           crypto_currency?: string
           currency?: string
+          failure_detected_at?: string | null
+          failure_reason_code?: string | null
+          failure_reason_raw?: string | null
           id?: string
+          last_sdk_callback_at?: string | null
+          lifecycle_state?: string | null
           network?: string
           partner_user_ref?: string
+          popup_closed_at?: string | null
+          popup_opened_at?: string | null
           provider?: string
           source?: string | null
           status?: string
+          status_source?: string | null
           updated_at?: string
           user_id?: string
+          visibility_events?: Json | null
           wallet_address?: string
+          webhook_received_at?: string | null
         }
         Relationships: []
       }
