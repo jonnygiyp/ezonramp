@@ -537,6 +537,8 @@ export default function CoinbaseTransactions() {
       "network",
       "created_at",
       "domain",
+      "failure_reason_code",
+      "failure_reason_raw",
     ];
     const escape = (v: unknown) => {
       if (v == null) return "";
