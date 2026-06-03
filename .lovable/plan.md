@@ -1,121 +1,91 @@
-# Coinbase Global Transaction UX & Lifecycle Overhaul
 
-A focused upgrade to the Coinbase Global (non-US) onramp flow. Stripe and Coinbase US logic stay untouched except for shared types. All existing JWT auth, CORS allowlists, webhook signature verification, and admin RLS remain intact.
+# MoonPay Headless Onramp — Replacement Plan
 
-## 1. Database (migration)
+Targets: `/express` (PartnerPortal) and the main onramp surface (`ApiIntegration` + `MoonPayOnramp`). Sandbox first (`api.moonpay.dev`, `sk_test_...`). Diagnostics and `/dark` keep the existing widget until we promote sandbox to production.
 
-Extend `purchase_attempts` (backward compatible — all new columns nullable):
+## Important reality check on "fully headless"
 
-- `lifecycle_state` text — canonical frontend state (see §3)
-- `failure_reason_code` text — normalized (`card_declined`, `verification_failed`, `abandoned`, `popup_closed`, `timeout`, `unknown`, etc.)
-- `failure_reason_raw` text — raw Coinbase reason string
-- `status_source` text — `webhook | polling | popup-closed | timeout | abandoned | resumed-session | sdk-callback`
-- `popup_opened_at`, `popup_closed_at`, `webhook_received_at`, `failure_detected_at`, `completed_at` timestamptz
-- `visibility_events` jsonb (small append-only log capped client-side)
-- `last_sdk_callback_at` timestamptz
+MoonPay's Platform API is the new product, and it is headless for everything *you* care about (quotes, transaction creation, status, history). However, three things still go through MoonPay-hosted iframes ("frames"), because they touch PCI / KYC scope:
 
-Extend `coinbase_transactions`:
+- **Connect frame** — initial customer connect / login to their MoonPay account
+- **Add Card frame** — PCI-compliant card capture (we cannot collect PANs ourselves)
+- **Challenge frame** — 3-D Secure and identity-verification challenges
 
-- `failure_reason_code` text
-- `failure_reason_raw` text
-- `intermediate_statuses` jsonb — array of `{status, at, source}` entries
+The actual **Buy frame** is truly headless (no UI rendered) and runs invisibly to evaluate requirements and submit the transaction. Your confirmation screen, loading states, success/failure UI — all yours.
 
-No changes to RLS. Service role keeps full access; admins keep read.
+This is the modern way MoonPay does "headless" and it is what every Platform partner uses today. If you wanted to also self-host the card form and KYC document upload, that would require MoonPay's enterprise PCI Level 1 program and is not something we can ship from this stack.
 
-## 2. Edge functions
-
-**`coinbase-webhook`**
-
-- Map Coinbase failure reasons → normalized `failure_reason_code` (table below).
-- Append every event to `coinbase_transactions.intermediate_statuses` and to `purchase_attempts` (when `partner_user_ref` matches).
-- Persist `webhook_received_at`, set `status_source = 'webhook'`, keep raw payload.
-- Preserve existing signature verification + 5-minute replay window.
-
-**`coinbase-transactions`** (admin list + polling)
-
-- Return new columns to admin panel.
-- When the periodic sync detects a terminal Coinbase state, write `failure_reason_*` and `status_source = 'polling'`.
-
-Failure-reason mapping:
+## Architecture
 
 ```text
-ONRAMP_TRANSACTION_FAILURE_REASON_BUY_FAILED + ERROR_CODE_CARD_DECLINED → card_declined
-*_BUY_FAILED + ERROR_CODE_UNSPECIFIED                                   → unknown
-*_KYC_FAILED / *_IDENTITY_*                                             → verification_failed
-*_USER_CANCELED                                                          → abandoned
-*_TIMEOUT                                                                → timeout
-fallback                                                                 → unknown
+Browser (React)                 Edge Functions (Deno)         MoonPay Platform
+─────────────                   ─────────────────────          ────────────────
+MoonPayHeadless.tsx  ───────►   moonpay-session   ─────────►  POST /platform/v1/sessions
+  (quote/confirm UI)            (mints session token)         (returns sessionToken)
+        │
+        ▼
+@moonpay/moonpay-js SDK  ─────────────────────────────────►   Connect / Add Card /
+  (renders required frames)                                    Buy / Challenge frames
+        │
+        ▼
+MoonPayHeadless.tsx  ───────►   moonpay-quote    ─────────►  POST /platform/v1/quotes/buy
+                                moonpay-tx       ─────────►  GET  /platform/v1/transactions/:id
+                                moonpay-tx-list  ─────────►  GET  /platform/v1/transactions
+
+MoonPay  ───►  moonpay-webhook  ──►  purchase_attempts + transaction_audit_log + Realtime
 ```
 
-## 3. Frontend lifecycle (`CoinbaseHeadlessOnramp.tsx`)
+All server-to-MoonPay calls use the **new** secret key `MOONPAY_PLATFORM_SECRET_KEY` (a `sk_test_...` token). The existing `MOONPAY_SECRET_KEY` and `MOONPAY_PUBLISHABLE_KEY` stay in place for the legacy widget on `/dark` and Diagnostics until cut-over.
 
-Single state machine `lifecycle_state`:
+## Work breakdown
 
-```text
-idle
-  → initializing       (creating session)
-  → waiting_coinbase   (popup open, pre-auth)
-  → waiting_card_auth  (3DS / card challenge)
-  → waiting_verification (KYC)
-  → processing         (Coinbase confirmed, awaiting webhook)
-  → complete
-  → incomplete         (popup closed, no terminal webhook in 60–90s)
-  → card_declined
-  → verification_failed
-  → failed
-  → unknown_failure
-```
+### 1. Secrets & config
+- Request `MOONPAY_PLATFORM_SECRET_KEY` (sandbox `sk_test_...`) via the secrets tool.
+- Add `MOONPAY_PLATFORM_BASE_URL` default `https://api.moonpay.dev` (sandbox) — flipping to `https://api.moonpay.com` is a single config change.
 
-Transitions driven by: SDK callbacks, popup `window.closed` poll (1s), `document.visibilitychange`, webhook updates via Supabase Realtime on `purchase_attempts`, and a 5-minute hard timeout (down from 15).
+### 2. Edge functions (all behind Supabase JWT, strict CORS via `_shared/auth.ts`)
+- `moonpay-session` — POST: creates a Platform session for the authenticated user, returns `sessionToken` + `customerId`.
+- `moonpay-quote` — POST: proxies `POST /platform/v1/quotes/buy` (amount, currency, network, wallet address). Validates wallet matches the user's linked Particle address.
+- `moonpay-payment-methods` — GET: lists stored payment methods.
+- `moonpay-transaction` — GET `?id=…`: returns single transaction.
+- `moonpay-transactions` — GET: paginated list for the connected user (powers "your purchases").
+- `moonpay-webhook` — public (signature-verified): writes/upserts into `purchase_attempts`, `transaction_audit_log`, broadcasts via existing realtime pipeline.
 
-Tracked locally + posted to `purchase_attempts` via existing authenticated edge route:
-- `popup_opened_at`, `popup_closed_at`, `last_sdk_callback_at`
-- `visibility_events` (capped at 20 entries)
-- `status_source` when frontend wins the race
+### 3. Frontend
+- Add `@moonpay/moonpay-js` (Platform SDK).
+- New `src/components/MoonPayHeadlessOnramp.tsx`:
+  - Wallet input (auto-filled from Particle, same UX as today).
+  - Amount + currency selector, defaulting to USDC on Solana.
+  - Live quote (`moonpay-quote` debounced) showing fees, network fee, total, exchange rate.
+  - "Continue" runs SDK `connect()` (Connect frame) if not yet connected.
+  - First-time users → SDK `addCard()` (Add Card frame) to store a card.
+  - Confirm screen → SDK `buy()` (headless Buy frame). We handle Challenge frame popups for 3-D Secure.
+  - Granular state machine mirroring our existing Coinbase headless tracking: `quoting → connecting → adding_card → confirming → processing → success | failed | challenge_required`.
+- Wire into `ApiIntegration.tsx` and `PartnerPortal.tsx` behind a `moonpay_headless` provider id; geo defaults from `rampSelection.ts` are unchanged.
+- Keep `MoonPayOnramp.tsx` (widget) mounted for `/dark` and Diagnostics; mark it deprecated in a code comment.
 
-Incomplete detection: if `popup_closed_at` set AND no webhook within 75s AND no terminal SDK callback → `incomplete`, `status_source = 'popup-closed'`.
+### 4. Database
+Reuse existing `purchase_attempts` schema (already has `provider`, `lifecycle_state`, `failure_reason_code`). Add provider value `'moonpay_headless'`. No migration needed unless we want a dedicated `moonpay_transactions` mirror table parallel to `coinbase_transactions` (recommend yes, for parity):
+- `moonpay_transactions` table: `transaction_id`, `customer_id`, `user_id`, `wallet_address`, `status`, `fiat_value/currency`, `crypto_value/currency`, `network`, `payload jsonb`, `failure_reason_code`, plus the standard `created_at/updated_at`. Service-role writes only; SELECT scoped to `auth.uid()` like `coinbase_transactions`.
 
-## 4. UI changes
+### 5. Cut-over plan
+1. Ship sandbox build behind a feature-flag-style URL param `?moonpayHeadless=1` so internal testing can run alongside the current widget.
+2. Once sandbox passes our test matrix (US card, EU card, 3DS challenge, failed quote, abandoned KYC), set `moonpay_headless` as the registered `moonpay` provider in `onramp_providers` table and add `MOONPAY_PLATFORM_BASE_URL=https://api.moonpay.com` + live `sk_live_...`.
+3. After 1 week of clean live traffic, remove `MoonPayOnramp.tsx`, `moonpay-sign` edge function, `MOONPAY_SECRET_KEY`, and `VITE_MOONPAY_PUBLISHABLE_KEY`.
 
-New `CoinbaseLifecycleBanner` component rendered above the widget:
+## Technical details
 
-- Maps each state to label + subcopy (per spec messaging).
-- Shows spinner for waiting/processing states, error icon for failures.
-- Renders **Start Again** button on `incomplete | card_declined | verification_failed | failed | unknown_failure`.
+- SDK init expects `{ flow: 'buy', environment: 'sandbox' | 'production', sessionToken }`. Session tokens are short-lived (~minutes); the frontend re-mints via `moonpay-session` on expiry.
+- Webhook signature: HMAC-SHA256 over the raw body with the `Moonpay-Signature-V2` header, secret `MOONPAY_WEBHOOK_SECRET` (new). Function returns 500 if secret unset (same hardening as `coinbase-webhook`).
+- Wallet binding: `moonpay-quote` and `moonpay-session` reject any wallet address that does not match `profiles.wallet_address` for the calling user. This carries the same guarantee that already protects Coinbase headless.
+- CORS: all new functions use `getCorsHeaders(origin)` from `_shared/auth.ts`. No new origins required.
+- RLS: any new `moonpay_transactions` table follows the established pattern — `service_role` for writes, authenticated SELECT scoped to `auth.uid()` and wallet match.
 
-Start Again handler:
-- Clears local state, popup ref, timers, lifecycle store.
-- Marks current `purchase_attempts` row `status='abandoned_by_user'` if not already terminal.
-- Re-mounts the headless widget via `key` bump.
-- Leaves Supabase/Particle session intact.
+## What I will NOT do in this pass
+- Touch `/dark` portal or Diagnostics — the legacy widget keeps working there until production cut-over.
+- Self-host the card form or KYC document capture — would require PCI scope we don't carry.
+- Change geo routing or default-provider selection logic.
+- Remove `moonpay-sign` / `MOONPAY_SECRET_KEY` until step 5 above.
 
-Styling uses existing semantic tokens (`bg-card`, `text-foreground`, `text-destructive`, etc.) — no hardcoded colors, dark mode preserved, mobile-friendly.
-
-## 5. Admin panel (`CoinbaseTransactions.tsx`)
-
-Add columns: **Failure Reason**, **Status Source**, and a popover with timestamps (created / popup opened / popup closed / webhook / failure / completed). Existing Domain logic untouched.
-
-## 6. Diagnostics
-
-`src/lib/coinbaseDiagnostics.ts` — namespaced `console.debug('[CB-GLOBAL]', …)` for: popup open/close, visibility, sdk callback, webhook arrival (via realtime), timeout, terminal resolution. Never logs raw payloads, only IDs + state.
-
-## 7. Files changed
-
-- migration (purchase_attempts + coinbase_transactions extensions)
-- `src/components/CoinbaseHeadlessOnramp.tsx` — state machine, popup/visibility tracking, timeout reduction, Start Again
-- `src/components/coinbase/CoinbaseLifecycleBanner.tsx` (new)
-- `src/lib/coinbaseLifecycle.ts` (new — types + reason mapping shared with edge)
-- `src/lib/coinbaseDiagnostics.ts` (new)
-- `src/components/admin/CoinbaseTransactions.tsx` — new columns + timestamps popover
-- `supabase/functions/coinbase-webhook/index.ts` — normalized reasons + intermediate statuses
-- `supabase/functions/coinbase-transactions/index.ts` — return new columns, write polling source
-
-## 8. Out of scope (unchanged)
-
-Stripe components/functions, Coinbase US widget, Particle auth, RLS policies, CORS allowlist, webhook signature scheme, admin role management.
-
-## 9. Verification
-
-- Build passes.
-- Manual: simulate popup-close-early, complete purchase, force decline (test card), webhook delay (block network), refresh mid-flow (state restored from `purchase_attempts`).
-- Confirm admin table shows new fields and timestamps for a new transaction.
+## Open question I'll resolve as I build
+Whether to fold "stored payment methods" into the confirm screen on first ship, or hide it behind an "Use saved card" toggle. I'll default to showing stored cards if `moonpay-payment-methods` returns ≥1 result; otherwise straight to Add Card frame.
