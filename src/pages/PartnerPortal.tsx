@@ -67,7 +67,8 @@ const PartnerPortal = () => {
     if (!supportedProviders.length) return;
     if (geoLoading) return; // wait so we don't flicker provider on first paint
     const available = supportedProviders.map(p => p.name);
-    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, available });
+    const geoUnknown = !geo?.country_code || geo?.source === 'error' || geo?.source === 'client-fallback' || geo?.source === 'unknown';
+    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, geoUnknown, available });
     if (chosen) {
       console.log('[PartnerPortal] initial ramp resolved', {
         country: geo?.country_code,
