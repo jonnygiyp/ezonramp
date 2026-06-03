@@ -12,7 +12,8 @@ const emailSchema = z.string().email('Invalid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 export default function AuthPage() {
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
