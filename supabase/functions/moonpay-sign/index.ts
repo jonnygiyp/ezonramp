@@ -46,13 +46,42 @@ serve(async (req) => {
 
     const { urlForSigning } = await req.json();
     
-    if (!urlForSigning) {
+    if (!urlForSigning || typeof urlForSigning !== 'string') {
       throw new Error('URL for signing is required');
     }
 
     // Extract the query string from the URL (everything after the ?)
-    const url = new URL(urlForSigning);
+    let url: URL;
+    try {
+      url = new URL(urlForSigning);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid URL' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // SECURITY: only sign URLs targeting known MoonPay hosts to prevent URL forgery
+    const ALLOWED_MOONPAY_HOSTS = new Set([
+      'buy.moonpay.com',
+      'buy-sandbox.moonpay.com',
+      'api.moonpay.com',
+      'api-sandbox.moonpay.com',
+    ]);
+    if (url.protocol !== 'https:' || !ALLOWED_MOONPAY_HOSTS.has(url.hostname)) {
+      logSecurityEvent("MOONPAY_SIGN_INVALID_HOST", {
+        clientId,
+        userId: authResult.userId,
+        host: url.hostname,
+      });
+      return new Response(
+        JSON.stringify({ error: 'URL host is not an allowed MoonPay domain' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
     const queryString = url.search.substring(1); // Remove the leading ?
+
     
     // Create HMAC signature using the query string
     const signature = createHmac('sha256', secretKey)

@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import {
+  getCorsHeaders,
+  validateAuth,
+  unauthorizedResponse,
+  getClientId,
+  logSecurityEvent,
+} from "../_shared/auth.ts";
 
 interface VerifyRequest {
   action: 'send' | 'check';
@@ -14,6 +15,9 @@ interface VerifyRequest {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -25,7 +29,19 @@ serve(async (req) => {
     });
   }
 
+  // SECURITY: require authentication to prevent abuse (SMS bombing, OTP enumeration)
+  const clientId = getClientId(req);
+  const authResult = await validateAuth(req);
+  if (!authResult.authenticated) {
+    logSecurityEvent('AUTH_FAILED_TWILIO_VERIFY', {
+      clientId,
+      error: authResult.error,
+    });
+    return unauthorizedResponse(corsHeaders, authResult.error);
+  }
+
   try {
+
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const serviceSid = Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
