@@ -85,7 +85,8 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
     if (!providers || providers.length === 0) return;
     if (geoLoading) return;
     const available = providers.map(p => p.name);
-    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, available });
+    const geoUnknown = !geo?.country_code || geo?.source === 'error' || geo?.source === 'client-fallback' || geo?.source === 'unknown';
+    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, geoUnknown, available });
     if (chosen) {
       console.log('[ApiIntegration] initial ramp resolved', {
         country: geo?.country_code,

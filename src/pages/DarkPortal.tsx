@@ -42,7 +42,8 @@ const DarkPortal = () => {
     if (!supportedProviders.length) return;
     if (geoLoading) return;
     const available = supportedProviders.map(p => p.name);
-    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, available });
+    const geoUnknown = !geo?.country_code || geo?.source === 'error' || geo?.source === 'client-fallback' || geo?.source === 'unknown';
+    const chosen = resolveInitialRamp({ isUs: !!geo?.is_us, geoUnknown, available });
     if (chosen) {
       console.log('[DarkPortal] initial ramp resolved', {
         country: geo?.country_code,
