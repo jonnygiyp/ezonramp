@@ -2,9 +2,12 @@
  * Region-aware ramp selection helpers.
  *
  * Default routing rules:
- *   - US visitors  -> Stripe (US)        [provider name: "stripe"]
- *   - Non-US       -> Coinbase (Global)  [provider name: "coinbase_global"]
- *   - Unknown / geo failure -> Coinbase (Global) (safest broad fallback)
+ *   - US visitors           -> Coinbase (US)      [provider name: "coinbase"]
+ *   - All other visitors    -> Coinbase (Global)  [provider name: "coinbase_global"]
+ *   - Unknown / geo failure -> Coinbase (Global)  (safest broad fallback)
+ *
+ * Stripe is never auto-selected by geo — users can still pick it manually,
+ * and that manual choice is honored on subsequent loads.
  *
  * Manual overrides are persisted per-browser in localStorage and take priority
  * over the geo default on subsequent loads. Geolocation is informational only;
@@ -21,8 +24,8 @@ export interface RampSelectionInput {
   available: RampName[];
 }
 
-const PREFERRED_US_ORDER: RampName[] = ["coinbase", "stripe", "coinbase_global"];
-const PREFERRED_NON_US_ORDER: RampName[] = ["coinbase_global", "stripe", "coinbase"];
+const PREFERRED_US_ORDER: RampName[] = ["coinbase", "coinbase_global", "stripe"];
+const PREFERRED_NON_US_ORDER: RampName[] = ["coinbase_global", "coinbase", "stripe"];
 
 /**
  * Pick the ramp the user should land on when no manual choice exists.
