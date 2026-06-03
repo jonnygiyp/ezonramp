@@ -16,21 +16,25 @@ const MANUAL_RAMP_STORAGE_KEY = "ezonramp:manual-ramp-choice";
 export type RampName = string;
 
 export interface RampSelectionInput {
+  /** Geo status for default ramp selection. */
   isUs: boolean;
+  /** When true, geo is unknown/failed — defaults to Stripe instead of Coinbase Global. */
+  geoUnknown?: boolean;
   /** Provider names that are currently enabled for this surface. */
   available: RampName[];
 }
 
 const PREFERRED_US_ORDER: RampName[] = ["coinbase", "coinbase_global", "stripe"];
 const PREFERRED_NON_US_ORDER: RampName[] = ["coinbase_global", "coinbase", "stripe"];
+const PREFERRED_UNKNOWN_ORDER: RampName[] = ["stripe", "coinbase_global", "coinbase"];
 
 /**
  * Pick the ramp the user should land on when no manual choice exists.
  * Always returns something present in `available` (or null if empty).
  */
-export function pickDefaultRamp({ isUs, available }: RampSelectionInput): RampName | null {
+export function pickDefaultRamp({ isUs, geoUnknown, available }: RampSelectionInput): RampName | null {
   if (!available.length) return null;
-  const order = isUs ? PREFERRED_US_ORDER : PREFERRED_NON_US_ORDER;
+  const order = geoUnknown ? PREFERRED_UNKNOWN_ORDER : (isUs ? PREFERRED_US_ORDER : PREFERRED_NON_US_ORDER);
   for (const name of order) {
     if (available.includes(name)) return name;
   }
