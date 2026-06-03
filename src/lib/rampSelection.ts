@@ -4,10 +4,7 @@
  * Default routing rules:
  *   - US visitors           -> Coinbase (US)      [provider name: "coinbase"]
  *   - All other visitors    -> Coinbase (Global)  [provider name: "coinbase_global"]
- *   - Unknown / geo failure -> Coinbase (Global)  (safest broad fallback)
- *
- * Stripe is never auto-selected by geo — users can still pick it manually,
- * and that manual choice is honored on subsequent loads.
+ *   - Unknown / geo failure -> Stripe              [provider name: "stripe"]
  *
  * Manual overrides are persisted per-browser in localStorage and take priority
  * over the geo default on subsequent loads. Geolocation is informational only;
