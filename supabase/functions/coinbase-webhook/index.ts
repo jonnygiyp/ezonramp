@@ -180,41 +180,46 @@ serve(async (req) => {
 
   try {
     const webhookSecret = Deno.env.get("COINBASE_WEBHOOK_SECRET");
-    
+
+    // SECURITY: require webhook secret to be configured. Never accept unsigned events.
+    if (!webhookSecret) {
+      console.error("[COINBASE-WEBHOOK] COINBASE_WEBHOOK_SECRET is not configured - refusing request");
+      return new Response(JSON.stringify({ error: "Webhook secret not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Get raw body for signature verification
     const rawBody = await req.text();
-    
-    // Verify signature if secret is configured
-    if (webhookSecret) {
-      const signatureHeader = req.headers.get("x-hook0-signature");
-      
-      if (!signatureHeader) {
-        console.error("[COINBASE-WEBHOOK] Missing X-Hook0-Signature header");
-        return new Response(JSON.stringify({ error: "Missing signature" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
 
-      const isValid = await verifyWebhookSignature(
-        rawBody,
-        signatureHeader,
-        webhookSecret,
-        req.headers
-      );
+    const signatureHeader = req.headers.get("x-hook0-signature");
 
-      if (!isValid) {
-        console.error("[COINBASE-WEBHOOK] Invalid signature");
-        return new Response(JSON.stringify({ error: "Invalid signature" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      console.log("[COINBASE-WEBHOOK] ✅ Signature verified");
-    } else {
-      console.warn("[COINBASE-WEBHOOK] ⚠️ No webhook secret configured - skipping verification");
+    if (!signatureHeader) {
+      console.error("[COINBASE-WEBHOOK] Missing X-Hook0-Signature header");
+      return new Response(JSON.stringify({ error: "Missing signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    const isValid = await verifyWebhookSignature(
+      rawBody,
+      signatureHeader,
+      webhookSecret,
+      req.headers
+    );
+
+    if (!isValid) {
+      console.error("[COINBASE-WEBHOOK] Invalid signature");
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("[COINBASE-WEBHOOK] ✅ Signature verified");
+
 
     // Parse the event
     const event = JSON.parse(rawBody);
