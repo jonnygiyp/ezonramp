@@ -12,7 +12,8 @@ const emailSchema = z.string().email('Invalid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 export default function AuthPage() {
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
@@ -42,22 +43,28 @@ export default function AuthPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    
+
     setIsSubmitting(true);
-    const { error } = await signIn(email, password);
+    const { error } = mode === 'signin'
+      ? await signIn(email, password)
+      : await signUp(email, password);
     setIsSubmitting(false);
-    
+
     if (error) {
       toast({
-        title: 'Sign in failed',
+        title: mode === 'signin' ? 'Sign in failed' : 'Sign up failed',
         description: error.message,
         variant: 'destructive',
       });
     } else {
-      toast({ title: 'Signed in successfully' });
+      toast({
+        title: mode === 'signin'
+          ? 'Signed in successfully'
+          : 'Account created — check your email to confirm, then sign in.',
+      });
     }
   };
 
@@ -74,14 +81,16 @@ export default function AuthPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Admin Access</CardTitle>
-          <CardDescription>Sign in to manage your site</CardDescription>
+          <CardDescription>
+            {mode === 'signin' ? 'Sign in to manage your site' : 'Create an admin account'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="signin-email">Email</Label>
+              <Label htmlFor="auth-email">Email</Label>
               <Input
-                id="signin-email"
+                id="auth-email"
                 type="email"
                 placeholder="admin@example.com"
                 value={email}
@@ -90,9 +99,9 @@ export default function AuthPage() {
               {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signin-password">Password</Label>
+              <Label htmlFor="auth-password">Password</Label>
               <Input
-                id="signin-password"
+                id="auth-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -100,11 +109,23 @@ export default function AuthPage() {
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
             </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Signing in...' : 'Sign In'}
+              {isSubmitting
+                ? (mode === 'signin' ? 'Signing in...' : 'Creating account...')
+                : (mode === 'signin' ? 'Sign In' : 'Sign Up')}
             </Button>
+            <button
+              type="button"
+              onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {mode === 'signin'
+                ? "Don't have an account? Sign up"
+                : 'Already have an account? Sign in'}
+            </button>
           </form>
         </CardContent>
       </Card>
     </div>
   );
 }
+
