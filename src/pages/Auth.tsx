@@ -12,8 +12,7 @@ const emailSchema = z.string().email('Invalid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 export default function AuthPage() {
-  const { user, loading, signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
@@ -28,17 +27,17 @@ export default function AuthPage() {
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
-    
+
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
       newErrors.email = emailResult.error.errors[0].message;
     }
-    
+
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
       newErrors.password = passwordResult.error.errors[0].message;
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -48,23 +47,17 @@ export default function AuthPage() {
     if (!validate()) return;
 
     setIsSubmitting(true);
-    const { error } = mode === 'signin'
-      ? await signIn(email, password)
-      : await signUp(email, password);
+    const { error } = await signIn(email, password);
     setIsSubmitting(false);
 
     if (error) {
       toast({
-        title: mode === 'signin' ? 'Sign in failed' : 'Sign up failed',
+        title: 'Sign in failed',
         description: error.message,
         variant: 'destructive',
       });
     } else {
-      toast({
-        title: mode === 'signin'
-          ? 'Signed in successfully'
-          : 'Account created — check your email to confirm, then sign in.',
-      });
+      toast({ title: 'Signed in successfully' });
     }
   };
 
@@ -81,9 +74,7 @@ export default function AuthPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Admin Access</CardTitle>
-          <CardDescription>
-            {mode === 'signin' ? 'Sign in to manage your site' : 'Create an admin account'}
-          </CardDescription>
+          <CardDescription>Sign in to manage your site</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,23 +100,11 @@ export default function AuthPage() {
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
             </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting
-                ? (mode === 'signin' ? 'Signing in...' : 'Creating account...')
-                : (mode === 'signin' ? 'Sign In' : 'Sign Up')}
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
             </Button>
-            <button
-              type="button"
-              onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {mode === 'signin'
-                ? "Don't have an account? Sign up"
-                : 'Already have an account? Sign in'}
-            </button>
           </form>
         </CardContent>
       </Card>
     </div>
   );
 }
-
