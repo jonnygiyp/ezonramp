@@ -12,6 +12,7 @@ import TermsEditor from '@/components/admin/TermsEditor';
 import PrivacyEditor from '@/components/admin/PrivacyEditor';
 import CoinbaseTransactions from '@/components/admin/CoinbaseTransactions';
 import InboundTracking from '@/components/admin/InboundTracking';
+import MoonPaySandbox from '@/components/admin/MoonPaySandbox';
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading, signOut } = useAuth();
@@ -75,7 +76,7 @@ export default function AdminDashboard() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <Tabs defaultValue="about" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="faq">FAQ</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -84,6 +85,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="onramps">Onramps</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="tracking">Tracking Links</TabsTrigger>
+            <TabsTrigger value="moonpay-dev">MoonPay Dev</TabsTrigger>
           </TabsList>
 
           <TabsContent value="about">
@@ -116,6 +118,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="tracking">
             <InboundTracking />
+          </TabsContent>
+
+          <TabsContent value="moonpay-dev">
+            <MoonPaySandbox />
           </TabsContent>
         </Tabs>
       </main>
