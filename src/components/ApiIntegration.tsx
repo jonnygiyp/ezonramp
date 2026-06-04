@@ -9,7 +9,7 @@ import { CoinflowCheckout } from "./CoinflowCheckout";
 import { CoinbaseHeadlessOnramp } from "./CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "./CoinbaseOnrampWidget";
 import { StripeOnramp } from "./StripeOnramp";
-import { MoonPayOnramp } from "./MoonPayOnramp";
+import { MoonPayHeadlessOnramp } from "./MoonPayHeadlessOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 import { useGeoLocation } from "@/hooks/useGeoLocation";
