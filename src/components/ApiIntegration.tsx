@@ -352,7 +352,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
         )}
 
         {activeTab === 'moonpay' && (
-          <MoonPayOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <MoonPayHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
         )}
       </div>
     </div>
