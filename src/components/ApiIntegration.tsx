@@ -9,7 +9,7 @@ import { CoinflowCheckout } from "./CoinflowCheckout";
 import { CoinbaseHeadlessOnramp } from "./CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "./CoinbaseOnrampWidget";
 import { StripeOnramp } from "./StripeOnramp";
-import { MoonPayOnramp } from "./MoonPayOnramp";
+import { MoonPayHeadlessOnramp } from "./MoonPayHeadlessOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 import { useGeoLocation } from "@/hooks/useGeoLocation";
@@ -352,7 +352,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
         )}
 
         {activeTab === 'moonpay' && (
-          <MoonPayOnramp defaultAsset="USDC" defaultNetwork="solana" />
+          <MoonPayHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
         )}
       </div>
     </div>
