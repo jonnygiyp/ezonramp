@@ -85,7 +85,6 @@ export default function AdminDashboard() {
             <TabsTrigger value="onramps">Onramps</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="tracking">Tracking Links</TabsTrigger>
-            <TabsTrigger value="moonpay-dev">MoonPay Dev</TabsTrigger>
           </TabsList>
 
           <TabsContent value="about">
