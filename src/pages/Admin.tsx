@@ -12,7 +12,7 @@ import TermsEditor from '@/components/admin/TermsEditor';
 import PrivacyEditor from '@/components/admin/PrivacyEditor';
 import CoinbaseTransactions from '@/components/admin/CoinbaseTransactions';
 import InboundTracking from '@/components/admin/InboundTracking';
-import MoonPaySandbox from '@/components/admin/MoonPaySandbox';
+
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading, signOut } = useAuth();
