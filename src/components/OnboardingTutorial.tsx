@@ -127,39 +127,11 @@ const coinbaseGlobalSteps: TutorialStep[] = [
   },
 ];
 
-// ─── MoonPay steps ──────────────────────────────────────────────
-const moonpaySteps: TutorialStep[] = [
-  signInStep,
-  providerTabsStep,
-  {
-    target: "[data-tutorial='moonpay-wallet-input']",
-    title: "Wallet Address",
-    description:
-      "Sign in to automatically populate your wallet address. Your connected wallet will appear here once logged in.",
-    position: "top",
-  },
-  {
-    target: "[data-tutorial='moonpay-amount-input']",
-    title: "Enter Amount",
-    description: "Enter the USD amount you'd like to spend on crypto.",
-    position: "top",
-  },
-  {
-    target: "[data-tutorial='moonpay-buy-button']",
-    title: "Buy with MoonPay",
-    description:
-      "Click to open the MoonPay widget where you can complete your purchase with card, debit, or bank transfer.",
-    position: "top",
-    loggedInOnly: true,
-  },
-];
-
 // ─── Provider → steps map ───────────────────────────────────────
 const STEP_MAP: Record<string, TutorialStep[]> = {
   stripe: stripeSteps,
   coinbase: coinbaseUSSteps,
   coinbase_global: coinbaseGlobalSteps,
-  moonpay: moonpaySteps,
 };
 
 const STORAGE_KEY = "onboarding_completed";
