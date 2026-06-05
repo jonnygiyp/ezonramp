@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 const CONTAINER_ID = "moonpay-admin-sandbox-container";
 
 type EnvOverride = "auto" | "sandbox" | "production";
+type WidgetVariant = "overlay" | "embedded" | "newTab" | "newWindow";
 
 interface EventLogEntry {
   ts: string;
@@ -31,6 +32,7 @@ export default function MoonPaySandbox() {
   const [currencyCode, setCurrencyCode] = useState("usdc_sol");
   const [baseCurrency, setBaseCurrency] = useState("usd");
   const [envOverride, setEnvOverride] = useState<EnvOverride>("auto");
+  const [variant, setVariant] = useState<WidgetVariant>("overlay");
   const [running, setRunning] = useState(false);
   const [sdkReady, setSdkReady] = useState(
     typeof window !== "undefined" && !!window.MoonPayWebSdk
@@ -95,8 +97,10 @@ export default function MoonPaySandbox() {
       const widget = window.MoonPayWebSdk.init({
         flow: "buy",
         environment,
-        variant: "embedded",
-        containerNodeSelector: `#${CONTAINER_ID}`,
+        variant,
+        ...(variant === "embedded"
+          ? { containerNodeSelector: `#${CONTAINER_ID}` }
+          : {}),
         useWarnBeforeRefresh: false,
         params: {
           apiKey: publishableKey,
@@ -110,11 +114,15 @@ export default function MoonPaySandbox() {
           onUrlSignatureRequested: handleSignature,
           onTransactionCompleted: (props) => pushEvent("transactionCompleted", props),
           onTransactionCreated: (props) => pushEvent("transactionCreated", props),
+          onCloseOverlay: () => {
+            pushEvent("overlayClosed", {});
+            setRunning(false);
+          },
         },
       });
       widgetRef.current = widget;
       widget.show();
-      pushEvent("widgetMounted", { environment, currencyCode, amount, baseCurrency });
+      pushEvent("widgetMounted", { variant, environment, currencyCode, amount, baseCurrency });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to initialize MoonPay";
       setError(msg);
@@ -130,7 +138,7 @@ export default function MoonPaySandbox() {
       widgetRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, sdkReady, publishableKey, environment]);
+  }, [running, sdkReady, publishableKey, environment, variant]);
 
   const handleStart = () => {
     setError(null);
@@ -243,6 +251,29 @@ export default function MoonPaySandbox() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sandbox-variant">Variant</Label>
+              <Select
+                value={variant}
+                onValueChange={(v) => setVariant(v as WidgetVariant)}
+                disabled={running}
+              >
+                <SelectTrigger id="sandbox-variant">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overlay">Overlay (recommended)</SelectItem>
+                  <SelectItem value="embedded">Embedded iframe (requires domain allowlist)</SelectItem>
+                  <SelectItem value="newTab">New Tab</SelectItem>
+                  <SelectItem value="newWindow">New Window</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Embedded iframe will show "refused to connect" unless the current origin is
+                allowlisted in the MoonPay dashboard (Developers → Domains).
+              </p>
+            </div>
           </div>
 
           {!publishableKey && (
@@ -280,7 +311,7 @@ export default function MoonPaySandbox() {
         </CardContent>
       </Card>
 
-      {running && (
+      {running && variant === "embedded" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Embedded widget</CardTitle>

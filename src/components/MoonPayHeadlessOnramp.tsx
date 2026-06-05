@@ -77,7 +77,10 @@ export function MoonPayHeadlessOnramp({
     return data.signature as string;
   }, []);
 
-  // Mount + show the SDK once the container is in the DOM.
+  // Launch SDK as an overlay (MoonPay-hosted modal). The embedded iframe
+  // variant requires the current origin to be allowlisted in the MoonPay
+  // dashboard; without that, buy.moonpay.com returns X-Frame-Options: DENY
+  // ("refused to connect"). Overlay avoids that constraint entirely.
   useEffect(() => {
     if (!showWidget || !sdkReady || !publishableKey) return;
     if (!window.MoonPayWebSdk) return;
@@ -87,8 +90,7 @@ export function MoonPayHeadlessOnramp({
       const widget = window.MoonPayWebSdk.init({
         flow: "buy",
         environment,
-        variant: "embedded",
-        containerNodeSelector: `#${CONTAINER_ID}`,
+        variant: "overlay",
         useWarnBeforeRefresh: false,
         params: {
           apiKey: publishableKey,
@@ -106,6 +108,7 @@ export function MoonPayHeadlessOnramp({
           onTransactionCreated: (props) => {
             console.log("[MoonPay] transaction created", props);
           },
+          onCloseOverlay: () => setShowWidget(false),
         },
       });
       widgetRef.current = widget;
@@ -114,6 +117,7 @@ export function MoonPayHeadlessOnramp({
       if (!cancelled) {
         const msg = e instanceof Error ? e.message : "Failed to initialize MoonPay";
         setError(msg);
+        setShowWidget(false);
       }
     }
 
@@ -126,8 +130,6 @@ export function MoonPayHeadlessOnramp({
       }
       widgetRef.current = null;
     };
-    // We intentionally re-init when showWidget toggles on; amount/wallet are
-    // captured at open-time, same as the legacy widget UX.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showWidget, sdkReady, publishableKey, environment]);
 
@@ -244,24 +246,24 @@ export function MoonPayHeadlessOnramp({
           </div>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div id={CONTAINER_ID} className="min-h-[600px]" />
-          <div className="p-4 border-t border-border">
-            <Button
-              variant="outline"
-              onClick={() => {
-                try {
-                  widgetRef.current?.close();
-                } catch {
-                  // ignore
-                }
-                setShowWidget(false);
-              }}
-              className="w-full"
-            >
-              Cancel
-            </Button>
-          </div>
+        <div className="bg-card border border-border rounded-xl p-6 text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Opening MoonPay checkout… complete your purchase in the overlay.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              try {
+                widgetRef.current?.close();
+              } catch {
+                // ignore
+              }
+              setShowWidget(false);
+            }}
+          >
+            Cancel
+          </Button>
         </div>
       )}
 
