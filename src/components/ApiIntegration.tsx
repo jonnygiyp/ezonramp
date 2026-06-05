@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { CreditCard, Wallet, Zap, Loader2, Globe, DollarSign, Moon } from "lucide-react";
+import { CreditCard, Wallet, Zap, Loader2, Globe, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CoinflowCheckout } from "./CoinflowCheckout";
 import { CoinbaseHeadlessOnramp } from "./CoinbaseHeadlessOnramp";
 import { CoinbaseOnrampWidget } from "./CoinbaseOnrampWidget";
 import { StripeOnramp } from "./StripeOnramp";
-import { MoonPayHeadlessOnramp } from "./MoonPayHeadlessOnramp";
 import { z } from "zod";
 import { useOnrampProviders } from "@/hooks/useOnrampProviders";
 import { useGeoLocation } from "@/hooks/useGeoLocation";
@@ -33,7 +32,6 @@ interface ApiIntegrationProps {
 }
 
 const CARD2CRYPTO_PROVIDERS = [
-  { id: 'moonpay', name: 'MoonPay', minAmount: 20 },
   { id: 'coinbase', name: 'Coinbase', minAmount: 2 },
   { id: 'transak', name: 'Transak', minAmount: 15 },
   { id: 'banxa', name: 'Banxa', minAmount: 20 },
@@ -57,8 +55,6 @@ const getTabIcon = (name: string) => {
       return Zap;
     case 'stripe':
       return DollarSign;
-    case 'moonpay':
-      return Moon;
     default:
       return CreditCard;
   }
@@ -73,7 +69,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   // Card2Crypto state
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState('moonpay');
+  const [selectedProvider, setSelectedProvider] = useState('coinbase');
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Region-aware initial ramp.
@@ -351,9 +347,6 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
           <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" transactionSource="homepage" />
         )}
 
-        {activeTab === 'moonpay' && (
-          <MoonPayHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
-        )}
       </div>
     </div>
   );
