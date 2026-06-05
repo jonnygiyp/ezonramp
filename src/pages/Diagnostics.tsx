@@ -295,7 +295,7 @@ const Diagnostics = () => {
     }
     setChecks([...results]);
 
-    // (MoonPay SDK check removed)
+    
 
     // Check 7: WebAssembly support
     results.push({
