@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 const CONTAINER_ID = "moonpay-admin-sandbox-container";
 
 type EnvOverride = "auto" | "sandbox" | "production";
+type WidgetVariant = "overlay" | "embedded" | "newTab" | "newWindow";
 
 interface EventLogEntry {
   ts: string;
