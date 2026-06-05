@@ -119,9 +119,6 @@ export default function AdminDashboard() {
             <InboundTracking />
           </TabsContent>
 
-          <TabsContent value="moonpay-dev">
-            <MoonPaySandbox />
-          </TabsContent>
         </Tabs>
       </main>
     </div>
