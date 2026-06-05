@@ -32,6 +32,7 @@ export default function MoonPaySandbox() {
   const [currencyCode, setCurrencyCode] = useState("usdc_sol");
   const [baseCurrency, setBaseCurrency] = useState("usd");
   const [envOverride, setEnvOverride] = useState<EnvOverride>("auto");
+  const [variant, setVariant] = useState<WidgetVariant>("overlay");
   const [running, setRunning] = useState(false);
   const [sdkReady, setSdkReady] = useState(
     typeof window !== "undefined" && !!window.MoonPayWebSdk
