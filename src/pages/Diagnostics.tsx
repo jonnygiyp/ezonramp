@@ -295,40 +295,7 @@ const Diagnostics = () => {
     }
     setChecks([...results]);
 
-    // Check 6: MoonPay SDK
-    results.push({
-      name: 'MoonPay SDK',
-      status: 'checking',
-      message: 'Checking...',
-    });
-    setChecks([...results]);
-    
-    await new Promise(r => setTimeout(r, 200));
-    const moonpayIdx = results.length - 1;
-    try {
-      const moonpay = await import('@moonpay/moonpay-react');
-      if (moonpay.MoonPayProvider) {
-        results[moonpayIdx] = {
-          name: 'MoonPay SDK',
-          status: 'pass',
-          message: 'MoonPayProvider available',
-        };
-      } else {
-        results[moonpayIdx] = {
-          name: 'MoonPay SDK',
-          status: 'warn',
-          message: 'SDK loaded but MoonPayProvider missing',
-        };
-      }
-    } catch (e) {
-      results[moonpayIdx] = {
-        name: 'MoonPay SDK',
-        status: 'fail',
-        message: 'Failed to load SDK',
-        details: e instanceof Error ? e.message : String(e),
-      };
-    }
-    setChecks([...results]);
+    // (MoonPay SDK check removed)
 
     // Check 7: WebAssembly support
     results.push({
