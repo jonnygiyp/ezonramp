@@ -503,7 +503,7 @@ function CampaignDetail({ campaign, onBack }: { campaign?: CampaignStat; onBack:
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="coinbase">Coinbase</SelectItem>
                 <SelectItem value="stripe">Stripe</SelectItem>
-                <SelectItem value="moonpay">MoonPay</SelectItem>
+                
                 <SelectItem value="coinflow">Coinflow</SelectItem>
               </SelectContent>
             </Select>
