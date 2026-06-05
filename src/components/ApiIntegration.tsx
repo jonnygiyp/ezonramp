@@ -347,9 +347,6 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
           <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" transactionSource="homepage" />
         )}
 
-        {activeTab === 'moonpay' && (
-          <MoonPayHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
-        )}
       </div>
     </div>
   );
