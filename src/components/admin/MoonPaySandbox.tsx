@@ -251,6 +251,29 @@ export default function MoonPaySandbox() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sandbox-variant">Variant</Label>
+              <Select
+                value={variant}
+                onValueChange={(v) => setVariant(v as WidgetVariant)}
+                disabled={running}
+              >
+                <SelectTrigger id="sandbox-variant">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overlay">Overlay (recommended)</SelectItem>
+                  <SelectItem value="embedded">Embedded iframe (requires domain allowlist)</SelectItem>
+                  <SelectItem value="newTab">New Tab</SelectItem>
+                  <SelectItem value="newWindow">New Window</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Embedded iframe will show "refused to connect" unless the current origin is
+                allowlisted in the MoonPay dashboard (Developers → Domains).
+              </p>
+            </div>
           </div>
 
           {!publishableKey && (
