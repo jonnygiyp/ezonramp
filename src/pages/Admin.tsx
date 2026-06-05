@@ -76,7 +76,7 @@ export default function AdminDashboard() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <Tabs defaultValue="about" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="faq">FAQ</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
