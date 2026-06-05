@@ -97,8 +97,10 @@ export default function MoonPaySandbox() {
       const widget = window.MoonPayWebSdk.init({
         flow: "buy",
         environment,
-        variant: "embedded",
-        containerNodeSelector: `#${CONTAINER_ID}`,
+        variant,
+        ...(variant === "embedded"
+          ? { containerNodeSelector: `#${CONTAINER_ID}` }
+          : {}),
         useWarnBeforeRefresh: false,
         params: {
           apiKey: publishableKey,
@@ -112,11 +114,15 @@ export default function MoonPaySandbox() {
           onUrlSignatureRequested: handleSignature,
           onTransactionCompleted: (props) => pushEvent("transactionCompleted", props),
           onTransactionCreated: (props) => pushEvent("transactionCreated", props),
+          onCloseOverlay: () => {
+            pushEvent("overlayClosed", {});
+            setRunning(false);
+          },
         },
       });
       widgetRef.current = widget;
       widget.show();
-      pushEvent("widgetMounted", { environment, currencyCode, amount, baseCurrency });
+      pushEvent("widgetMounted", { variant, environment, currencyCode, amount, baseCurrency });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to initialize MoonPay";
       setError(msg);
