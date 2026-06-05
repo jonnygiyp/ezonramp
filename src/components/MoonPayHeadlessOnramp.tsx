@@ -246,24 +246,24 @@ export function MoonPayHeadlessOnramp({
           </div>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div id={CONTAINER_ID} className="min-h-[600px]" />
-          <div className="p-4 border-t border-border">
-            <Button
-              variant="outline"
-              onClick={() => {
-                try {
-                  widgetRef.current?.close();
-                } catch {
-                  // ignore
-                }
-                setShowWidget(false);
-              }}
-              className="w-full"
-            >
-              Cancel
-            </Button>
-          </div>
+        <div className="bg-card border border-border rounded-xl p-6 text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Opening MoonPay checkout… complete your purchase in the overlay.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              try {
+                widgetRef.current?.close();
+              } catch {
+                // ignore
+              }
+              setShowWidget(false);
+            }}
+          >
+            Cancel
+          </Button>
         </div>
       )}
 
