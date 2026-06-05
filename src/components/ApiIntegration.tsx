@@ -69,7 +69,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   // Card2Crypto state
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState('moonpay');
+  const [selectedProvider, setSelectedProvider] = useState('coinbase');
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Region-aware initial ramp.
