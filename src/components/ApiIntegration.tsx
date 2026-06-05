@@ -32,7 +32,6 @@ interface ApiIntegrationProps {
 }
 
 const CARD2CRYPTO_PROVIDERS = [
-  { id: 'moonpay', name: 'MoonPay', minAmount: 20 },
   { id: 'coinbase', name: 'Coinbase', minAmount: 2 },
   { id: 'transak', name: 'Transak', minAmount: 15 },
   { id: 'banxa', name: 'Banxa', minAmount: 20 },
