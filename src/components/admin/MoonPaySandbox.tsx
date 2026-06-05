@@ -138,7 +138,7 @@ export default function MoonPaySandbox() {
       widgetRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, sdkReady, publishableKey, environment]);
+  }, [running, sdkReady, publishableKey, environment, variant]);
 
   const handleStart = () => {
     setError(null);
