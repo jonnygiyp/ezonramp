@@ -311,7 +311,7 @@ export default function MoonPaySandbox() {
         </CardContent>
       </Card>
 
-      {running && (
+      {running && variant === "embedded" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Embedded widget</CardTitle>
