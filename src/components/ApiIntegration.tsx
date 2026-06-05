@@ -55,8 +55,6 @@ const getTabIcon = (name: string) => {
       return Zap;
     case 'stripe':
       return DollarSign;
-    case 'moonpay':
-      return Moon;
     default:
       return CreditCard;
   }
