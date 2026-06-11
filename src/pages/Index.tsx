@@ -34,6 +34,14 @@ const Index = () => {
     }, 400);
   };
 
+  // On mount, if URL contains a FAQ hash, navigate to FAQ section
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith("#faq-")) {
+      handleNavigate("faq");
+    }
+  }, []);
+
   const renderContent = () => {
     switch (activeSection) {
       case "about":
