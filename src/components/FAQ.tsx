@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import {
@@ -12,8 +13,15 @@ interface FAQProps {
   onNavigate: (section: string) => void;
 }
 
+const slugify = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
 const FAQ = ({ onNavigate }: FAQProps) => {
   const { data, isLoading } = useFAQContent();
+  const [openValue, setOpenValue] = useState<string>("");
 
   // Default FAQs if no database content
   const defaultFaqs = [
@@ -46,37 +54,86 @@ const FAQ = ({ onNavigate }: FAQProps) => {
 
   const faqs = data?.items?.length ? data.items : defaultFaqs;
 
+  // On mount / when data loads, check for a FAQ hash and open the matching item
+  useEffect(() => {
+    if (isLoading) return;
+
+    const hash = window.location.hash;
+    if (hash.startsWith("#faq-")) {
+      const slug = hash.slice(5); // remove '#faq-'
+      const hasMatch = faqs.some((faq) => slugify(faq.question) === slug);
+      if (hasMatch) {
+        setOpenValue(slug);
+        // Scroll the opened item into view after render
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const el = document.getElementById(`faq-${slug}`);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }, 100);
+        });
+      }
+    }
+  }, [isLoading]);
+
+  const handleValueChange = (value: string) => {
+    setOpenValue(value);
+    if (value) {
+      history.replaceState(null, "", `#faq-${value}`);
+    } else {
+      history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search
+      );
+    }
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto px-6 py-4 md:py-6 space-y-4">
-
       {/* Page Header - Matches Homepage/About styling */}
       <div>
         <h1 className="text-lg md:text-2xl font-bold tracking-tight text-foreground">
           Frequently Asked Questions
         </h1>
       </div>
-      
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
         /* FAQ Container - Clean accordion without extra spacing */
-        <Accordion type="single" collapsible className="w-full">
-          {faqs.map((faq, index) => (
-            <AccordionItem 
-              key={index} 
-              value={`item-${index}`}
-              className="border-b border-border"
-            >
-              <AccordionTrigger className="text-left text-sm md:text-base font-medium text-foreground hover:no-underline py-3 [&[data-state=open]>svg]:text-primary [&>svg]:text-muted-foreground [&>svg]:transition-colors">
-                {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-3 prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline [&_u]:text-primary [&_u]:underline [&_u]:decoration-primary/60 [&_u]:underline-offset-2">
-                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+        <Accordion
+          type="single"
+          collapsible
+          value={openValue}
+          onValueChange={handleValueChange}
+          className="w-full"
+        >
+          {faqs.map((faq, index) => {
+            const slug = slugify(faq.question);
+            return (
+              <AccordionItem
+                key={index}
+                value={slug}
+                id={`faq-${slug}`}
+                className="border-b border-border"
+              >
+                <AccordionTrigger className="text-left text-sm md:text-base font-medium text-foreground hover:no-underline py-3 [&[data-state=open]>svg]:text-primary [&>svg]:text-muted-foreground [&>svg]:transition-colors">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-3 prose prose-sm max-w-none [&_a]:text-primary [&_a]:underline [&_u]:text-primary [&_u]:underline [&_u]:decoration-primary/60 [&_u]:underline-offset-2">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(faq.answer),
+                    }}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
         </Accordion>
       )}
     </div>
