@@ -233,7 +233,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
             </div>
           </div>
           <p className="text-xs text-muted-foreground text-center mb-4">
-            Payment options are selected based on your region and availability
+            Debit card payments are 80% more likely to succeed.
           </p>
         </>
       )}
