@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -33,6 +33,14 @@ const Index = () => {
       setIsAnimating(false);
     }, 400);
   };
+
+  // On mount, if URL contains a FAQ hash, navigate to FAQ section
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith("#faq-")) {
+      handleNavigate("faq");
+    }
+  }, []);
 
   const renderContent = () => {
     switch (activeSection) {
