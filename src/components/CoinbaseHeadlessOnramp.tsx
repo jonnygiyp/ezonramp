@@ -604,8 +604,16 @@ export function CoinbaseHeadlessOnramp({
 
   // --- Continue to Purchase: generate buy URL and open popup ---
   const continueToPurchase = async () => {
+    const { logAuthDiagnostics } = await import("@/lib/authDiagnostics");
+    await logAuthDiagnostics('CoinbaseHeadless.continueToPurchase', {
+      walletConnected: isConnected,
+      destinationAddress: destinationAddress?.slice(0, 10),
+      amount,
+    });
     if (!session) {
-      toast({ title: "Authentication Required", description: "Please sign in to use Coinbase onramp", variant: "destructive" });
+      const next = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+      toast({ title: "Sign in required", description: "Please sign in to use Coinbase onramp.", variant: "destructive" });
+      window.location.assign(`/auth?next=${next}`);
       return;
     }
     if (!amount || parseFloat(amount) < MIN_AMOUNT) {
