@@ -68,25 +68,29 @@ async function loadParticleSDK(): Promise<void> {
       const chainsModule = await import('@particle-network/connectkit/chains');
       const { mainnet, polygon, base, arbitrum, solana } = chainsModule;
 
-      // Step 4: Import wallet module
-      const walletModule = await import('@particle-network/connectkit/wallet');
-      const { EntryPosition, wallet } = walletModule;
+      // NOTE: We intentionally do NOT load `@particle-network/connectkit/wallet`.
+      // That plugin renders Particle's embedded wallet UI which exposes Buy /
+      // Swap / Bridge / Deposit (Particle's native onramp). EZOnramp uses
+      // Particle strictly for wallet auth + address retrieval — purchases must
+      // only happen through our supported ramps (Stripe, Coinbase Global,
+      // Coinbase Headless). Omitting this plugin removes the entire surface
+      // through which Particle's onramp could be triggered.
 
-      // Step 5: Import auth connectors
+      // Step 4: Import auth connectors
       const authModule = await import('@particle-network/connectkit/auth');
       const { authWalletConnectors } = authModule;
 
-      // Step 6: Import solana connectors
+      // Step 5: Import solana connectors
       const solanaModule = await import('@particle-network/connectkit/solana');
       const { solanaWalletConnectors } = solanaModule;
 
-      // Step 7: Import EVM connectors last (has most dependencies)
+      // Step 6: Import EVM connectors last (has most dependencies)
       const evmModule = await import('@particle-network/connectkit/evm');
       const { evmWalletConnectors } = evmModule;
 
       console.log('[ParticleConnectkit] All modules loaded, creating config...');
 
-      // Step 8: Create config only after all modules are loaded
+      // Step 7: Create config only after all modules are loaded
       particleConfig = createConfig({
         projectId: 'e7041872-c6f2-4de1-826a-8c20f4d26e7f',
         clientKey: 'cQYG1BDRMOjRHHfoifZ10kiAXuHGbe5ypVetw2LV',
@@ -115,12 +119,9 @@ async function loadParticleSDK(): Promise<void> {
             },
           }),
         ],
-        plugins: [
-          wallet({
-            visible: false,
-            entryPosition: EntryPosition.BR,
-          }),
-        ],
+        // No plugins — Particle wallet plugin (with Buy/Swap/Bridge UI) is
+        // deliberately disabled. See comment above.
+        plugins: [],
         chains: [solana, mainnet, polygon, base, arbitrum],
       });
       

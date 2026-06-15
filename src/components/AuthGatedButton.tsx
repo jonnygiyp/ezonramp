@@ -2,6 +2,7 @@ import { forwardRef, useCallback, ComponentPropsWithoutRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useAccount, useModal } from '@/hooks/useParticle';
+import { openParticleConnectModalIfDisconnected } from '@/lib/particleModal';
 import { usePendingOnrampAction } from '@/hooks/usePendingOnrampAction';
 import { logAuthDiagnostics } from '@/lib/authDiagnostics';
 
@@ -37,7 +38,7 @@ export const AuthGatedButton = forwardRef<HTMLButtonElement, AuthGatedButtonProp
 
       // No wallet → open Particle modal and replay onClick after connect.
       if (onClick) setPendingAction(onClick);
-      setOpen(true);
+      openParticleConnectModalIfDisconnected(setOpen, isConnected);
     }, [session, isConnected, onClick, setOpen, setPendingAction]);
 
     return (
