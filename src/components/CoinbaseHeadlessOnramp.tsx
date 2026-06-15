@@ -5,6 +5,7 @@ import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
 import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "./ui/toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
