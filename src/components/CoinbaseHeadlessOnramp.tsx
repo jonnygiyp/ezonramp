@@ -6,7 +6,6 @@ import { Skeleton } from "./ui/skeleton";
 import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
-import { openParticleConnectModalIfDisconnected } from "@/lib/particleModal";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
@@ -613,7 +612,7 @@ export function CoinbaseHeadlessOnramp({
     });
     if (!session) {
       toast({ title: "Wallet session expired", description: "We could not verify your wallet session. Please reconnect your wallet.", variant: "destructive" });
-      openParticleConnectModalIfDisconnected(setOpen, isConnected);
+      setOpen(true);
       return;
     }
 
@@ -920,7 +919,7 @@ export function CoinbaseHeadlessOnramp({
       {!isConnected && (
         <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
           <Button
-            onClick={() => openParticleConnectModalIfDisconnected(setOpen, isConnected)}
+            onClick={() => setOpen(true)}
             className="gap-2 px-6"
             size="lg"
           >

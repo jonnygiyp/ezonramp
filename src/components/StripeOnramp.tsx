@@ -6,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, Wallet, LogIn } from "lucide-react";
 import { useAccount, useModal } from '@/hooks/useParticle';
-import { openParticleConnectModalIfDisconnected } from '@/lib/particleModal';
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp } from "@stripe/crypto";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
@@ -353,7 +352,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           {errorCode === 'AUTH_REQUIRED' ? (
             <Button
               size="sm"
-              onClick={() => openParticleConnectModalIfDisconnected(setOpen, isConnected)}
+              onClick={() => setOpen(true)}
               className="gap-2"
             >
               <Wallet className="h-4 w-4" />
@@ -390,7 +389,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       {loadState === 'idle' && !connectedAddressValid && (
         <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center" data-tutorial="stripe-sign-in">
           <Button
-            onClick={() => openParticleConnectModalIfDisconnected(setOpen, isConnected)}
+            onClick={() => setOpen(true)}
             className="gap-2 px-6"
             size="lg"
           >
