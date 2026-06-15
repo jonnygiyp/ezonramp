@@ -344,7 +344,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       {loadState === 'error' && (
         <div className="bg-card border border-destructive/30 rounded-xl p-8 flex flex-col items-center justify-center space-y-4 text-center">
           <p className="text-sm font-semibold text-foreground">
-            {errorCode === 'AUTH_REQUIRED' ? 'Sign in required' : 'Unable to load Stripe onramp'}
+            {errorCode === 'AUTH_REQUIRED' ? 'Wallet session expired' : 'Unable to load Stripe onramp'}
           </p>
           <p className="text-sm text-destructive font-medium">
             {errorMessage || "Please try again."}
@@ -352,14 +352,11 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           {errorCode === 'AUTH_REQUIRED' ? (
             <Button
               size="sm"
-              onClick={() => {
-                const next = encodeURIComponent(location.pathname + location.search + location.hash);
-                navigate(`/auth?next=${next}`);
-              }}
+              onClick={() => setOpen(true)}
               className="gap-2"
             >
-              <LogIn className="h-4 w-4" />
-              Sign In
+              <Wallet className="h-4 w-4" />
+              Reconnect Wallet
             </Button>
           ) : (
             <Button variant="outline" size="sm" onClick={handleRetry} className="gap-2">
@@ -369,6 +366,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           )}
         </div>
       )}
+
 
 
       {/* Stripe container - visible during mounted and ready states */}
