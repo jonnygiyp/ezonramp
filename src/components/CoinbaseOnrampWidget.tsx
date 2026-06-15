@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGatedButton } from "./AuthGatedButton";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
+import { ensureSupabaseSession } from "@/lib/ensureSession";
 
 interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
@@ -287,10 +288,30 @@ export function CoinbaseOnrampWidget({
 
   // Handle the buy action - get session token and open URL with partnerUserId tracking
   const handleBuy = useCallback(async () => {
-    if (!session) {
+    // Ensure a Supabase session exists (refresh stale / create anonymous for
+    // Particle-only users) before showing an auth error.
+    const ensured = await ensureSupabaseSession();
+    const activeSession = ensured.session ?? session;
+
+    console.info("[COINBASE-GLOBAL] handleBuy diagnostics", {
+      authUserId: activeSession?.user?.id ?? null,
+      walletAddress: address ? `${address.slice(0, 8)}...` : null,
+      supabaseSessionExists: !!activeSession,
+      supabaseAccessTokenExists: !!activeSession?.access_token,
+      particleSessionExists: !!isConnected,
+      selectedRamp: "coinbase_global",
+      sessionSource: ensured.source,
+      pageUrl: typeof window !== "undefined" ? window.location.href : null,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    });
+
+    if (!activeSession) {
+      const expired = ensured.error?.toLowerCase().includes("expired") || ensured.source === "none";
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to use Coinbase onramp",
+        title: expired ? "Session Expired" : "Authentication Required",
+        description: expired
+          ? "Your login session expired. Please log out and sign back in."
+          : "Please sign in to use Coinbase onramp",
         variant: "destructive",
       });
       return;
@@ -312,7 +333,7 @@ export function CoinbaseOnrampWidget({
       // and this attempt. Format: u<userIdShort>_a<uuidNoDashes> — kept under
       // Coinbase's 49-char partnerUserId limit so admin tooling can reconcile
       // a transaction back to a Supabase user + purchase_attempt row.
-      const userIdShort = session.user.id.replace(/-/g, "").slice(0, 8);
+      const userIdShort = activeSession.user.id.replace(/-/g, "").slice(0, 8);
       const attemptShort = crypto.randomUUID().replace(/-/g, "");
       const attemptId = `u${userIdShort}_a${attemptShort}`;
       const source = resolveTransactionSource(transactionSource);
@@ -353,7 +374,7 @@ export function CoinbaseOnrampWidget({
       // USDC purchase amount (crypto); `currency` = "USDC" signals this.
       try {
         await (supabase as any).from("purchase_attempts").insert({
-          user_id: session.user.id,
+          user_id: activeSession.user.id,
           wallet_address: destinationAddress,
           amount: purchaseAmountUsdc,
           currency: "USDC",
