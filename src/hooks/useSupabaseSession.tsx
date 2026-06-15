@@ -32,24 +32,8 @@ export function useSupabaseSession() {
         return existingSession;
       }
 
-      // No session exists - create anonymous session if wallet is connected
-      if (isConnected && address && !hasAttemptedAnonSignIn.current) {
-        hasAttemptedAnonSignIn.current = true;
-        console.log('[SupabaseSession] No session, creating anonymous session for wallet:', address.slice(0, 10));
-        
-        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
-        
-        if (anonError) {
-          console.error('[SupabaseSession] Anonymous sign-in failed:', anonError);
-          throw anonError;
-        }
-
-        if (anonData.session) {
-          console.log('[SupabaseSession] Anonymous session created for user:', anonData.session.user.id.slice(0, 8));
-          return anonData.session;
-        }
-      }
-
+      // Anonymous sign-ins are disabled. A real Supabase login (email/OAuth)
+      // is required; surfaces the prompt via hasSession=false to callers.
       return null;
     } catch (err) {
       console.error('[SupabaseSession] ensureSession error:', err);
