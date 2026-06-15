@@ -374,7 +374,7 @@ export function CoinbaseOnrampWidget({
       // USDC purchase amount (crypto); `currency` = "USDC" signals this.
       try {
         await (supabase as any).from("purchase_attempts").insert({
-          user_id: session.user.id,
+          user_id: activeSession.user.id,
           wallet_address: destinationAddress,
           amount: purchaseAmountUsdc,
           currency: "USDC",
