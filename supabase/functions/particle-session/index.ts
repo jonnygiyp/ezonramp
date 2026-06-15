@@ -247,8 +247,12 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "session_exchange_failed" }), { status: 500, headers });
   }
 
+  // Concise, redacted success log. Never include tokens, hashed_token, email, or full wallet.
+  const walletTag = walletAddress
+    ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
+    : "none";
   console.log(
-    `[particle-session] minted session user=${userId.slice(0, 8)} particle=${particleUuid.slice(0, 8)} wallet_verified=${walletCheck.ok}`,
+    `[particle-session] ok user=${userId.slice(0, 8)} particle=${particleUuid.slice(0, 8)} wallet=${walletTag} verified=${walletCheck.ok} bound=${walletBound}`,
   );
 
   return new Response(
