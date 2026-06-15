@@ -611,11 +611,11 @@ export function CoinbaseHeadlessOnramp({
       amount,
     });
     if (!session) {
-      const next = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
-      toast({ title: "Sign in required", description: "Please sign in to use Coinbase onramp.", variant: "destructive" });
-      window.location.assign(`/auth?next=${next}`);
+      toast({ title: "Wallet session expired", description: "We could not verify your wallet session. Please reconnect your wallet.", variant: "destructive" });
+      setOpen(true);
       return;
     }
+
     if (!amount || parseFloat(amount) < MIN_AMOUNT) {
       toast({ title: "Invalid Amount", description: `Please enter an amount of at least $${MIN_AMOUNT}`, variant: "destructive" });
       return;
