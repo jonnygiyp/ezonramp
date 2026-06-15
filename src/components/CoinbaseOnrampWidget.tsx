@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGatedButton } from "./AuthGatedButton";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
+import { ensureSupabaseSession } from "@/lib/ensureSession";
 
 interface CoinbaseOnrampWidgetProps {
   defaultAsset?: string;
