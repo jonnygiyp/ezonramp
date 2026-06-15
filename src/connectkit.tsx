@@ -118,10 +118,10 @@ async function loadParticleSDK(): Promise<void> {
           }),
         ],
         plugins: [
-          wallet({
-            visible: false,
-            entryPosition: EntryPosition.BR,
-          }),
+          // Intentionally empty: no Particle wallet plugin — see Step 4 above.
+          // Registering `wallet({...})` would enable Particle's embedded wallet
+          // UI (Buy / Deposit / Swap / Onramp), which must never appear in
+          // EZOnramp. Our AccountModal provides all wallet UX instead.
         ],
         chains: [solana, mainnet, polygon, base, arbitrum],
       });
