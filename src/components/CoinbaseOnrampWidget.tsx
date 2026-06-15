@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Loader2, ExternalLink, LogIn, Check, X, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "./ui/toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -306,13 +307,15 @@ export function CoinbaseOnrampWidget({
     });
 
     if (!activeSession) {
-      const expired = ensured.error?.toLowerCase().includes("expired") || ensured.source === "none";
       toast({
-        title: expired ? "Session Expired" : "Authentication Required",
-        description: expired
-          ? "Your login session expired. Please log out and sign back in."
-          : "Please sign in to use Coinbase onramp",
+        title: "Sign in required",
+        description: "Please sign in with your email or Google account to buy USDC.",
         variant: "destructive",
+        action: (
+          <ToastAction altText="Sign in" onClick={() => { window.location.href = "/auth"; }}>
+            Sign in
+          </ToastAction>
+        ),
       });
       return;
     }
