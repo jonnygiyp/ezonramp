@@ -114,6 +114,23 @@ function walletAuthorized(
   return { ok: false, network: null };
 }
 
+// Best-effort per-uuid rate limit (per isolate). Caps Particle API + Supabase admin churn
+// if a misbehaving client loops. Not a security boundary — purely a brake.
+const RATE_WINDOW_MS = 10_000;
+const RATE_MAX = 6;
+const rateBuckets = new Map<string, number[]>();
+function rateLimited(uuid: string): boolean {
+  const now = Date.now();
+  const recent = (rateBuckets.get(uuid) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  recent.push(now);
+  rateBuckets.set(uuid, recent);
+  if (rateBuckets.size > 500) {
+    // crude eviction
+    for (const k of rateBuckets.keys()) { rateBuckets.delete(k); if (rateBuckets.size < 250) break; }
+  }
+  return recent.length > RATE_MAX;
+}
+
 serve(async (req: Request) => {
   const origin = req.headers.get("origin");
   const headers = { ...corsFor(origin), "Content-Type": "application/json" };
