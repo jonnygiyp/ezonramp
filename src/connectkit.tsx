@@ -68,9 +68,11 @@ async function loadParticleSDK(): Promise<void> {
       const chainsModule = await import('@particle-network/connectkit/chains');
       const { mainnet, polygon, base, arbitrum, solana } = chainsModule;
 
-      // Step 4: Import wallet module
-      const walletModule = await import('@particle-network/connectkit/wallet');
-      const { EntryPosition, wallet } = walletModule;
+      // Step 4: (Removed) Particle embedded wallet plugin.
+      // EZOnramp intentionally does NOT register the Particle wallet plugin so
+      // that Particle never surfaces its Buy / Deposit / Swap / Onramp UI to
+      // users. Wallet UX is provided by our own AccountModal. Particle is used
+      // ONLY for connection, authentication, and signing via useWallets().
 
       // Step 5: Import auth connectors
       const authModule = await import('@particle-network/connectkit/auth');
