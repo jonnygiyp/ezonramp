@@ -40,4 +40,8 @@ verify_jwt = false
 [functions.admin-user-lookup]
 verify_jwt = false
 
+[functions.particle-session]
+verify_jwt = false
+
+
 
