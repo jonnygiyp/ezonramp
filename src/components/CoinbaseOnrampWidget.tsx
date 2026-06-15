@@ -6,6 +6,7 @@ import { Label } from "./ui/label";
 import { Loader2, ExternalLink, LogIn, Check, X, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
+import { openParticleConnectModalIfDisconnected } from "@/lib/particleModal";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGatedButton } from "./AuthGatedButton";
@@ -300,7 +301,7 @@ export function CoinbaseOnrampWidget({
         description: "We could not verify your wallet session. Please reconnect your wallet.",
         variant: "destructive",
       });
-      setOpen(true);
+      openParticleConnectModalIfDisconnected(setOpen, isConnected);
       return;
     }
 
@@ -502,7 +503,7 @@ export function CoinbaseOnrampWidget({
       {!isConnected && (
         <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">
           <Button
-            onClick={() => setOpen(true)}
+            onClick={() => openParticleConnectModalIfDisconnected(setOpen, isConnected)}
             className="gap-2 px-6"
             size="lg"
           >
