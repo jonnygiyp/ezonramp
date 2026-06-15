@@ -167,6 +167,10 @@ serve(async (req: Request) => {
   if (!/^[0-9a-f-]{32,36}$/i.test(particleUuid)) {
     return new Response(JSON.stringify({ error: "invalid_uuid" }), { status: 400, headers });
   }
+  if (rateLimited(particleUuid)) {
+    console.warn(`[particle-session] rate_limited particle=${particleUuid.slice(0, 8)}`);
+    return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429, headers });
+  }
 
   // 1. Verify with Particle.
   let info: ParticleUserInfo;
