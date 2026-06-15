@@ -36,10 +36,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { setOpen } = useModal();
-  const { getAccessToken, isLoading: isSessionLoading } = useSupabaseSession();
+  const { getAccessToken, isLoading: isSessionLoading, hasSession } = useSupabaseSession();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
   const initLockRef = useRef(false);
