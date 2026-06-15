@@ -97,7 +97,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       log("Auth state resolving...");
       const accessToken = await getAccessToken();
       if (!accessToken) {
-        throw new Error("Please sign in with your email or Google account to use Stripe onramp.");
+        throw new Error("Unable to establish a session. Please refresh the page and try again.");
       }
       if (!mountedRef.current) { initLockRef.current = false; return; }
       log("Auth resolved");

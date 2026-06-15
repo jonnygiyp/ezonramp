@@ -5,7 +5,6 @@ import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
 import { Loader2, Mail, Phone, ArrowRight, ArrowLeft, Check, RefreshCw, ShieldCheck, AlertCircle, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "./ui/toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +22,6 @@ import {
   coinbaseStatusToLifecycle,
 } from "@/lib/coinbaseLifecycle";
 import { cbDiag } from "@/lib/coinbaseDiagnostics";
-import { ensureSupabaseSession } from "@/lib/ensureSession";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
@@ -606,36 +604,8 @@ export function CoinbaseHeadlessOnramp({
 
   // --- Continue to Purchase: generate buy URL and open popup ---
   const continueToPurchase = async () => {
-    // Ensure a valid Supabase session exists before initializing the ramp.
-    // Particle-only users may not have an active Supabase session yet — try to
-    // refresh or create an anonymous one rather than blocking with a misleading
-    // "Authentication Required" toast.
-    const ensured = await ensureSupabaseSession();
-    const activeSession = ensured.session ?? session;
-
-    console.info("[COINBASE-HEADLESS] continueToPurchase diagnostics", {
-      authUserId: activeSession?.user?.id ?? null,
-      walletAddress: address ? `${address.slice(0, 8)}...` : null,
-      supabaseSessionExists: !!activeSession,
-      supabaseAccessTokenExists: !!activeSession?.access_token,
-      particleSessionExists: !!isConnected,
-      selectedRamp: "coinbase_headless",
-      sessionSource: ensured.source,
-      pageUrl: typeof window !== "undefined" ? window.location.href : null,
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
-    });
-
-    if (!activeSession) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in with your email or Google account to buy USDC.",
-        variant: "destructive",
-        action: (
-          <ToastAction altText="Sign in" onClick={() => { window.location.href = "/auth"; }}>
-            Sign in
-          </ToastAction>
-        ),
-      });
+    if (!session) {
+      toast({ title: "Authentication Required", description: "Please sign in to use Coinbase onramp", variant: "destructive" });
       return;
     }
     if (!amount || parseFloat(amount) < MIN_AMOUNT) {
@@ -652,7 +622,7 @@ export function CoinbaseHeadlessOnramp({
     try {
       // partnerUserRef tied to the authenticated Supabase user + this attempt.
       // Format: u<userIdShort>_a<uuidNoDashes> (<= 49 chars for Coinbase).
-      const userIdShort = activeSession.user.id.replace(/-/g, "").slice(0, 8);
+      const userIdShort = session.user.id.replace(/-/g, "").slice(0, 8);
       const attemptShort = crypto.randomUUID().replace(/-/g, "");
       const attemptId = `u${userIdShort}_a${attemptShort}`;
       const source = resolveTransactionSource(transactionSource);
@@ -693,7 +663,7 @@ export function CoinbaseHeadlessOnramp({
       // Insert purchase attempt record
       try {
         await (supabase as any).from('purchase_attempts').insert({
-          user_id: activeSession.user.id,
+          user_id: session.user.id,
           wallet_address: destinationAddress,
           amount: parseFloat(amount),
           currency: 'USD',
