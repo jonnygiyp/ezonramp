@@ -9,6 +9,8 @@ import { useAccount, useModal } from '@/hooks/useParticle';
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp } from "@stripe/crypto";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
+import { logAuthDiagnostics, getDeviceContext } from "@/lib/authDiagnostics";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const LOG_PREFIX = "[StripeOnramp]";
 const log = (msg: string, ...args: unknown[]) => console.log(`${LOG_PREFIX} ${msg}`, ...args);
@@ -95,9 +97,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
 
     try {
       log("Auth state resolving...");
+      await logAuthDiagnostics('StripeOnramp.init', { walletConnected: isConnected, walletAddress: walletAddress?.slice(0, 10) });
       const accessToken = await getAccessToken();
       if (!accessToken) {
-        throw new Error("Unable to establish a session. Please refresh the page and try again.");
+        // Anonymous Supabase sign-ins are disabled — user must sign in via /auth.
+        const err = new Error("Please sign in to start your purchase.") as Error & { code?: string };
+        err.code = 'AUTH_REQUIRED';
+        throw err;
       }
       if (!mountedRef.current) { initLockRef.current = false; return; }
       log("Auth resolved");
