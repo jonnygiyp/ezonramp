@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,8 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 export default function AuthPage() {
   const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get('next');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,9 +23,13 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/admin');
+      // Honor ?next= so onramp flows return the user to where they came from.
+      const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+        ? nextParam
+        : '/admin';
+      navigate(safeNext);
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, nextParam]);
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};

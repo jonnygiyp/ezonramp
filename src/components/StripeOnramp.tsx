@@ -9,6 +9,8 @@ import { useAccount, useModal } from '@/hooks/useParticle';
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { loadStripeOnramp } from "@stripe/crypto";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
+import { logAuthDiagnostics, getDeviceContext } from "@/lib/authDiagnostics";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const LOG_PREFIX = "[StripeOnramp]";
 const log = (msg: string, ...args: unknown[]) => console.log(`${LOG_PREFIX} ${msg}`, ...args);
@@ -34,10 +36,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
   const { toast } = useToast();
   const { address, isConnected } = useAccount();
   const { setOpen } = useModal();
-  const { getAccessToken, isLoading: isSessionLoading } = useSupabaseSession();
+  const { getAccessToken, isLoading: isSessionLoading, hasSession } = useSupabaseSession();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
   const initLockRef = useRef(false);
@@ -95,9 +100,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
 
     try {
       log("Auth state resolving...");
+      await logAuthDiagnostics('StripeOnramp.init', { walletConnected: isConnected, walletAddress: walletAddress?.slice(0, 10) });
       const accessToken = await getAccessToken();
       if (!accessToken) {
-        throw new Error("Unable to establish a session. Please refresh the page and try again.");
+        // Anonymous Supabase sign-ins are disabled — user must sign in via /auth.
+        const err = new Error("Please sign in to start your purchase.") as Error & { code?: string };
+        err.code = 'AUTH_REQUIRED';
+        throw err;
       }
       if (!mountedRef.current) { initLockRef.current = false; return; }
       log("Auth resolved");
@@ -261,8 +270,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       setTimeout(() => clearInterval(pollInterval), WATCHDOG_TIMEOUT_MS + 1000);
 
     } catch (err) {
-      logError("Init error:", err);
+      const code = (err as { code?: string })?.code || null;
+      logError("Init error:", err, "code:", code, "device:", getDeviceContext());
       destroySession();
+      setErrorCode(code);
       setErrorMessage(err instanceof Error ? err.message : "Failed to start onramp session");
       setLoadState('error');
       initLockRef.current = false;
@@ -331,21 +342,33 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       {/* Error state */}
       {loadState === 'error' && (
         <div className="bg-card border border-destructive/30 rounded-xl p-8 flex flex-col items-center justify-center space-y-4 text-center">
-          <p className="text-sm font-semibold text-foreground">Unable to load Stripe onramp</p>
+          <p className="text-sm font-semibold text-foreground">
+            {errorCode === 'AUTH_REQUIRED' ? 'Sign in required' : 'Unable to load Stripe onramp'}
+          </p>
           <p className="text-sm text-destructive font-medium">
             {errorMessage || "Please try again."}
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRetry}
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Retry
-          </Button>
+          {errorCode === 'AUTH_REQUIRED' ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                const next = encodeURIComponent(location.pathname + location.search + location.hash);
+                navigate(`/auth?next=${next}`);
+              }}
+              className="gap-2"
+            >
+              <LogIn className="h-4 w-4" />
+              Sign In
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={handleRetry} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+          )}
         </div>
       )}
+
 
       {/* Stripe container - visible during mounted and ready states */}
       {(loadState === 'mounted' || loadState === 'ready') && (

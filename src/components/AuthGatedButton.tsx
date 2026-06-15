@@ -1,60 +1,62 @@
-import { forwardRef, useState, useCallback, ComponentPropsWithoutRef } from 'react';
+import { forwardRef, useCallback, ComponentPropsWithoutRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import { useAccount, useModal } from '@/hooks/useParticle';
 import { usePendingOnrampAction } from '@/hooks/usePendingOnrampAction';
+import { logAuthDiagnostics } from '@/lib/authDiagnostics';
 
 interface AuthGatedButtonProps extends ComponentPropsWithoutRef<typeof Button> {
   onClick?: () => void;
 }
 
 /**
- * A Button wrapper that gates click actions behind Particle authentication.
- * If user is not authenticated, opens Particle auth modal directly (no intermediate modal).
- * After successful auth, the original click action is automatically executed.
+ * Button wrapper that ensures BOTH a Supabase session and a connected Particle
+ * wallet exist before invoking onClick.
+ *
+ * - Missing Supabase session → route to /auth (anonymous sign-ins are disabled).
+ * - Missing wallet only → open Particle modal and replay onClick post-connect.
  */
 export const AuthGatedButton = forwardRef<HTMLButtonElement, AuthGatedButtonProps>(
   ({ onClick, children, disabled, ...props }, ref) => {
+    const { session, loading: authLoading } = useAuth();
     const { isConnected } = useAccount();
     const { setOpen } = useModal();
     const { setPendingAction } = usePendingOnrampAction();
-    const [authError, setAuthError] = useState<string | null>(null);
+    const navigate = useNavigate();
+    const location = useLocation();
 
-    const handleClick = useCallback(() => {
-      // Clear any previous error
-      setAuthError(null);
+    const handleClick = useCallback(async () => {
+      await logAuthDiagnostics('AuthGatedButton.click', {
+        authLoading,
+        hasSupabaseSession: !!session,
+        walletConnected: isConnected,
+      });
 
-      // If already authenticated, just run the action
-      if (isConnected) {
+      // Both prerequisites satisfied — run the action.
+      if (session && isConnected) {
         onClick?.();
         return;
       }
 
-      // Not authenticated - store pending action and open Particle auth directly
-      try {
-        if (onClick) {
-          setPendingAction(onClick);
-        }
-        setOpen(true);
-      } catch (err) {
-        console.error('[AuthGatedButton] Failed to open Particle auth:', err);
-        setAuthError('You must be signed in to make a purchase.');
+      // No Supabase session → must sign in via Supabase (email/Google),
+      // anonymous sign-ins are disabled at the project level.
+      if (!session) {
+        const next = encodeURIComponent(location.pathname + location.search + location.hash);
+        navigate(`/auth?next=${next}`);
+        return;
       }
-    }, [isConnected, onClick, setOpen, setPendingAction]);
+
+      // Has Supabase session but no wallet → open Particle modal,
+      // queue onClick for after connect.
+      if (onClick) setPendingAction(onClick);
+      setOpen(true);
+    }, [session, authLoading, isConnected, onClick, navigate, location, setOpen, setPendingAction]);
 
     return (
-      <>
-        <Button
-          ref={ref}
-          onClick={handleClick}
-          disabled={disabled}
-          {...props}
-        >
-          {children}
-        </Button>
-        {authError && (
-          <p className="text-sm text-destructive mt-2">{authError}</p>
-        )}
-      </>
+      <Button ref={ref} onClick={handleClick} disabled={disabled} {...props}>
+        {children}
+      </Button>
     );
   }
 );

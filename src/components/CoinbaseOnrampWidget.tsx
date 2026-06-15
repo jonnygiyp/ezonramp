@@ -287,14 +287,24 @@ export function CoinbaseOnrampWidget({
 
   // Handle the buy action - get session token and open URL with partnerUserId tracking
   const handleBuy = useCallback(async () => {
+    // Diagnostic log captures device, session, token state for every attempt.
+    const { logAuthDiagnostics } = await import("@/lib/authDiagnostics");
+    await logAuthDiagnostics('CoinbaseGlobal.handleBuy', {
+      walletConnected: isConnected,
+      destinationAddress: destinationAddress?.slice(0, 10),
+    });
+
     if (!session) {
+      const next = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to use Coinbase onramp",
+        title: "Sign in required",
+        description: "Please sign in to use Coinbase onramp.",
         variant: "destructive",
       });
+      window.location.assign(`/auth?next=${next}`);
       return;
     }
+
 
     if (!destinationAddress) {
       toast({
