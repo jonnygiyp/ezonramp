@@ -605,8 +605,34 @@ export function CoinbaseHeadlessOnramp({
 
   // --- Continue to Purchase: generate buy URL and open popup ---
   const continueToPurchase = async () => {
-    if (!session) {
-      toast({ title: "Authentication Required", description: "Please sign in to use Coinbase onramp", variant: "destructive" });
+    // Ensure a valid Supabase session exists before initializing the ramp.
+    // Particle-only users may not have an active Supabase session yet — try to
+    // refresh or create an anonymous one rather than blocking with a misleading
+    // "Authentication Required" toast.
+    const ensured = await ensureSupabaseSession();
+    const activeSession = ensured.session ?? session;
+
+    console.info("[COINBASE-HEADLESS] continueToPurchase diagnostics", {
+      authUserId: activeSession?.user?.id ?? null,
+      walletAddress: address ? `${address.slice(0, 8)}...` : null,
+      supabaseSessionExists: !!activeSession,
+      supabaseAccessTokenExists: !!activeSession?.access_token,
+      particleSessionExists: !!isConnected,
+      selectedRamp: "coinbase_headless",
+      sessionSource: ensured.source,
+      pageUrl: typeof window !== "undefined" ? window.location.href : null,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    });
+
+    if (!activeSession) {
+      const expired = ensured.error?.toLowerCase().includes("expired") || ensured.source === "none";
+      toast({
+        title: expired ? "Session Expired" : "Authentication Required",
+        description: expired
+          ? "Your login session expired. Please log out and sign back in."
+          : "Please sign in to use Coinbase onramp",
+        variant: "destructive",
+      });
       return;
     }
     if (!amount || parseFloat(amount) < MIN_AMOUNT) {
@@ -623,7 +649,7 @@ export function CoinbaseHeadlessOnramp({
     try {
       // partnerUserRef tied to the authenticated Supabase user + this attempt.
       // Format: u<userIdShort>_a<uuidNoDashes> (<= 49 chars for Coinbase).
-      const userIdShort = session.user.id.replace(/-/g, "").slice(0, 8);
+      const userIdShort = activeSession.user.id.replace(/-/g, "").slice(0, 8);
       const attemptShort = crypto.randomUUID().replace(/-/g, "");
       const attemptId = `u${userIdShort}_a${attemptShort}`;
       const source = resolveTransactionSource(transactionSource);
