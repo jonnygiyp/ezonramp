@@ -194,21 +194,44 @@ serve(async (req: Request) => {
   const userId = linkRes.data.user.id;
   const tokenHash = linkRes.data.properties.hashed_token;
 
-  // 4. Sync profile (particle_uuid + verified wallet).
-  const profileUpdate: Record<string, unknown> = {
+  // 4. Sync profile in two safe steps so a wallet-collision cannot block particle_uuid binding.
+  // 4a. Always upsert particle_uuid (uniqueness on particle_uuid is partial; user_id is PK).
+  const baseUpsert: Record<string, unknown> = {
     id: userId,
     particle_uuid: particleUuid,
     updated_at: new Date().toISOString(),
   };
-  if (walletAddress && walletCheck.ok) {
-    profileUpdate.wallet_address = walletAddress;
-    profileUpdate.wallet_network = walletCheck.network || (/^0x/.test(walletAddress) ? "ethereum" : "solana");
+  const { error: baseErr } = await admin.from("profiles").upsert(baseUpsert, { onConflict: "id" });
+  if (baseErr) {
+    // Do not include raw message details that may echo user data.
+    console.warn("[particle-session] profile uuid sync warn code=", (baseErr as { code?: string }).code || "unknown");
   }
-  const { error: profileError } = await admin
-    .from("profiles")
-    .upsert(profileUpdate, { onConflict: "id" });
-  if (profileError) {
-    console.warn("[particle-session] profile upsert warn:", profileError.message);
+
+  // 4b. Conditionally bind wallet — only if Particle vouches for it AND no other profile owns it.
+  let walletBound = false;
+  if (walletAddress && walletCheck.ok) {
+    const { data: owner } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("wallet_address", walletAddress)
+      .maybeSingle();
+    if (!owner || owner.id === userId) {
+      const { error: walletErr } = await admin
+        .from("profiles")
+        .update({
+          wallet_address: walletAddress,
+          wallet_network: walletCheck.network || (/^0x/.test(walletAddress) ? "ethereum" : "solana"),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+      if (walletErr) {
+        console.warn("[particle-session] wallet bind warn code=", (walletErr as { code?: string }).code || "unknown");
+      } else {
+        walletBound = true;
+      }
+    } else {
+      console.warn("[particle-session] wallet already bound to a different user — skipping");
+    }
   }
 
   // 5. Exchange token_hash for a real session using the anon client.
