@@ -12,7 +12,9 @@ export {
   useModal,
   useDisconnect,
   useWallets,
+  useParticleAuth,
 } from '@particle-network/connectkit';
+
 
 // Wallet type definition for useWallets
 export interface ParticleWallet {

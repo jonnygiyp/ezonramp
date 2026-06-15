@@ -103,11 +103,12 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       await logAuthDiagnostics('StripeOnramp.init', { walletConnected: isConnected, walletAddress: walletAddress?.slice(0, 10) });
       const accessToken = await getAccessToken();
       if (!accessToken) {
-        // Anonymous Supabase sign-ins are disabled — user must sign in via /auth.
-        const err = new Error("Please sign in to start your purchase.") as Error & { code?: string };
+        // Particle → Supabase token exchange did not produce a session.
+        const err = new Error("We could not verify your wallet session. Please reconnect your wallet.") as Error & { code?: string };
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
+
       if (!mountedRef.current) { initLockRef.current = false; return; }
       log("Auth resolved");
 
@@ -343,7 +344,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       {loadState === 'error' && (
         <div className="bg-card border border-destructive/30 rounded-xl p-8 flex flex-col items-center justify-center space-y-4 text-center">
           <p className="text-sm font-semibold text-foreground">
-            {errorCode === 'AUTH_REQUIRED' ? 'Sign in required' : 'Unable to load Stripe onramp'}
+            {errorCode === 'AUTH_REQUIRED' ? 'Wallet session expired' : 'Unable to load Stripe onramp'}
           </p>
           <p className="text-sm text-destructive font-medium">
             {errorMessage || "Please try again."}
@@ -351,14 +352,11 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           {errorCode === 'AUTH_REQUIRED' ? (
             <Button
               size="sm"
-              onClick={() => {
-                const next = encodeURIComponent(location.pathname + location.search + location.hash);
-                navigate(`/auth?next=${next}`);
-              }}
+              onClick={() => setOpen(true)}
               className="gap-2"
             >
-              <LogIn className="h-4 w-4" />
-              Sign In
+              <Wallet className="h-4 w-4" />
+              Reconnect Wallet
             </Button>
           ) : (
             <Button variant="outline" size="sm" onClick={handleRetry} className="gap-2">
@@ -368,6 +366,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           )}
         </div>
       )}
+
 
 
       {/* Stripe container - visible during mounted and ready states */}

@@ -295,15 +295,15 @@ export function CoinbaseOnrampWidget({
     });
 
     if (!session) {
-      const next = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
       toast({
-        title: "Sign in required",
-        description: "Please sign in to use Coinbase onramp.",
+        title: "Wallet session expired",
+        description: "We could not verify your wallet session. Please reconnect your wallet.",
         variant: "destructive",
       });
-      window.location.assign(`/auth?next=${next}`);
+      setOpen(true);
       return;
     }
+
 
 
     if (!destinationAddress) {
