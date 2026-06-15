@@ -24,12 +24,13 @@ export interface EnsureSessionResult {
 export async function ensureSupabaseSession(opts?: {
   allowAnonymous?: boolean;
 }): Promise<EnsureSessionResult> {
-  const allowAnonymous = opts?.allowAnonymous ?? true;
+  // Anonymous sign-ins are disabled at the auth provider level. Both ramps
+  // now require a real Supabase login (email/password or OAuth).
+  const allowAnonymous = opts?.allowAnonymous ?? false;
 
   try {
     const { data: getData } = await supabase.auth.getSession();
     if (getData.session) {
-      // Check if expired or near-expiry (<60s) — refresh proactively
       const exp = getData.session.expires_at ?? 0;
       const nowSec = Math.floor(Date.now() / 1000);
       if (exp && exp - nowSec < 60) {
@@ -42,14 +43,13 @@ export async function ensureSupabaseSession(opts?: {
       return { session: getData.session, source: "existing" };
     }
 
-    // Try a refresh in case getSession returned null due to stale storage
     const { data: refreshed } = await supabase.auth.refreshSession();
     if (refreshed.session) {
       return { session: refreshed.session, source: "refreshed" };
     }
 
     if (!allowAnonymous) {
-      return { session: null, source: "none", error: "No session and anonymous disabled" };
+      return { session: null, source: "none", error: "Sign-in required" };
     }
 
     const { data: anon, error: anonErr } = await supabase.auth.signInAnonymously();
