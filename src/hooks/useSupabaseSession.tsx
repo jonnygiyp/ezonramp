@@ -4,75 +4,31 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAccount } from '@/hooks/useParticle';
 
 /**
- * Unified hook that ensures a Supabase session exists when a Particle wallet is connected.
- * If no session exists and wallet is connected, automatically creates an anonymous session.
- * This enables Stripe Onramp and other authenticated features without requiring email/password.
+ * Tracks the current Supabase auth session and (when also wallet-connected)
+ * idempotently links the connected wallet to the user's profile.
+ *
+ * IMPORTANT: Anonymous Supabase sign-ins are DISABLED for this project.
+ * This hook will NEVER attempt to create a session implicitly — callers must
+ * ensure the user signs in via the /auth page (email/password or future OAuth)
+ * BEFORE invoking onramp providers. If `hasSession` is false, the caller
+ * should prompt the user to sign in instead of proceeding.
  */
 export function useSupabaseSession() {
   const { address, isConnected } = useAccount();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const hasAttemptedAnonSignIn = useRef(false);
   const lastSyncedWallet = useRef<string | null>(null);
 
-  // Ensure Supabase session exists - create anonymous if needed
-  const ensureSession = useCallback(async (): Promise<Session | null> => {
-    try {
-      // First check for existing session
-      const { data: { session: existingSession }, error: getError } = await supabase.auth.getSession();
-      
-      if (getError) {
-        console.error('[SupabaseSession] Error getting session:', getError);
-        throw getError;
-      }
-
-      if (existingSession) {
-        console.log('[SupabaseSession] Existing session found for user:', existingSession.user.id.slice(0, 8));
-        return existingSession;
-      }
-
-      // No session exists - create anonymous session if wallet is connected
-      if (isConnected && address && !hasAttemptedAnonSignIn.current) {
-        hasAttemptedAnonSignIn.current = true;
-        console.log('[SupabaseSession] No session, creating anonymous session for wallet:', address.slice(0, 10));
-        
-        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
-        
-        if (anonError) {
-          console.error('[SupabaseSession] Anonymous sign-in failed:', anonError);
-          throw anonError;
-        }
-
-        if (anonData.session) {
-          console.log('[SupabaseSession] Anonymous session created for user:', anonData.session.user.id.slice(0, 8));
-          return anonData.session;
-        }
-      }
-
-      return null;
-    } catch (err) {
-      console.error('[SupabaseSession] ensureSession error:', err);
-      throw err;
-    }
-  }, [isConnected, address]);
-
-  // Sync wallet address to user metadata (for auditing, non-blocking, idempotent)
-  // Runs at most once per session - checks DB first to avoid conflicts
+  // Sync wallet → profile (idempotent, non-blocking).
   const syncWalletToUser = useCallback(async (currentSession: Session, walletAddress: string) => {
-    // Skip if already attempted for this wallet (success or conflict)
-    if (lastSyncedWallet.current === walletAddress) {
-      return;
-    }
-
-    // Mark as attempted immediately to prevent concurrent/repeated calls
+    if (lastSyncedWallet.current === walletAddress) return;
     lastSyncedWallet.current = walletAddress;
 
     try {
       const isEvmAddress = /^0x[a-fA-F0-9]{40}$/.test(walletAddress);
       const walletNetwork = isEvmAddress ? 'ethereum' : 'solana';
 
-      // Step 1: Check if this wallet is already linked to ANY user (including current user)
       const { data: existingProfile, error: queryError } = await supabase
         .from('profiles')
         .select('id, wallet_address')
@@ -80,25 +36,15 @@ export function useSupabaseSession() {
         .maybeSingle();
 
       if (queryError) {
-        // Query failed - log and exit gracefully (non-blocking)
         console.warn('[SupabaseSession] Could not check wallet ownership:', queryError.message);
         return;
       }
 
-      // Step 2: If wallet is already linked to current user, we're done
-      if (existingProfile?.id === currentSession.user.id) {
-        console.log('[SupabaseSession] Wallet already linked to current user');
-        return;
-      }
-
-      // Step 3: If wallet is linked to a DIFFERENT user, skip silently
+      if (existingProfile?.id === currentSession.user.id) return;
       if (existingProfile && existingProfile.id !== currentSession.user.id) {
-        console.log('[SupabaseSession] Wallet linked to different user - skipping PATCH');
+        console.log('[SupabaseSession] Wallet linked to different user — skipping PATCH');
         return;
       }
-
-      // Step 4: Wallet is not linked anywhere - safe to update current user's profile
-      console.log('[SupabaseSession] Linking wallet to profile:', walletAddress.slice(0, 10));
 
       const { error: updateError } = await supabase
         .from('profiles')
@@ -109,93 +55,53 @@ export function useSupabaseSession() {
         })
         .eq('id', currentSession.user.id);
 
-      if (updateError) {
-        // Handle race condition: another request may have linked this wallet - skip silently
-        if (updateError.code === '23505' || updateError.message?.includes('duplicate')) {
-          console.log('[SupabaseSession] Wallet linked by another user (race condition) - expected');
-          return;
-        }
-        
-        // Other errors - log quietly
+      if (updateError && updateError.code !== '23505') {
         console.warn('[SupabaseSession] Profile update failed:', updateError.message);
-      } else {
-        console.log('[SupabaseSession] Wallet linked successfully');
       }
     } catch (err) {
-      // Catch-all for unexpected errors - never block onramp flows
       console.warn('[SupabaseSession] Wallet sync error (non-blocking):', err);
     }
   }, []);
 
-  // Initialize session on mount and listen for changes
+  // Listen for auth changes + read current session on mount.
   useEffect(() => {
     let isMounted = true;
 
-    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!isMounted) return;
-      
-      console.log('[SupabaseSession] Auth state changed:', event, newSession?.user?.id?.slice(0, 8) || 'no user');
+      console.log('[SupabaseSession] Auth event:', event, 'user:', newSession?.user?.id?.slice(0, 8) || 'none');
       setSession(newSession);
-      
-      // Sync wallet on sign in
       if (newSession && address && isConnected) {
-        setTimeout(() => {
-          syncWalletToUser(newSession, address);
-        }, 0);
+        setTimeout(() => syncWalletToUser(newSession, address), 0);
       }
     });
 
-    // Initial session check
-    const initSession = async () => {
+    (async () => {
       try {
-        const currentSession = await ensureSession();
-        if (isMounted) {
-          setSession(currentSession);
-          
-          // Sync wallet if we have both session and wallet
-          if (currentSession && address && isConnected) {
-            await syncWalletToUser(currentSession, address);
-          }
+        const { data: { session: existing }, error: getErr } = await supabase.auth.getSession();
+        if (getErr) throw getErr;
+        if (!isMounted) return;
+        setSession(existing);
+        if (existing && address && isConnected) {
+          await syncWalletToUser(existing, address);
         }
       } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-        }
+        if (isMounted) setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
-    };
-
-    initSession();
+    })();
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [ensureSession, syncWalletToUser, address, isConnected]);
+  }, [syncWalletToUser, address, isConnected]);
 
-  // Re-trigger session creation when wallet connects
-  useEffect(() => {
-    if (isConnected && address && !session && !isLoading) {
-      hasAttemptedAnonSignIn.current = false; // Reset to allow retry
-      ensureSession().then(newSession => {
-        if (newSession) {
-          setSession(newSession);
-          syncWalletToUser(newSession, address);
-        }
-      }).catch(err => {
-        console.error('[SupabaseSession] Session creation on wallet connect failed:', err);
-      });
-    }
-  }, [isConnected, address, session, isLoading, ensureSession, syncWalletToUser]);
-
-  // Get fresh access token for API calls
+  // Get a fresh access token; null if no session exists.
   const getAccessToken = useCallback(async (): Promise<string | null> => {
-    const { data: { session: freshSession } } = await supabase.auth.getSession();
-    return freshSession?.access_token || null;
+    const { data: { session: fresh } } = await supabase.auth.getSession();
+    return fresh?.access_token || null;
   }, []);
 
   return {
