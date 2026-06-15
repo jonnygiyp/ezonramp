@@ -270,8 +270,10 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       setTimeout(() => clearInterval(pollInterval), WATCHDOG_TIMEOUT_MS + 1000);
 
     } catch (err) {
-      logError("Init error:", err);
+      const code = (err as { code?: string })?.code || null;
+      logError("Init error:", err, "code:", code, "device:", getDeviceContext());
       destroySession();
+      setErrorCode(code);
       setErrorMessage(err instanceof Error ? err.message : "Failed to start onramp session");
       setLoadState('error');
       initLockRef.current = false;
