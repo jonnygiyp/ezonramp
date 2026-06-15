@@ -22,6 +22,7 @@ import {
   coinbaseStatusToLifecycle,
 } from "@/lib/coinbaseLifecycle";
 import { cbDiag } from "@/lib/coinbaseDiagnostics";
+import { ensureSupabaseSession } from "@/lib/ensureSession";
 
 const emailSchema = z.string().trim().email("Invalid email address").max(255);
 const phoneSchema = z.string().trim().regex(/^\d{10}$/, "Enter your 10-digit US phone number");
