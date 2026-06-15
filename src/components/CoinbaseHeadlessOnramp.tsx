@@ -690,7 +690,7 @@ export function CoinbaseHeadlessOnramp({
       // Insert purchase attempt record
       try {
         await (supabase as any).from('purchase_attempts').insert({
-          user_id: session.user.id,
+          user_id: activeSession.user.id,
           wallet_address: destinationAddress,
           amount: parseFloat(amount),
           currency: 'USD',
