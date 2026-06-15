@@ -103,11 +103,12 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       await logAuthDiagnostics('StripeOnramp.init', { walletConnected: isConnected, walletAddress: walletAddress?.slice(0, 10) });
       const accessToken = await getAccessToken();
       if (!accessToken) {
-        // Anonymous Supabase sign-ins are disabled — user must sign in via /auth.
-        const err = new Error("Please sign in to start your purchase.") as Error & { code?: string };
+        // Particle → Supabase token exchange did not produce a session.
+        const err = new Error("We could not verify your wallet session. Please reconnect your wallet.") as Error & { code?: string };
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
+
       if (!mountedRef.current) { initLockRef.current = false; return; }
       log("Auth resolved");
 
