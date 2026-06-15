@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Loader2, ExternalLink, LogIn, Check, X, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "./ui/toast";
 import { useAccount, useModal } from "@/hooks/useParticle";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
