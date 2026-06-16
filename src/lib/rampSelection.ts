@@ -24,7 +24,7 @@ export interface RampSelectionInput {
   available: RampName[];
 }
 
-const PREFERRED_US_ORDER: RampName[] = ["coinbase", "coinbase_global", "stripe"];
+const PREFERRED_US_ORDER: RampName[] = ["stripe", "coinbase", "coinbase_global"];
 const PREFERRED_NON_US_ORDER: RampName[] = ["coinbase_global", "coinbase", "stripe"];
 const PREFERRED_UNKNOWN_ORDER: RampName[] = ["stripe", "coinbase_global", "coinbase"];
 
