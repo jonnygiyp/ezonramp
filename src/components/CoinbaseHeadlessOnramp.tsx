@@ -12,6 +12,8 @@ import { z } from "zod";
 import { AuthGatedButton } from "./AuthGatedButton";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
 import { CoinbaseLifecycleBanner } from "./coinbase/CoinbaseLifecycleBanner";
+import { ConnectedWalletCard } from "./ConnectedWalletCard";
+import { TrustIndicators } from "./TrustIndicators";
 import {
   type CoinbaseLifecycleState,
   type CoinbaseFailureCode,
@@ -1129,7 +1131,7 @@ export function CoinbaseHeadlessOnramp({
                   </Button>
                 </p>
               )}
-              <h2 className="text-base font-semibold text-muted-foreground">How much do you want to buy?</h2>
+              
             </div>
 
             {/* Amount input */}
@@ -1229,13 +1231,17 @@ export function CoinbaseHeadlessOnramp({
               )}
             </div>
 
-            {/* Destination preview */}
+            {/* Compact connected-wallet destination ("Receive USDC At") */}
             {destinationAddress && isValidDestinationAddress && (
-              <div className="p-3 bg-muted/30 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Destination</p>
-                <p className="font-mono text-sm truncate">{destinationAddress}</p>
-              </div>
+              <ConnectedWalletCard
+                address={destinationAddress}
+                label="Receive USDC At"
+                onChange={connectedAddressValid ? () => setOpen(true) : undefined}
+              />
             )}
+
+            {/* Trust indicators sit just above the conversion CTA */}
+            <TrustIndicators />
 
             {/* CTA */}
             <div className="flex gap-2">
@@ -1259,7 +1265,7 @@ export function CoinbaseHeadlessOnramp({
                 {isLoadingBuy ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing...</>
                 ) : (
-                  <>Continue<ArrowRight className="ml-2 h-4 w-4" /></>
+                  <>Continue to Coinbase<ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
               </AuthGatedButton>
             </div>

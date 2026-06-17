@@ -206,34 +206,66 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
     );
   }
 
+  // Outcome-first tab labels: primary line says what the user gets,
+  // secondary line names the underlying provider.
+  const tabLabelOverrides: Record<string, { primary: string; secondary: string }> = {
+    stripe: { primary: 'US Debit', secondary: 'Stripe' },
+    coinbase: { primary: 'US Coinbase', secondary: 'Coinbase' },
+    coinbase_global: { primary: 'Worldwide', secondary: 'Coinbase' },
+  };
+
+  // Subtle, region-aware recommendation line beneath the tabs.
+  const recommendationLabel = (() => {
+    if (!geo?.country_code || !activeTab) return null;
+    const override = tabLabelOverrides[activeTab];
+    if (!override) return null;
+    return `Recommended for your location: ${override.primary} (${override.secondary})`;
+  })();
+
   return (
-    <div className="w-full min-h-[600px] flex flex-col items-center justify-start px-6 pt-4">
+    <div className="w-full min-h-[600px] flex flex-col items-center justify-start px-4 md:px-6 pt-3 md:pt-4">
       {/* Tab Switcher - only show if multiple providers */}
       {providers.length > 1 && (
         <>
-          <div className="flex items-center justify-center mb-2">
-            <div className="flex flex-wrap justify-center gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
+          <div className="flex items-center justify-center mb-2 w-full">
+            <div className="flex flex-wrap justify-center gap-1 md:gap-2 bg-muted rounded-2xl md:rounded-full p-1 max-w-full" data-tutorial="provider-tabs">
               {providers.map((provider) => {
                 const Icon = getTabIcon(provider.name);
+                const override = tabLabelOverrides[provider.name];
+                const primaryLabel = override?.primary ?? provider.display_name;
+                const secondaryLabel = override?.secondary;
+                const active = activeTab === provider.name;
                 return (
                   <button
                     key={provider.id}
                     onClick={() => handleTabChange(provider.name)}
-                    className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-full transition-all ${
-                      activeTab === provider.name 
-                        ? 'bg-primary text-primary-foreground' 
+                    className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 rounded-xl md:rounded-full transition-all min-h-[40px] ${
+                      active
+                        ? 'bg-primary text-primary-foreground'
                         : 'hover:bg-muted-foreground/10'
                     }`}
                   >
                     <Icon className="hidden md:block h-4 w-4" />
-                    <span className="font-medium text-xs md:text-base">{provider.display_name}</span>
+                    <span className="flex flex-col items-start leading-tight text-left">
+                      <span className="font-semibold text-[11px] md:text-sm">{primaryLabel}</span>
+                      {secondaryLabel && (
+                        <span className={`text-[9px] md:text-[10px] ${active ? 'opacity-80' : 'text-muted-foreground'}`}>
+                          {secondaryLabel}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground text-center mb-4">
-            Debit card payments are 80% more likely to succeed.
+          {recommendationLabel && (
+            <p className="text-[11px] text-muted-foreground text-center mb-1">
+              {recommendationLabel}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground text-center mb-3">
+            For best results, use a debit card.
           </p>
         </>
       )}
