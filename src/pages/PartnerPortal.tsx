@@ -31,6 +31,12 @@ const getTabIcon = (name: string) => {
   }
 };
 
+const TAB_DISPLAY_NAMES: Record<string, string> = {
+  coinbase: 'Coinbase',
+  coinbase_global: 'Worldwide',
+  stripe: 'Stripe',
+};
+
 const PartnerPortal = () => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
   const { data: geo, isLoading: geoLoading } = useGeoLocation();
@@ -145,20 +151,21 @@ const PartnerPortal = () => {
               <>
                 <div className="flex justify-center mb-2" data-pp-tut="tabs">
                   <div className="pp-tab-bar">
-                    {supportedProviders.map((provider) => {
-                      const Icon = getTabIcon(provider.name);
-                      const isActive = activeTab === provider.name;
-                      return (
-                        <button
-                          key={provider.id}
-                          onClick={() => handleTabChange(provider.name)}
-                          className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
-                        >
-                          <Icon className="h-4 w-4 hidden md:block" />
-                          <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
-                        </button>
-                      );
-                    })}
+                {supportedProviders.map((provider) => {
+                  const Icon = getTabIcon(provider.name);
+                  const isActive = activeTab === provider.name;
+                  const tabLabel = TAB_DISPLAY_NAMES[provider.name] ?? provider.display_name;
+                  return (
+                    <button
+                      key={provider.id}
+                      onClick={() => handleTabChange(provider.name)}
+                      className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
+                    >
+                      <Icon className="h-4 w-4 hidden md:block" />
+                      <span className="text-xs md:text-sm font-medium">{tabLabel}</span>
+                    </button>
+                  );
+                })}
                   </div>
                 </div>
               </>
@@ -166,18 +173,27 @@ const PartnerPortal = () => {
 
             {/* Onramp card */}
             <div className="pp-card" data-pp-tut="widget">
-              {/* Debit success tip */}
-              <div
-                className="pp-provider-label pp-text-primary font-semibold"
-                data-pp-tut="debit-tip"
-              >
-                Debit is more likely to succeed when purchasing
-              </div>
-
-              {/* Provider label */}
-              <div className="pp-provider-label">
-                Powered by{' '}
-                {activeTab === 'stripe' ? 'Stripe' : activeTab === 'coinbase' ? 'Coinbase' : activeTab === 'coinbase_global' ? 'Coinbase' : '—'}
+              {/* Provider header — label, subtitle, and debit tip sit tightly above the widget */}
+              <div className="text-center space-y-1 mb-2">
+                <p className="pp-provider-label !mb-0">
+                  Powered by{' '}
+                  {activeTab === 'stripe' ? 'Stripe' : activeTab === 'coinbase' ? 'Coinbase' : activeTab === 'coinbase_global' ? 'Coinbase' : '—'}
+                </p>
+                {activeTab === 'coinbase' && (
+                  <>
+                    <p className="text-sm font-medium pp-text-white">Buy USDC with debit or Apple Pay</p>
+                    <p className="text-xs pp-text-secondary">Up to $500 per week - no Coinbase account required.</p>
+                  </>
+                )}
+                {activeTab === 'coinbase_global' && (
+                  <p className="text-xs pp-text-secondary">Buy USDC worldwide with credit card. Coinbase account required.</p>
+                )}
+                {activeTab === 'stripe' && (
+                  <p className="text-xs pp-text-secondary">US residents with a Stripe account can buy instantly.</p>
+                )}
+                <p className="text-xs pp-text-primary font-semibold" data-pp-tut="debit-tip">
+                  Debit card payments are 80% more likely to succeed.
+                </p>
               </div>
 
               {/* Widget content */}
@@ -186,7 +202,7 @@ const PartnerPortal = () => {
                   <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" presetAmounts={['5', '10', '20', '50']} defaultAmount="0" hideHeader transactionSource="express" />
                 )}
                 {activeTab === 'coinbase_global' && (
-                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Requires Coinbase account. May require KYC." defaultAmount="0" hideHeader checkoutDescription="A new page will open to complete purchase." transactionSource="express" />
+                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Buy USDC worldwide with credit card. Coinbase account required." defaultAmount="0" hideHeader checkoutDescription="A new page will open to complete purchase." transactionSource="express" />
                 )}
                 {activeTab === 'stripe' && (
                   <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" theme="dark" hideHeader transactionSource="express" />
