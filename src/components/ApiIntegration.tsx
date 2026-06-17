@@ -36,11 +36,18 @@ const CARD2CRYPTO_PROVIDERS = [
   { id: 'transak', name: 'Transak', minAmount: 15 },
   { id: 'banxa', name: 'Banxa', minAmount: 20 },
   { id: 'rampnetwork', name: 'Ramp Network', minAmount: 4 },
-  { id: 'stripe', name: 'Stripe (USA)', minAmount: 2 },
+  { id: 'stripe', name: 'Stripe', minAmount: 2 },
   { id: 'mercuryo', name: 'Mercuryo', minAmount: 30 },
   { id: 'simplex', name: 'Simplex', minAmount: 50 },
   { id: 'revolut', name: 'Revolut', minAmount: 15 },
 ];
+
+const TAB_DISPLAY_NAMES: Record<string, string> = {
+  coinbase: 'Recommended',
+  coinbase_global: 'Worldwide',
+  stripe: 'Stripe',
+};
+
 
 
 const getTabIcon = (name: string) => {
