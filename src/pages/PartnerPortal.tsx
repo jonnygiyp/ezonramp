@@ -151,20 +151,21 @@ const PartnerPortal = () => {
               <>
                 <div className="flex justify-center mb-2" data-pp-tut="tabs">
                   <div className="pp-tab-bar">
-                    {supportedProviders.map((provider) => {
-                      const Icon = getTabIcon(provider.name);
-                      const isActive = activeTab === provider.name;
-                      return (
-                        <button
-                          key={provider.id}
-                          onClick={() => handleTabChange(provider.name)}
-                          className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
-                        >
-                          <Icon className="h-4 w-4 hidden md:block" />
-                          <span className="text-xs md:text-sm font-medium">{provider.display_name}</span>
-                        </button>
-                      );
-                    })}
+                {supportedProviders.map((provider) => {
+                  const Icon = getTabIcon(provider.name);
+                  const isActive = activeTab === provider.name;
+                  const tabLabel = TAB_DISPLAY_NAMES[provider.name] ?? provider.display_name;
+                  return (
+                    <button
+                      key={provider.id}
+                      onClick={() => handleTabChange(provider.name)}
+                      className={`pp-tab ${isActive ? 'pp-tab-active' : 'pp-tab-inactive'}`}
+                    >
+                      <Icon className="h-4 w-4 hidden md:block" />
+                      <span className="text-xs md:text-sm font-medium">{tabLabel}</span>
+                    </button>
+                  );
+                })}
                   </div>
                 </div>
               </>
