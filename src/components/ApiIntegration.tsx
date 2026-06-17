@@ -232,6 +232,9 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
               })}
             </div>
           </div>
+          <p className="text-xs text-muted-foreground text-center mb-4">
+            Debit card payments are 80% more likely to succeed.
+          </p>
         </>
       )}
 

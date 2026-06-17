@@ -489,11 +489,11 @@ export function CoinbaseOnrampWidget({
     <div className="space-y-8 animate-fade-in">
       {!hideHeader && (
       <div className="text-center space-y-2">
+        <h1 className="text-lg md:text-2xl font-bold tracking-tight">
+          Buy USDC with Coinbase
+        </h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          {subtitle ?? "Coinbase account required for non-US users."}
-        </p>
-        <p className="text-xs md:text-sm text-muted-foreground">
-          Debit card payments are 80% more likely to succeed.
+          {subtitle ?? "International users can buy USDC with credit card, debit card, or bank transfer through Coinbase. May require KYC."}
         </p>
       </div>
       )}
