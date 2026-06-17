@@ -369,7 +369,20 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
 
 
 
-      {/* Stripe container - visible during mounted and ready states */}
+      {/* Compact connected-wallet display — reduced visual weight, copy + reveal still available */}
+      {connectedAddressValid && (
+        <ConnectedWalletCard
+          address={walletAddress}
+          label="Receive USDC At"
+          onChange={() => setOpen(true)}
+        />
+      )}
+
+      {/* Trust messaging placed immediately above the conversion area for visibility */}
+      <TrustIndicators className="px-1" />
+
+      {/* Stripe container — page scrolls, not the iframe.
+          overflow-visible + auto height prevents a second scrollbar inside the widget. */}
       {(loadState === 'mounted' || loadState === 'ready') && (
         <div className="relative" data-tutorial="stripe-checkout">
           {loadState === 'mounted' && (
@@ -380,7 +393,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           )}
           <div
             ref={onrampContainerRef}
-            className="rounded-xl overflow-hidden border border-border min-h-[500px]"
+            className="rounded-xl border border-border min-h-[560px] [&_iframe]:!h-auto [&_iframe]:!min-h-[560px] [&_iframe]:!w-full [&_iframe]:!block"
           />
         </div>
       )}
@@ -402,56 +415,20 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
         </div>
       )}
 
-      {/* Wallet Address */}
-      <div className="space-y-2" data-tutorial="stripe-wallet-card">
-        <Label htmlFor="wallet-stripe">Wallet address to receive USDC</Label>
-        {connectedAddressValid ? (
-          <>
-            <div className="p-3 bg-muted/50 rounded-lg border border-border">
-              <p className="font-mono text-sm truncate">{walletAddress}</p>
-            </div>
-            <p className="text-[10px] text-muted-foreground/70">
-              Connected wallet detected
-            </p>
-          </>
-        ) : (
-          <>
-            <Input
-              id="wallet-stripe"
-              type="text"
-              placeholder="Sign Up / Sign In To Populate Address"
-              value=""
-              disabled
-              className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground"
-            />
-            <p className="text-[10px] text-muted-foreground/70">
-              Sign in to automatically populate your wallet address
-            </p>
-          </>
-        )}
-      </div>
-
-      {/* Feature badges */}
-      <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">
-        <div className="flex flex-col items-center space-y-1 md:space-y-2">
-          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-base md:text-2xl">🔒</span>
-          </div>
-          <p className="font-medium text-xs md:text-sm">Secure Payments</p>
+      {/* Sign-in stub for wallet field when disconnected */}
+      {!connectedAddressValid && (
+        <div className="space-y-1.5">
+          <Label htmlFor="wallet-stripe" className="text-xs text-muted-foreground">Receive USDC At</Label>
+          <Input
+            id="wallet-stripe"
+            type="text"
+            placeholder="Sign in to populate your wallet address"
+            value=""
+            disabled
+            className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground h-9"
+          />
         </div>
-        <div className="flex flex-col items-center space-y-1 md:space-y-2">
-          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-base md:text-2xl">⚡</span>
-          </div>
-          <p className="font-medium text-xs md:text-sm">Instant Delivery</p>
-        </div>
-        <div className="flex flex-col items-center space-y-1 md:space-y-2">
-          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-base md:text-2xl">🇺🇸</span>
-          </div>
-          <p className="font-medium text-xs md:text-sm">USA Supported</p>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
