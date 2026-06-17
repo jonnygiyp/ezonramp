@@ -149,7 +149,7 @@ const DarkPortal = () => {
                   <CoinbaseHeadlessOnramp defaultAsset="USDC" defaultNetwork="solana" />
                 )}
                 {activeTab === 'coinbase_global' && (
-                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Requires Coinbase account. May require KYC." />
+                  <CoinbaseOnrampWidget defaultAsset="USDC" defaultNetwork="solana" subtitle="Buy USDC worldwide with credit card. Coinbase account required." />
                 )}
                 {activeTab === 'stripe' && (
                   <StripeOnramp defaultAsset="USDC" defaultNetwork="solana" theme="dark" />

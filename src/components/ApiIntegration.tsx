@@ -43,7 +43,7 @@ const CARD2CRYPTO_PROVIDERS = [
 ];
 
 const TAB_DISPLAY_NAMES: Record<string, string> = {
-  coinbase: 'Recommended',
+  coinbase: 'Coinbase',
   coinbase_global: 'Worldwide',
   stripe: 'Stripe',
 };
