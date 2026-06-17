@@ -12,6 +12,8 @@ import { z } from "zod";
 import { AuthGatedButton } from "./AuthGatedButton";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
 import { CoinbaseLifecycleBanner } from "./coinbase/CoinbaseLifecycleBanner";
+import { ConnectedWalletCard } from "./ConnectedWalletCard";
+import { TrustIndicators } from "./TrustIndicators";
 import {
   type CoinbaseLifecycleState,
   type CoinbaseFailureCode,
