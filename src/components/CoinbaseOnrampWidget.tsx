@@ -493,14 +493,13 @@ export function CoinbaseOnrampWidget({
           Buy USDC with Coinbase
         </h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          {subtitle ?? "International users can buy USDC with credit card, debit card, or bank transfer through Coinbase. May require KYC."}
+          {subtitle ?? "Buy USDC worldwide with credit card. Coinbase account required."}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Debit card payments are 80% more likely to succeed.
         </p>
       </div>
       )}
-
-      <p className="text-xs text-muted-foreground text-center">
-        Debit card payments are 80% more likely to succeed.
-      </p>
 
       {/* Sign-in gate for logged-out users */}
       {!isConnected && (

@@ -326,12 +326,11 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
         <p className="text-xs md:text-sm text-muted-foreground">
           US residents with a Stripe account can buy instantly.
         </p>
+        <p className="text-xs text-muted-foreground">
+          Debit card payments are 80% more likely to succeed.
+        </p>
       </div>
       )}
-
-      <p className="text-xs text-muted-foreground text-center">
-        Debit card payments are 80% more likely to succeed.
-      </p>
 
       {/* Loading state */}
       {loadState === 'loading' && (

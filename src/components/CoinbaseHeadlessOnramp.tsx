@@ -912,12 +912,11 @@ export function CoinbaseHeadlessOnramp({
         <p className="text-xs md:text-sm text-muted-foreground">
           Up to $500 per week - no Coinbase account required.
         </p>
+        <p className="text-xs text-muted-foreground">
+          Debit card payments are 80% more likely to succeed.
+        </p>
       </div>
       )}
-
-      <p className="text-xs text-muted-foreground text-center">
-        Debit card payments are 80% more likely to succeed.
-      </p>
 
       {/* Sign-in gate for logged-out users */}
       {!isConnected && (
