@@ -324,9 +324,11 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       {/* Header */}
       {!hideHeader && (
       <div className="text-center space-y-1">
-        <h1 className="text-lg md:text-2xl font-bold tracking-tight">Buy USDC with Stripe</h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          US residents with a Stripe account can buy instantly.
+          Stripe or LINK account required.
+        </p>
+        <p className="text-xs md:text-sm text-muted-foreground">
+          Debit card payments are 80% more likely to succeed.
         </p>
       </div>
       )}
