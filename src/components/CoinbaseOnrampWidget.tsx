@@ -518,10 +518,10 @@ export function CoinbaseOnrampWidget({
       )}
 
       {isConnected && !showStatusView && (
-      <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-        {/* Amount Input */}
+      <div className="bg-card border border-border rounded-xl p-5 md:p-6 space-y-5">
+        {/* Amount Input — primary action, given visual prominence */}
         <div className="space-y-2" data-tutorial="global-amount-input">
-          <Label htmlFor="amount-global">Amount of USDC</Label>
+          <Label htmlFor="amount-global" className="text-sm">Amount of USDC</Label>
           <Input
             id="amount-global"
             type="number"
@@ -530,41 +530,36 @@ export function CoinbaseOnrampWidget({
             onChange={(e) => setAmount(e.target.value)}
             min="1"
             step="any"
-            className="text-lg"
+            className="text-lg h-12"
           />
           <p className="text-[11px] text-muted-foreground">
             You'll see the final price in your local currency in Coinbase before confirming.
           </p>
         </div>
 
-        {/* Wallet Address */}
-        <div className="space-y-2" data-tutorial="global-wallet-input">
-          <Label htmlFor="wallet-global">Wallet address to receive USDC</Label>
-          {isConnected && address ? (
-            <>
-              <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                <p className="font-mono text-sm truncate">{address}</p>
-              </div>
-              <p className="text-[10px] text-muted-foreground/70">
-                Connected wallet detected
-              </p>
-            </>
-          ) : (
-            <>
-              <Input
-                id="wallet-global"
-                type="text"
-                placeholder="Sign Up / Sign In To Populate Address"
-                value=""
-                disabled
-                className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground"
-              />
-              <p className="text-[10px] text-muted-foreground/70">
-                Sign in to automatically populate your wallet address
-              </p>
-            </>
-          )}
-        </div>
+        {/* Compact wallet display — de-emphasized vs amount */}
+        {isConnected && address ? (
+          <ConnectedWalletCard
+            address={address}
+            label="Receive USDC At"
+            onChange={() => setOpen(true)}
+          />
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor="wallet-global" className="text-xs text-muted-foreground">Receive USDC At</Label>
+            <Input
+              id="wallet-global"
+              type="text"
+              placeholder="Sign in to populate your wallet address"
+              value=""
+              disabled
+              className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground h-9"
+            />
+          </div>
+        )}
+
+        {/* Trust indicators above the CTA */}
+        <TrustIndicators />
 
         {/* Buy Button */}
         <AuthGatedButton
@@ -583,15 +578,14 @@ export function CoinbaseOnrampWidget({
             "Enter Wallet Address"
           ) : (
             <>
-              Continue
+              Continue to Coinbase
               <ExternalLink className="ml-2 h-4 w-4" />
             </>
           )}
         </AuthGatedButton>
 
-        <p className="text-xs text-center text-muted-foreground">
-          {checkoutDescription ?? (<>A Coinbase window will open to complete your purchase. <br />
-          Available worldwide with support for multiple payment methods.</>)}
+        <p className="text-[11px] text-center text-muted-foreground">
+          {checkoutDescription ?? "A Coinbase window will open to complete your purchase. Available worldwide with support for multiple payment methods."}
         </p>
       </div>
       )}
