@@ -11,6 +11,8 @@ import { loadStripeOnramp } from "@stripe/crypto";
 import { resolveTransactionSource, type TransactionSource } from "@/lib/transactionSource";
 import { logAuthDiagnostics, getDeviceContext } from "@/lib/authDiagnostics";
 import { useNavigate, useLocation } from "react-router-dom";
+import { ConnectedWalletCard } from "./ConnectedWalletCard";
+import { TrustIndicators } from "./TrustIndicators";
 
 const LOG_PREFIX = "[StripeOnramp]";
 const log = (msg: string, ...args: unknown[]) => console.log(`${LOG_PREFIX} ${msg}`, ...args);
