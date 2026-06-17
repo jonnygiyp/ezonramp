@@ -1231,13 +1231,17 @@ export function CoinbaseHeadlessOnramp({
               )}
             </div>
 
-            {/* Destination preview */}
+            {/* Compact connected-wallet destination ("Receive USDC At") */}
             {destinationAddress && isValidDestinationAddress && (
-              <div className="p-3 bg-muted/30 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Destination</p>
-                <p className="font-mono text-sm truncate">{destinationAddress}</p>
-              </div>
+              <ConnectedWalletCard
+                address={destinationAddress}
+                label="Receive USDC At"
+                onChange={connectedAddressValid ? () => setOpen(true) : undefined}
+              />
             )}
+
+            {/* Trust indicators sit just above the conversion CTA */}
+            <TrustIndicators />
 
             {/* CTA */}
             <div className="flex gap-2">
@@ -1261,7 +1265,7 @@ export function CoinbaseHeadlessOnramp({
                 {isLoadingBuy ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing...</>
                 ) : (
-                  <>Continue<ArrowRight className="ml-2 h-4 w-4" /></>
+                  <>Continue to Coinbase<ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
               </AuthGatedButton>
             </div>
