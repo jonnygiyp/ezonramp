@@ -906,11 +906,11 @@ export function CoinbaseHeadlessOnramp({
     <div className="space-y-6 animate-fade-in">
       {!hideHeader && (
       <div className="text-center space-y-2">
-        <h1 className="text-lg md:text-2xl font-bold tracking-tight">
-          Buy USDC with debit or Apple Pay
-        </h1>
         <p className="text-xs md:text-sm text-muted-foreground">
-          Up to $500 per week - no Coinbase account required.
+          No Coinbase account required for US users.
+        </p>
+        <p className="text-xs md:text-sm text-muted-foreground">
+          Debit card payments are 80% more likely to succeed.
         </p>
       </div>
       )}
