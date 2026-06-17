@@ -320,7 +320,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
   }, [destroySession]);
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-lg mx-auto" data-tutorial="stripe-content">
+    <div className="space-y-3 animate-fade-in max-w-lg mx-auto" data-tutorial="stripe-content">
       {/* Header */}
       {!hideHeader && (
       <div className="text-center space-y-1">
@@ -331,9 +331,13 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
       </div>
       )}
 
+      <p className="text-xs text-muted-foreground text-center">
+        Debit card payments are 80% more likely to succeed.
+      </p>
+
       {/* Loading state */}
       {loadState === 'loading' && (
-        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-3">
+        <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading Stripe checkout…</p>
           <p className="text-xs text-muted-foreground/70">Please wait while secure checkout loads.</p>
@@ -342,7 +346,7 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
 
       {/* Error state */}
       {loadState === 'error' && (
-        <div className="bg-card border border-destructive/30 rounded-xl p-8 flex flex-col items-center justify-center space-y-4 text-center">
+        <div className="bg-card border border-destructive/30 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 text-center">
           <p className="text-sm font-semibold text-foreground">
             {errorCode === 'AUTH_REQUIRED' ? 'Wallet session expired' : 'Unable to load Stripe onramp'}
           </p>
@@ -380,14 +384,14 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           )}
           <div
             ref={onrampContainerRef}
-            className="rounded-xl overflow-hidden border border-border min-h-[500px]"
+            className="rounded-xl overflow-hidden border border-border min-h-[420px]"
           />
         </div>
       )}
 
       {/* Logged-out sign-in state */}
       {loadState === 'idle' && !connectedAddressValid && (
-        <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center" data-tutorial="stripe-sign-in">
+        <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center space-y-4 text-center" data-tutorial="stripe-sign-in">
           <Button
             onClick={() => setOpen(true)}
             className="gap-2 px-6"
@@ -401,35 +405,6 @@ export function StripeOnramp({ defaultAsset = "usdc", defaultNetwork = "solana",
           </p>
         </div>
       )}
-
-      {/* Wallet Address */}
-      <div className="space-y-2" data-tutorial="stripe-wallet-card">
-        <Label htmlFor="wallet-stripe">Wallet address to receive USDC</Label>
-        {connectedAddressValid ? (
-          <>
-            <div className="p-3 bg-muted/50 rounded-lg border border-border">
-              <p className="font-mono text-sm truncate">{walletAddress}</p>
-            </div>
-            <p className="text-[10px] text-muted-foreground/70">
-              Connected wallet detected
-            </p>
-          </>
-        ) : (
-          <>
-            <Input
-              id="wallet-stripe"
-              type="text"
-              placeholder="Sign Up / Sign In To Populate Address"
-              value=""
-              disabled
-              className="font-mono bg-muted/50 cursor-not-allowed text-muted-foreground"
-            />
-            <p className="text-[10px] text-muted-foreground/70">
-              Sign in to automatically populate your wallet address
-            </p>
-          </>
-        )}
-      </div>
 
       {/* Feature badges */}
       <div className="grid grid-cols-3 gap-2 md:gap-4 text-sm text-muted-foreground">

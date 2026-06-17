@@ -80,7 +80,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Region-aware initial ramp.
-  // - Stripe (US) for US visitors, Coinbase Global elsewhere
+  // - Stripe for US visitors, Coinbase elsewhere
   // - A previously-stored manual choice always wins
   // - Wait on geo so the UI doesn't flash the wrong tab
   useEffect(() => {
@@ -222,6 +222,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
             <div className="flex flex-wrap justify-center gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
               {providers.map((provider) => {
                 const Icon = getTabIcon(provider.name);
+                const tabLabel = TAB_DISPLAY_NAMES[provider.name] ?? provider.display_name;
                 return (
                   <button
                     key={provider.id}
@@ -233,7 +234,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
                     }`}
                   >
                     <Icon className="hidden md:block h-4 w-4" />
-                    <span className="font-medium text-xs md:text-base">{provider.display_name}</span>
+                    <span className="font-medium text-xs md:text-base">{tabLabel}</span>
                   </button>
                 );
               })}
