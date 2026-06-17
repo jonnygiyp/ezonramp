@@ -915,6 +915,10 @@ export function CoinbaseHeadlessOnramp({
       </div>
       )}
 
+      <p className="text-xs text-muted-foreground text-center">
+        Debit card payments are 80% more likely to succeed.
+      </p>
+
       {/* Sign-in gate for logged-out users */}
       {!isConnected && (
         <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center space-y-4 text-center">

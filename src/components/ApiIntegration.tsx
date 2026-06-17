@@ -36,11 +36,18 @@ const CARD2CRYPTO_PROVIDERS = [
   { id: 'transak', name: 'Transak', minAmount: 15 },
   { id: 'banxa', name: 'Banxa', minAmount: 20 },
   { id: 'rampnetwork', name: 'Ramp Network', minAmount: 4 },
-  { id: 'stripe', name: 'Stripe (USA)', minAmount: 2 },
+  { id: 'stripe', name: 'Stripe', minAmount: 2 },
   { id: 'mercuryo', name: 'Mercuryo', minAmount: 30 },
   { id: 'simplex', name: 'Simplex', minAmount: 50 },
   { id: 'revolut', name: 'Revolut', minAmount: 15 },
 ];
+
+const TAB_DISPLAY_NAMES: Record<string, string> = {
+  coinbase: 'Recommended',
+  coinbase_global: 'Worldwide',
+  stripe: 'Stripe',
+};
+
 
 
 const getTabIcon = (name: string) => {
@@ -73,7 +80,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Region-aware initial ramp.
-  // - Stripe (US) for US visitors, Coinbase Global elsewhere
+  // - Stripe for US visitors, Coinbase elsewhere
   // - A previously-stored manual choice always wins
   // - Wait on geo so the UI doesn't flash the wrong tab
   useEffect(() => {
@@ -215,6 +222,7 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
             <div className="flex flex-wrap justify-center gap-1 md:gap-2 bg-muted rounded-full p-1" data-tutorial="provider-tabs">
               {providers.map((provider) => {
                 const Icon = getTabIcon(provider.name);
+                const tabLabel = TAB_DISPLAY_NAMES[provider.name] ?? provider.display_name;
                 return (
                   <button
                     key={provider.id}
@@ -226,15 +234,12 @@ const ApiIntegration = ({ apis, onProviderChange }: ApiIntegrationProps) => {
                     }`}
                   >
                     <Icon className="hidden md:block h-4 w-4" />
-                    <span className="font-medium text-xs md:text-base">{provider.display_name}</span>
+                    <span className="font-medium text-xs md:text-base">{tabLabel}</span>
                   </button>
                 );
               })}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground text-center mb-4">
-            Debit card payments are 80% more likely to succeed.
-          </p>
         </>
       )}
 
