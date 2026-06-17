@@ -31,6 +31,12 @@ const getTabIcon = (name: string) => {
   }
 };
 
+const TAB_DISPLAY_NAMES: Record<string, string> = {
+  coinbase: 'Coinbase',
+  coinbase_global: 'Worldwide',
+  stripe: 'Stripe',
+};
+
 const PartnerPortal = () => {
   const { data: providers, isLoading: providersLoading } = useOnrampProviders();
   const { data: geo, isLoading: geoLoading } = useGeoLocation();
